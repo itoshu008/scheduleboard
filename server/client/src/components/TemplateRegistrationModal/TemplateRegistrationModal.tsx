@@ -62,7 +62,7 @@ const TemplateRegistrationModal: React.FC<TemplateRegistrationModalProps> = ({
       await createTemplate({
         name: formData.name,
         title: formData.title,
-        color: formData.color,
+        color: safeHexColor(formData.color) as `#${string}`,
         duration_minutes: 60
       });
       
@@ -93,7 +93,7 @@ const TemplateRegistrationModal: React.FC<TemplateRegistrationModalProps> = ({
     }
 
     try {
-      await templateApi.delete(id);
+      await deleteTemplate(id);
       await loadTemplates();
     } catch (err: any) {
       console.error('テンプレート削除エラー:', err);
