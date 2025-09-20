@@ -6,7 +6,6 @@ import { Employee, Schedule, ScheduleParticipant, Equipment, Template } from '..
 
 // 重複チェック用ユーティリティ
 import { checkAllParticipantsOverlap } from '../../utils/overlapUtils';
-import { getAll as getTemplates } from '../../api/templates';
 
 interface ScheduleRegistrationModalProps {
   selectedCells: Set<string>;
