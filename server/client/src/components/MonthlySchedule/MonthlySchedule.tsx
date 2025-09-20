@@ -732,7 +732,11 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       console.log('MonthlySchedule: Creating schedule with data:', createData);
       console.log('MonthlySchedule: Start datetime:', createData.start_datetime.toDateString(), createData.start_datetime.toTimeString());
       console.log('MonthlySchedule: End datetime:', createData.end_datetime.toDateString(), createData.end_datetime.toTimeString());
+      
+      console.log('MonthlySchedule: Calling scheduleApi.create...');
       const createRes = await scheduleApi.create({ ...(createData as any), equipment_ids: scheduleData.equipment_ids } as any);
+      console.log('MonthlySchedule: scheduleApi.create completed');
+      
       const created = createRes.data as Schedule;
       console.log('MonthlySchedule: Created schedule response:', created);
       console.log('MonthlySchedule: API response status:', createRes.status);
@@ -791,6 +795,10 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       setSelectedCells(new Set());
     } catch (error) {
       console.error('スケジュール登録エラー:', error);
+      console.error('エラーの詳細:', error instanceof Error ? error.message : error);
+      if (error && typeof error === 'object' && 'response' in error) {
+        console.error('APIレスポンスエラー:', (error as any).response?.data);
+      }
       alert('スケジュールの登録に失敗しました。');
     }
   };

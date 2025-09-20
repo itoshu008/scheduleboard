@@ -88,17 +88,10 @@ const ScheduleRegistrationModal: React.FC<ScheduleRegistrationModalProps> = ({
     }
   ]);
   
-  // テンプレート読み込み
+  // テンプレート読み込み（一時的に無効化）
   useEffect(() => {
-    (async () => {
-      try {
-        const templates = await getTemplates();
-        setTemplates(Array.isArray(templates) ? templates : []);
-      } catch (e) {
-        console.warn('Template loading failed:', e);
-        setTemplates([]); // エラー時は空配列
-      }
-    })();
+    console.log('Template loading disabled - setting empty array');
+    setTemplates([]); // 一時的に空配列を設定
   }, []);
 
   // initialDataの処理
