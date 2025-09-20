@@ -390,7 +390,7 @@ const CurrentTimeLine: React.FC<CurrentTimeLineProps> = ({
       const cells = gridContainerRef.current.querySelectorAll(cellSelector);
       if (cells.length > 0) {
         const targetSlot = Math.floor(cellPosition);
-        const targetCell = Array.from(cells).find(cell => {
+        const targetCell = Array.from(cells ?? []).find(cell => {
           const slot = parseInt(cell.getAttribute('data-slot') || '0');
           return slot === targetSlot;
         }) as HTMLElement;
@@ -487,7 +487,7 @@ const CurrentTimeLine: React.FC<CurrentTimeLineProps> = ({
               // より確実な位置計算方法
               const tbody = gridContainerRef.current.querySelector('tbody');
               if (tbody) {
-                const allRows = Array.from(tbody.querySelectorAll('tr'));
+                const allRows = Array.from(tbody.querySelectorAll('tr') ?? []);
                 const rowIndex = allRows.findIndex(row => row.getAttribute('data-employee-id') === targetId.toString());
                 
                 if (rowIndex !== -1) {
@@ -547,7 +547,7 @@ const CurrentTimeLine: React.FC<CurrentTimeLineProps> = ({
               // より確実な位置計算方法
               const tbody = gridContainerRef.current.querySelector('tbody');
               if (tbody) {
-                const allRows = Array.from(tbody.querySelectorAll('tr'));
+                const allRows = Array.from(tbody.querySelectorAll('tr') ?? []);
                 const rowIndex = allRows.findIndex(row => row.getAttribute('data-employee-id') === targetId.toString());
                 
                 if (rowIndex !== -1) {

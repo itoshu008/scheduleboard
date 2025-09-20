@@ -58,7 +58,7 @@ const EquipmentReservationModal: React.FC<EquipmentReservationModalProps> = ({
       setSelectedEquipment(initialData.equipmentId);
     } else if (selectedCells.size > 0) {
       // 選択されたセルから時間を計算
-      const cellIds = Array.from(selectedCells);
+      const cellIds = Array.from(selectedCells ?? []);
       const slots = cellIds.map(id => {
         const parts = id.split('-');
         return parseInt(parts[1]);

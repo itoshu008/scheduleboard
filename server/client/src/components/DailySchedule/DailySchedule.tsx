@@ -20,7 +20,7 @@ import { CurrentTimeLineWrapper } from '../CurrentTimeLine/CurrentTimeLine';
 import OverlapConfirmationDialog from '../OverlapConfirmationDialog/OverlapConfirmationDialog';
 import { checkScheduleOverlap, markOverlappingSchedules } from '../../utils/overlapUtils';
 
-import { safeHexColor, lightenColor } from '../../utils/color';
+import { safeHexColor, lightenColor, toApiColor } from '../../utils/color';
 
 interface DailyScheduleProps {
   selectedDate: Date;
@@ -252,6 +252,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
         end_datetime: typeof scheduleData.end_datetime === 'string' 
           ? new Date(scheduleData.end_datetime) 
           : scheduleData.end_datetime,
+        color: toApiColor(scheduleData.color),
       };
       
       await scheduleApi.create(processedData);
@@ -340,7 +341,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
     if (selectedCells.size === 0) return null;
     
     // 選択されたセルから時間スロットを抽出し、ソート
-    const cellIds = Array.from(selectedCells);
+    const cellIds = Array.from(selectedCells ?? []);
     const slots = cellIds.map(id => {
       const [employeeId, slot] = id.split('-').map(Number);
       return { employeeId, slot };
@@ -481,7 +482,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
     
     // セルが選択されている場合は、その位置にペースト
     if (selectedCells.size > 0) {
-      const firstCellId = Array.from(selectedCells)[0];
+      const firstCellId = Array.from(selectedCells ?? [])[0];
       const [employeeIdStr, slotStr] = firstCellId.split('-');
       const employeeId = parseInt(employeeIdStr);
       const timeSlot = parseInt(slotStr);
@@ -501,7 +502,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
         title: clipboard.title,
         start_datetime: startTime,
         end_datetime: endTime,
-        color: clipboard.color
+        color: toApiColor(clipboard.color)
       };
       
       await scheduleApi.create(newSchedule);
@@ -822,7 +823,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
             await scheduleApi.update(dragData.schedule.id, {
               employee_id: dragGhost.schedule.employee_id, // 新しい社員IDを使用
               title: dragData.schedule.title,
-              color: dragData.schedule.color,
+              color: toApiColor(dragData.schedule.color),
               start_datetime: newStart,
               end_datetime: newEnd
             });
@@ -872,7 +873,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
           await scheduleApi.update(resizeData.schedule.id, {
             employee_id: resizeData.schedule.employee_id,
             title: resizeData.schedule.title,
-            color: resizeData.schedule.color,
+            color: toApiColor(resizeData.schedule.color),
             start_datetime: new Date(currentSchedule.start_datetime),
             end_datetime: new Date(currentSchedule.end_datetime)
           });

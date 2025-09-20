@@ -118,7 +118,7 @@ const ScheduleRegistrationModal: React.FC<ScheduleRegistrationModalProps> = ({
   // selectedCellsの処理
   useEffect(() => {
     if (selectedCells.size > 0) {
-      const cellIds = Array.from(selectedCells);
+      const cellIds = Array.from(selectedCells ?? []);
       // セルIDから日付情報を取得（月別スケジュール形式: YYYY-MM-DD-slot）
       const firstCellId = cellIds[0];
       const parts = firstCellId.split('-');

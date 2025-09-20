@@ -19,7 +19,7 @@ import { CurrentTimeLineWrapper } from '../CurrentTimeLine/CurrentTimeLine';
 import OverlapConfirmationDialog from '../OverlapConfirmationDialog/OverlapConfirmationDialog';
 import { checkScheduleOverlap, markOverlappingSchedules } from '../../utils/overlapUtils';
 
-import { safeHexColor, lightenColor } from '../../utils/color';
+import { safeHexColor, lightenColor, toApiColor } from '../../utils/color';
 
 interface AllEmployeesScheduleProps {
   selectedDate: Date;
@@ -580,7 +580,7 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
     
     // セルが選択されている場合は、その位置にペースト
     if (selectedCells.size > 0) {
-      const firstCellId = Array.from(selectedCells)[0];
+      const firstCellId = Array.from(selectedCells ?? [])[0];
       const [employeeIdStr, slotStr] = firstCellId.split('-');
       const employeeId = parseInt(employeeIdStr);
       const timeSlot = parseInt(slotStr);
@@ -600,7 +600,7 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
         title: clipboard.title,
         start_datetime: startTime,
         end_datetime: endTime,
-        color: clipboard.color
+        color: toApiColor(clipboard.color)
       };
       
       await scheduleApi.create(newSchedule);
@@ -714,7 +714,7 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
     if (selectedCells.size === 0) return null;
     
     // 選択されたセルから時間スロットを抽出し、ソート
-    const cellIds = Array.from(selectedCells);
+    const cellIds = Array.from(selectedCells ?? []);
     const slots = cellIds.map(id => {
       const [employeeId, slot] = id.split('-').map(Number);
       return { employeeId, slot };
@@ -922,7 +922,7 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
             const updatedSchedule = {
               employee_id: dragGhost.schedule.employee_id, // 新しい社員IDを使用
               title: dragData.schedule.title,
-              color: dragData.schedule.color,
+              color: toApiColor(dragData.schedule.color),
               start_datetime: dragGhost.start,
               end_datetime: dragGhost.end
             };

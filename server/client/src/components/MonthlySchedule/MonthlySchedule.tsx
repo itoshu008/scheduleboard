@@ -42,7 +42,7 @@ import EmployeeRegistration from '../EmployeeRegistration/EmployeeRegistration';
 import EquipmentRegistration from '../EquipmentRegistration/EquipmentRegistration';
 import { CurrentTimeLineWrapper } from '../CurrentTimeLine/CurrentTimeLine';
 import { lightenColor } from '../../utils/colorUtils';
-import { safeHexColor } from '../../utils/color';
+import { safeHexColor, toApiColor } from '../../utils/color';
 
 interface MonthlyScheduleProps {
   selectedDepartment: Department | null;
@@ -517,7 +517,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
           // 元のスケジュールデータを保持して更新（Date オブジェクトとして送信）
           const updateData = {
               title: dragData.schedule.title,
-              color: dragData.schedule.color,
+              color: toApiColor(dragData.schedule.color),
             employee_id: dragData.schedule.employee_id,
             start_datetime: dragGhost.start,
             end_datetime: dragGhost.end
@@ -553,7 +553,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
         try {
           const updateData = {
               title: resizeData.schedule.title,
-              color: resizeData.schedule.color,
+              color: toApiColor(resizeData.schedule.color),
             employee_id: resizeData.schedule.employee_id,
               start_datetime: resizeGhost.newStart,
               end_datetime: resizeGhost.newEnd
@@ -630,7 +630,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
     if (!clipboard || selectedCells.size === 0) return;
 
     try {
-      const firstCellId = Array.from(selectedCells)[0];
+      const firstCellId = Array.from(selectedCells ?? [])[0];
       const parts = firstCellId.split('-');
       const year = parseInt(parts[0]);
       const month = parseInt(parts[1]);
@@ -650,7 +650,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
         title: clipboard.title,
         start_datetime: targetTime,
         end_datetime: endTime,
-        color: clipboard.color
+        color: toApiColor(clipboard.color)
       });
 
       await reloadSchedules();
@@ -664,7 +664,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
   const getSelectedCellDateTime = () => {
     if (selectedCells.size === 0) return null;
 
-    const cellIds = Array.from(selectedCells).sort();
+    const cellIds = Array.from(selectedCells ?? []).sort();
     const firstCellId = cellIds[0];
     const lastCellId = cellIds[cellIds.length - 1];
 
@@ -969,7 +969,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
                         className="employee-select"
                       >
                         <option value="">社員を選択してください</option>
-                        {deptEmployees.map(emp => (
+                        {(deptEmployees ?? []).map(emp => (
                           <option key={emp.id} value={emp.id}>
                             {emp.name}
                           </option>
@@ -993,7 +993,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontWeight: '500', color: '#495057' }}>部署:</span>
             <div className="department-buttons">
-              {departments.map(dept => (
+              {(departments ?? []).map(dept => (
                 <button
                   key={dept.id}
                   className={`dept-btn ${selectedDepartment?.id === dept.id ? 'active' : ''}`}
@@ -1124,7 +1124,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
           minWidth: `${scaledDateColumnWidth + DISPLAY_SLOTS * scaledCellWidth}px`
           }}>
             {/* 日付行とスケジュールセル */}
-            {monthDates.map((date, dateIndex) => (
+            {(monthDates ?? []).map((date, dateIndex) => (
               <div key={`date-${dateIndex}`} className="excel-date-row" style={{
                 display: 'flex',
                 borderBottom: '1px solid #ccc',
@@ -1230,7 +1230,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
                       title={`${date.getMonth() + 1}/${date.getDate()} ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`}
                     >
                       {/* スケジュールアイテム */}
-                      {cellSchedules.map(schedule => {
+                      {(cellSchedules ?? []).map(schedule => {
                         const originalStartSlot = getTimeSlot(new Date(schedule.start_datetime));
                         if (originalStartSlot !== slot) return null;
                         
@@ -1253,7 +1253,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
                         
                         if (isCurrentCellSelected && selectedCells.size > 1) {
                           // 同じ日付の選択されたセルの範囲を計算
-                          const dateSelectedCells = Array.from(selectedCells)
+                          const dateSelectedCells = Array.from(selectedCells ?? [])
                             .filter(cellId => cellId.startsWith(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}-`))
                             .map(cellId => {
                               const parts = cellId.split('-');
@@ -1359,7 +1359,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
                         if (cellSchedules.length > 0) return null;
                         
                         // 同じ日付の選択されたセルの範囲を計算
-                        const dateSelectedCells = Array.from(selectedCells)
+                        const dateSelectedCells = Array.from(selectedCells ?? [])
                           .filter(cellId => cellId.startsWith(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}-`))
                           .map(cellId => {
                             const parts = cellId.split('-');
