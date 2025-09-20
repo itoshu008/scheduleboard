@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import './TemplateRegistrationModal.css';
 import { Template, CreateTemplateForm, SCHEDULE_COLORS } from '../../types';
-import { templateApi } from '../../utils/api';
+import { getAll as getTemplates, createTemplate } from '../../api/templates';
 import { safeHexColor } from '../../utils/color';
 
 interface TemplateRegistrationModalProps {
@@ -34,8 +34,8 @@ const TemplateRegistrationModal: React.FC<TemplateRegistrationModalProps> = ({
 
   const loadTemplates = async () => {
     try {
-      const response = await templateApi.getAll();
-      setTemplates(Array.isArray(response.data) ? response.data : []);
+      const templates = await getTemplates(); // ← 404でも[]で返る
+      setTemplates(templates ?? []);
     } catch (err) {
       console.error('テンプレート読み込みエラー:', err);
     }
@@ -53,7 +53,7 @@ const TemplateRegistrationModal: React.FC<TemplateRegistrationModalProps> = ({
       setLoading(true);
       setError(null);
       
-      await templateApi.create(formData);
+      await createTemplate(formData);
       
       // フォームリセット
       setFormData({
