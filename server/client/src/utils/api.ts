@@ -171,24 +171,7 @@ export const equipmentApi = {
   },
 };
 
-// テンプレートAPI
-export const templateApi = {
-  getAll: async (): Promise<import('axios').AxiosResponse<Template[]>> => {
-    return await api.get<Template[]>('/templates');
-  },
-  getById: async (id: number): Promise<import('axios').AxiosResponse<Template>> => {
-    return await api.get<Template>(`/templates/${id}`);
-  },
-  create: async (data: CreateTemplateForm): Promise<import('axios').AxiosResponse<Template>> => {
-    return await api.post<Template>('/templates', data);
-  },
-  update: async (id: number, data: Partial<CreateTemplateForm>): Promise<import('axios').AxiosResponse<Template>> => {
-    return await api.put<Template>(`/templates/${id}`, data);
-  },
-  delete: async (id: number): Promise<import('axios').AxiosResponse<any>> => {
-    return await api.delete(`/templates/${id}`);
-  },
-};
+// テンプレートAPIは src/api/templates.ts に移動済み
 
 // 設備予約API
 export const equipmentReservationApi = {

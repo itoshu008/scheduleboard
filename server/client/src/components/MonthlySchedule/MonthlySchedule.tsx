@@ -735,6 +735,8 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       const createRes = await scheduleApi.create({ ...(createData as any), equipment_ids: scheduleData.equipment_ids } as any);
       const created = createRes.data as Schedule;
       console.log('MonthlySchedule: Created schedule response:', created);
+      console.log('MonthlySchedule: API response status:', createRes.status);
+      console.log('MonthlySchedule: Current schedules count:', schedules.length);
       // フロント側でも設備予約を同期（保険）
       if (Array.isArray(scheduleData.equipment_ids)) {
         for (const eid of scheduleData.equipment_ids) {
@@ -752,10 +754,8 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
           }
         }
       }
-      // 楽観反映
-      if (onScheduleCreate) {
-        onScheduleCreate(created);
-      }
+      // 楽観反映を一時的に無効化（reloadSchedulesで確実に更新）
+      console.log('MonthlySchedule: Skipping optimistic update, using reloadSchedules instead');
       
       // 作成したスケジュールの月が現在表示中の月と異なる場合は確認
       const scheduleMonth = createData.start_datetime.getMonth();
@@ -778,7 +778,13 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       } else {
         // 同じ月でも再読み込みしてUIを更新
         console.log('MonthlySchedule: Reloading schedules for same month');
+        console.log('MonthlySchedule: Schedules before reload:', schedules.length);
         await reloadSchedules();
+        console.log('MonthlySchedule: Reload completed');
+        // 少し待ってから再度確認
+        setTimeout(() => {
+          console.log('MonthlySchedule: Schedules after reload:', schedules.length);
+        }, 100);
       }
       
       setShowRegistrationTab(false);
