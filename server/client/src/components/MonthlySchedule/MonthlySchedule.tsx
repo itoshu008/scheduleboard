@@ -706,17 +706,26 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       
       // セルの情報から日時を取得
       const cellDateTime = getSelectedCellDateTime();
-      if (!cellDateTime) {
-        console.error('MonthlySchedule: No cell information available');
-        alert('セルの情報が取得できません。');
-        return;
+      
+      let startDateTime, endDateTime;
+      
+      if (cellDateTime) {
+        // セルの情報から日時を取得
+        console.log('MonthlySchedule: Using cell information for datetime');
+        startDateTime = cellDateTime.startDateTime;
+        endDateTime = cellDateTime.endDateTime;
+      } else {
+        // セルの情報がない場合は scheduleData から取得
+        console.log('MonthlySchedule: Using scheduleData for datetime');
+        startDateTime = new Date(scheduleData.start_datetime);
+        endDateTime = new Date(scheduleData.end_datetime);
       }
       
       const createData = {
         employee_id: scheduleData.employee_id,
         title: scheduleData.title,
-        start_datetime: cellDateTime.startDateTime,
-        end_datetime: cellDateTime.endDateTime,
+        start_datetime: startDateTime,
+        end_datetime: endDateTime,
         color: scheduleData.color || SCHEDULE_COLORS[0]
       };
 
