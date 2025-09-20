@@ -170,13 +170,69 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       });
     };
 
-    const handleMouseUp = () => {
-      if (dragData && dragGhost) {
-        // ドラッグ終了 - スケジュール更新
-        updateSchedulePosition(dragData.schedule, dragGhost.newDate, dragGhost.newSlot);
+    const handleMouseUp = async () => {
+      // アニメーションフレームをクリア
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
+
+      // ドラッグ終了処理
+      if (dragData && dragGhost) {
+        try {
+          console.log('MonthlySchedule: Starting drag update...', {
+            scheduleId: dragData.schedule.id,
+            newDate: dragGhost.newDate.toDateString(),
+            newSlot: dragGhost.newSlot
+          });
+          
+          // ドラッグ終了 - スケジュール更新
+          await updateSchedulePosition(dragData.schedule, dragGhost.newDate, dragGhost.newSlot);
+          
+          console.log('MonthlySchedule: Drag update completed successfully');
+        } catch (error) {
+          console.error('MonthlySchedule: Drag update failed:', error);
+          alert('スケジュールの移動に失敗しました: ' + (error as any)?.message);
+        }
+      }
+      
+      // リサイズ終了処理
+      if (resizeData && resizeGhost) {
+        try {
+          console.log('MonthlySchedule: Starting resize update...', {
+            scheduleId: resizeData.schedule.id,
+            newStart: resizeGhost.newStart.toISOString(),
+            newEnd: resizeGhost.newEnd.toISOString()
+          });
+          
+          const updateData = {
+            title: resizeData.schedule.title,
+            color: toApiColor(resizeData.schedule.color),
+            employee_id: resizeData.schedule.employee_id,
+            start_datetime: resizeGhost.newStart,
+            end_datetime: resizeGhost.newEnd
+          };
+          
+          await scheduleApi.update(resizeData.schedule.id, updateData);
+          await reloadSchedules();
+          
+          console.log('MonthlySchedule: Resize update completed successfully');
+        } catch (error) {
+          console.error('MonthlySchedule: Resize update failed:', error);
+          alert('スケジュールのリサイズに失敗しました: ' + (error as any)?.message);
+        }
+      }
+      
+      // 状態をクリア
       setDragData(null);
       setDragGhost(null);
+      setResizeData(null);
+      setResizeGhost(null);
+      setMousePosition(null);
+      
+      if (typeof setIsResizing !== 'undefined') {
+        setIsResizing(false);
+      }
     };
 
     if (dragData) {
@@ -190,7 +246,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       document.removeEventListener('mouseup', handleMouseUp);
       document.body.style.cursor = 'auto';
     };
-  }, [dragData, dragGhost, scheduleScale]);
+  }, [dragData, dragGhost, resizeData, resizeGhost, scheduleScale, reloadSchedules]);
 
 
   // リサイズゴースト
@@ -639,111 +695,6 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       });
     };
 
-    const handleMouseUp = async () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-
-      // ドラッグ終了処理
-      if (dragData && dragGhost) {
-        // 新しい時間を計算
-        const originalStart = new Date(dragData.schedule.start_datetime);
-        const originalEnd = new Date(dragData.schedule.end_datetime);
-        const originalDuration = originalEnd.getTime() - originalStart.getTime();
-        
-        const newStart = createTimeFromSlot(dragGhost.newDate, dragGhost.newSlot);
-        const newEnd = new Date(newStart.getTime() + originalDuration);
-        
-        console.log('MonthlySchedule: Drag ended, updating schedule:', {
-          scheduleId: dragData.schedule.id,
-          newSlot: dragGhost.newSlot,
-          newStart: newStart.toISOString(),
-          newEnd: newEnd.toISOString()
-        });
-        
-        try {
-          // 元のスケジュールデータを保持して更新
-          const updateData = {
-            title: dragData.schedule.title,
-            color: toApiColor(dragData.schedule.color),
-            employee_id: dragData.schedule.employee_id,
-            start_datetime: newStart,
-            end_datetime: newEnd
-          };
-          
-          console.log('MonthlySchedule: Sending update data:', {
-            scheduleId: dragData.schedule.id,
-            updateData: {
-              ...updateData,
-              start_datetime: newStart.toISOString(),
-              end_datetime: newEnd.toISOString()
-            }
-          });
-          
-          await scheduleApi.update(dragData.schedule.id, updateData);
-          console.log('MonthlySchedule: Schedule update successful');
-          await reloadSchedules();
-        } catch (error) {
-          console.error('スケジュール移動エラー:', error);
-          if (error && typeof error === 'object' && 'response' in error) {
-            console.error('Error details:', (error as any).response?.data);
-          }
-            alert('スケジュールの移動に失敗しました。');
-        }
-
-        setDragData(null);
-        setDragGhost(null);
-        setMousePosition(null);
-      }
-
-      // リサイズ終了処理
-      if (resizeData && resizeGhost) {
-        try {
-          const updateData = {
-              title: resizeData.schedule.title,
-              color: toApiColor(resizeData.schedule.color),
-            employee_id: resizeData.schedule.employee_id,
-              start_datetime: resizeGhost.newStart,
-              end_datetime: resizeGhost.newEnd
-          };
-          
-          console.log('MonthlySchedule: Resize update data:', {
-            scheduleId: resizeData.schedule.id,
-            updateData: {
-              ...updateData,
-              start_datetime: resizeGhost.newStart.toISOString(),
-              end_datetime: resizeGhost.newEnd.toISOString()
-            }
-          });
-          
-          await scheduleApi.update(resizeData.schedule.id, updateData);
-            await reloadSchedules();
-        } catch (error) {
-          console.error('スケジュールリサイズエラー:', error);
-          if (error && typeof error === 'object' && 'response' in error) {
-            console.error('Error details:', (error as any).response?.data);
-          }
-            alert('スケジュールのリサイズに失敗しました。');
-        }
-
-        setResizeData(null);
-        setResizeGhost(null);
-        setIsResizing(false);
-      }
-    };
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-        }
-      };
-  }, [dragData, dragGhost, resizeData, resizeGhost, reloadSchedules]);
 
   // スケジュール操作関数
   const handleScheduleSave = async (scheduleData: any) => {
