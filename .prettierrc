@@ -1,0 +1,9 @@
+{
+  "semi": false,          // セミコロンを付けない
+  "singleQuote": true,    // 文字列はシングルクォート
+  "printWidth": 100,      // 1行100文字で自動改行
+  "tabWidth": 2,          // インデントはスペース2
+  "trailingComma": "es5", // 配列/オブジェクトの最後にカンマを残す
+  "bracketSpacing": true, // { foo: bar } ← スペースあり
+  "arrowParens": "always" // アロー関数は (x) => で統一
+}

@@ -1,0 +1,1110 @@
+/* Light Blue Theme - Global Styles */
+:root {
+  --primary-blue: #e3f2fd;
+  --secondary-blue: #bbdefb;
+  --accent-blue: #2196f3;
+  --dark-blue: #1976d2;
+  --light-blue: #f3f9ff;
+  --border-blue: #90caf9;
+  --text-primary: #1565c0;
+  --text-secondary: #1976d2;
+  --background: #fafcff;
+  --surface: #ffffff;
+  --shadow: rgba(33, 150, 243, 0.1);
+  --shadow-hover: rgba(33, 150, 243, 0.2);
+  
+  /* スケール対応変数 */
+  --schedule-scale: 1;
+  --scaled-font-size: calc(11px * var(--schedule-scale));
+  --scaled-padding: calc(2px * var(--schedule-scale));
+  --scaled-border-radius: calc(4px * var(--schedule-scale));
+  --scaled-border-width: calc(1px * var(--schedule-scale));
+  
+  /* スケール対応のサイズ変数 */
+  --scaled-font-small: calc(8px * var(--schedule-scale));
+  --scaled-font-medium: calc(10px * var(--schedule-scale));
+  --scaled-font-large: calc(12px * var(--schedule-scale));
+  --scaled-font-xl: calc(14px * var(--schedule-scale));
+  --scaled-margin: calc(4px * var(--schedule-scale));
+  --scaled-gap: calc(2px * var(--schedule-scale));
+}
+
+/* リセットスタイル */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  /* scrollbar-width: none;  Firefox用 - すべての要素のスクロールバーを非表示 */
+  /* -ms-overflow-style: none;  IE/Edge用 - すべての要素のスクロールバーを非表示 */
+}
+
+/* 右クリックコンテキストメニューを無効化 */
+* {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* テキスト入力要素は選択可能にする */
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* すべての要素のWebKitスクロールバーを非表示 */
+/* *::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+} */
+
+html {
+  font-size: 16px;
+  /* scrollbar-width: none;  Firefox用 - スクロールバーを非表示 */
+  /* -ms-overflow-style: none;  IE/Edge用 - スクロールバーを非表示 */
+}
+
+@media (max-width: 768px) {
+  html {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Noto Sans', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'YuGothic', 'Meiryo', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--background);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+  /* scrollbar-width: none;  Firefox用 - スクロールバーを非表示 */
+  /* -ms-overflow-style: none;  IE/Edge用 - スクロールバーを非表示 */
+  /* 右クリックコンテキストメニューを無効化 */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* ドラッグ中はテキスト選択を禁止し、カーソルをgrabbingに */
+.dragging, .dragging * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  cursor: grabbing !important;
+}
+
+/* ドラッグ中のスケジュールアイテムは例外 */
+.dragging .schedule-item {
+  pointer-events: auto !important;
+}
+
+/* ドラッグ中のリサイズハンドルは例外 */
+.dragging .resize-handle {
+  pointer-events: auto !important;
+  cursor: ew-resize !important;
+}
+
+/* ドラッグ中のセルは例外（ドラッグ操作のため） */
+.dragging .schedule-cell-15min {
+  pointer-events: auto !important;
+}
+
+/* スクロールバーを非表示にする */
+/* ::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+::-webkit-scrollbar-track {
+  display: none;
+}
+
+::-webkit-scrollbar-thumb {
+  display: none;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  display: none;
+} */
+
+/* 共通スタイル */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 12px;
+  }
+}
+
+/* ボタンスタイル - 大型化とタッチフレンドリー */
+.btn {
+  background: var(--accent-blue);
+  color: white;
+  border: none;
+  padding: 14px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 2px 8px var(--shadow);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  background: var(--dark-blue);
+  box-shadow: 0 4px 12px var(--shadow-hover);
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px var(--shadow);
+}
+
+.btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-secondary {
+  background: var(--secondary-blue);
+  color: var(--text-primary);
+  border: 1px solid var(--border-blue);
+}
+
+.btn-secondary:hover {
+  background: var(--primary-blue);
+  border-color: var(--accent-blue);
+  color: var(--dark-blue);
+}
+
+.btn-light {
+  background: var(--surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-blue);
+}
+
+.btn-light:hover {
+  background: var(--light-blue);
+  border-color: var(--accent-blue);
+}
+
+.btn-danger {
+  background: #f44336;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #d32f2f;
+}
+
+.btn-success {
+  background: #4caf50;
+  color: white;
+}
+
+.btn-success:hover {
+  background: #388e3c;
+}
+
+/* モバイル用ボタン - さらに大きく */
+@media (max-width: 768px) {
+  .btn {
+    padding: 16px 28px;
+    font-size: 1.1rem;
+    min-height: 52px;
+  }
+}
+
+@media (max-width: 480px) {
+  .btn {
+    padding: 18px 32px;
+    font-size: 1.2rem;
+    min-height: 56px;
+    width: 100%;
+    margin-bottom: 8px;
+  }
+}
+
+/* フォームスタイル */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.form-control {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid var(--border-blue);
+  border-radius: 8px;
+  font-size: 1rem;
+  background: var(--surface);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+  min-height: 48px;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+  background: var(--light-blue);
+}
+
+/* モバイル用フォーム */
+@media (max-width: 768px) {
+  .form-control {
+    padding: 14px 18px;
+    font-size: 1.1rem;
+    min-height: 52px;
+  }
+}
+
+@media (max-width: 480px) {
+  .form-control {
+    padding: 16px 20px;
+    font-size: 1.2rem;
+    min-height: 56px;
+  }
+}
+
+/* セレクトボックス */
+select.form-control {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%232196f3' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 12px center;
+  background-repeat: no-repeat;
+  background-size: 16px;
+  padding-right: 40px;
+  appearance: none;
+}
+
+/* カードスタイル */
+.card {
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: 0 2px 12px var(--shadow);
+  border: 1px solid var(--primary-blue);
+  overflow: hidden;
+}
+
+.card-header {
+  background: var(--primary-blue);
+  padding: 20px;
+  border-bottom: 1px solid var(--border-blue);
+}
+
+.card-body {
+  padding: 20px;
+}
+
+/* カレンダー関連のスタイル */
+.saturday {
+  color: var(--accent-blue);
+  font-weight: 600;
+}
+
+.sunday {
+  color: #f44336;
+  font-weight: 600;
+}
+
+.holiday {
+  color: #f44336;
+  font-weight: bold;
+  background: rgba(244, 67, 54, 0.1);
+}
+
+/* ユーティリティクラス */
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-accent { color: var(--accent-blue); }
+
+.fw-bold { font-weight: bold; }
+.fw-normal { font-weight: normal; }
+.fw-600 { font-weight: 600; }
+
+/* スペーシング */
+.mt-1 { margin-top: 8px; }
+.mt-2 { margin-top: 16px; }
+.mt-3 { margin-top: 24px; }
+.mt-4 { margin-top: 32px; }
+.mb-1 { margin-bottom: 8px; }
+.mb-2 { margin-bottom: 16px; }
+.mb-3 { margin-bottom: 24px; }
+.mb-4 { margin-bottom: 32px; }
+.mr-1 { margin-right: 8px; }
+.mr-2 { margin-right: 16px; }
+.mr-3 { margin-right: 24px; }
+.ml-1 { margin-left: 8px; }
+.ml-2 { margin-left: 16px; }
+.ml-3 { margin-left: 24px; }
+
+.p-1 { padding: 8px; }
+.p-2 { padding: 16px; }
+.p-3 { padding: 24px; }
+.p-4 { padding: 32px; }
+
+/* フレックスボックス */
+.d-flex {
+  display: flex;
+}
+
+.flex-column {
+  flex-direction: column;
+}
+
+.flex-wrap {
+  flex-wrap: wrap;
+}
+
+.justify-content-between {
+  justify-content: space-between;
+}
+
+.justify-content-center {
+  justify-content: center;
+}
+
+.justify-content-start {
+  justify-content: flex-start;
+}
+
+.justify-content-end {
+  justify-content: flex-end;
+}
+
+.align-items-center {
+  align-items: center;
+}
+
+.align-items-start {
+  align-items: flex-start;
+}
+
+.align-items-end {
+  align-items: flex-end;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.gap-1 { gap: 8px; }
+.gap-2 { gap: 16px; }
+.gap-3 { gap: 24px; }
+.gap-4 { gap: 32px; }
+
+/* レスポンシブ表示制御 */
+.d-none { display: none; }
+.d-block { display: block; }
+.d-inline { display: inline; }
+.d-inline-block { display: inline-block; }
+
+@media (max-width: 768px) {
+  .d-md-none { display: none; }
+  .d-md-block { display: block; }
+  .d-md-flex { display: flex; }
+}
+
+@media (max-width: 480px) {
+  .d-sm-none { display: none; }
+  .d-sm-block { display: block; }
+  .d-sm-flex { display: flex; }
+}
+
+/* アニメーション */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* フォーカス表示 */
+.focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
+/* 共通スケジュールコンテナスタイル */
+.schedule-container-base {
+  /* 基本サイズ設定 */
+  width: auto;
+  max-width: 95vw;
+  min-width: 800px;
+  height: auto;
+  min-height: 400px;
+  max-height: 80vh;
+  
+  /* 位置設定 */
+  margin: 16px;
+  position: relative;
+  
+  /* レイアウト設定 */
+  display: block;
+  box-sizing: border-box;
+  
+  /* スタイル設定 */
+  border: 2px solid var(--border-blue);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 4px 12px var(--shadow);
+  
+  /* 操作設定 */
+  overflow: auto;
+  cursor: grab;
+  transition: all 0.3s ease;
+}
+
+.schedule-container-base:active {
+  cursor: grabbing;
+}
+
+/* 日別スケジュール用マージン */
+.schedule-container-daily {
+  margin-top: 100px;
+}
+
+/* 月別スケジュール用マージン */
+.schedule-container-monthly {
+  margin-top: 200px;
+  margin-right: 40px;
+  height: calc(100vh - 320px);
+  min-height: calc(100vh - 320px);
+  max-height: calc(100vh - 200px);
+}
+
+/* 全社員スケジュール用マージン */
+.schedule-container-all-employees {
+  margin-top: 150px;
+}
+
+/* 設備スケジュール用マージン */
+.schedule-container-equipment {
+  margin-top: 300px;
+}
+
+/* スケジュールテーブル基本スタイル */
+.schedule-table-base {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 150px repeat(96, 20px);
+  grid-auto-rows: 40px;
+  border-collapse: separate;
+}
+
+/* スケジュールテーブル要素をフラット化 */
+.schedule-table-base thead,
+.schedule-table-base tbody,
+.schedule-table-base tr {
+  display: contents;
+}
+
+.schedule-table-base th,
+.schedule-table-base td {
+  border: 1px solid #eee;
+  padding: 0;
+  margin: 0;
+  vertical-align: top;
+  box-sizing: border-box;
+}
+
+/* 共通カラムスタイル */
+.schedule-column-base {
+  width: 150px;
+  min-width: 150px;
+  background: var(--primary-blue);
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: center;
+  padding: 8px;
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  border-right: 2px solid var(--border-blue);
+}
+
+/* スケール対応のヘッダースタイル */
+.schedule-header-scaled {
+  width: var(--header-width, 150px);
+  height: var(--header-height, 40px);
+  font-size: var(--header-font-size, 14px);
+  padding: var(--header-padding, 8px);
+}
+
+.schedule-employee-header {
+  width: var(--employee-column-width, 150px);
+  min-width: var(--employee-column-width, 150px);
+  background: var(--primary-blue);
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: center;
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  border-right: 2px solid var(--border-blue);
+}
+
+.schedule-time-header {
+  width: var(--time-column-width, 80px);
+  min-width: var(--time-column-width, 80px);
+  background: var(--primary-blue);
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  grid-column: span 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--border-blue);
+}
+
+.schedule-time-column-base {
+  width: 80px;
+  min-width: 80px;
+  background: var(--primary-blue);
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: center;
+  font-size: 0.85rem;
+  padding: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  grid-column: span 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--border-blue);
+}
+
+/* 共通セルスタイル */
+.schedule-cell-base {
+  width: 20px;
+  min-width: 20px;
+  height: 60px;
+  position: relative;
+  padding: 0;
+  margin: 0;
+  border-left: 1px solid var(--border-blue);
+  border-bottom: 1px solid var(--border-blue);
+  box-sizing: border-box;
+  grid-column: span 1;
+  background: var(--surface);
+  transition: background-color 0.2s ease;
+}
+
+/* 従業員セルの共通スタイル */
+.schedule-employee-cell {
+  width: var(--employee-column-width, 150px);
+  min-width: var(--employee-column-width, 150px);
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  text-align: center;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-right: 2px solid var(--border-blue);
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  height: var(--cell-height, 60px);
+  padding: 0;
+  font-size: var(--cell-font-size, 12px);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.schedule-employee-cell:hover {
+  background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.schedule-employee-cell .employee-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2c3e50;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+  letter-spacing: 0.5px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+
+
+/* 時間セルの共通スタイル */
+.schedule-time-cell {
+  width: var(--time-cell-width, 20px);
+  min-width: var(--time-cell-width, 20px);
+  height: var(--cell-height, 60px);
+  position: relative;
+  border: 1px solid #eee;
+  background: var(--surface);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  padding: 0;
+  margin: 0;
+}
+
+/* スケール対応ユーティリティクラス */
+.schedule-scaled {
+  font-size: var(--scaled-font-size);
+  padding: var(--scaled-padding);
+  border-radius: var(--scaled-border-radius);
+  border-width: var(--scaled-border-width);
+}
+
+.schedule-font-small {
+  font-size: var(--scaled-font-small);
+}
+
+.schedule-font-medium {
+  font-size: var(--scaled-font-medium);
+}
+
+.schedule-font-large {
+  font-size: var(--scaled-font-large);
+}
+
+.schedule-font-xl {
+  font-size: var(--scaled-font-xl);
+}
+
+.schedule-gap {
+  gap: var(--scaled-gap);
+}
+
+.schedule-margin {
+  margin: var(--scaled-margin);
+}
+
+/* 1行おきのストライプを削除 - Excelライクな統一デザイン */
+
+.schedule-cell-base.selected {
+  background: var(--secondary-blue);
+  border-color: var(--accent-blue);
+}
+
+.schedule-cell-base:hover {
+  background: var(--light-blue);
+  cursor: pointer;
+}
+
+/* 共通スケジュールアイテムスタイル */
+.schedule-item-base {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: var(--schedule-width, 100px);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 11px;
+  color: white;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.schedule-item-base:hover {
+  z-index: 2;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.schedule-item-base.selected {
+  z-index: 30 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  transform: scale(1.02) !important;
+}
+
+/* スケジュールアイテムの基本背景とボーダー */
+.schedule-item-gradient {
+  background: linear-gradient(180deg, var(--schedule-color-light, rgba(0, 123, 255, 0.2)) 0%, var(--schedule-color, #007bff) 100%);
+  border: 1px solid var(--schedule-color-dark, #0056b3);
+}
+
+/* スケジュールアイテムのコンテンツレイアウト */
+.schedule-item-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  color: white;
+}
+
+.schedule-item-title {
+  font-weight: 700;
+  color: white;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.schedule-item-time {
+  font-size: 10px;
+  opacity: 0.9;
+  color: white;
+}
+
+/* 共通リサイズハンドルスタイル */
+.resize-handle-base {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 15;
+  transition: all 0.2s ease;
+  width: 12px;
+  background-color: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 2px;
+  opacity: 0.8;
+}
+
+.resize-handle-base:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+.resize-handle-start {
+  left: -4px;
+  background: linear-gradient(90deg, #2e7d32, rgba(46, 125, 50, 0.8));
+}
+
+.resize-handle-end {
+  right: -4px;
+  background: linear-gradient(90deg, rgba(198, 40, 40, 0.8), #c62828);
+}
+
+/* スケール対応のリサイズハンドル */
+.resize-handle-scaled {
+  width: var(--resize-handle-width, 12px);
+  left: var(--resize-handle-left, -4px);
+  border-width: var(--resize-handle-border, 1px);
+  border-radius: var(--resize-handle-radius, 2px);
+}
+
+/* 共通スクロールバースタイル */
+.schedule-scrollbar-base::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+  background: rgba(0, 0, 0, 0.05);
+  display: block;
+  visibility: visible;
+  opacity: 1;
+}
+
+.schedule-scrollbar-base::-webkit-scrollbar-track {
+  background: #f8f9fa;
+  border-radius: 10px;
+  border: 1px solid #e9ecef;
+  margin: 2px;
+  display: block;
+  visibility: visible;
+  opacity: 1;
+}
+
+.schedule-scrollbar-base::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #4285f4 0%, #1a73e8 100%);
+  border-radius: 10px;
+  border: 2px solid #f8f9fa;
+  transition: all 0.3s ease;
+  min-height: 40px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  display: block;
+  visibility: visible;
+  opacity: 1;
+}
+
+.schedule-scrollbar-base::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #1a73e8 0%, #1557b0 100%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transform: scale(1.1);
+}
+
+.schedule-scrollbar-base::-webkit-scrollbar-corner {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  display: block;
+  visibility: visible;
+  opacity: 1;
+}
+
+/* ローディング状態 */
+.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* 警告・エラーメッセージ */
+.alert {
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  border: 1px solid;
+}
+
+.alert-info {
+  background: rgba(33, 150, 243, 0.1);
+  border-color: var(--accent-blue);
+  color: var(--dark-blue);
+}
+
+.alert-warning {
+  background: rgba(255, 152, 0, 0.1);
+  border-color: #ff9800;
+  color: #e65100;
+}
+
+.alert-error {
+  background: rgba(244, 67, 54, 0.1);
+  border-color: #f44336;
+  color: #c62828;
+}
+
+.alert-success {
+  background: rgba(76, 175, 80, 0.1);
+  border-color: #4caf50;
+  color: #2e7d32;
+}
+
+/* === HTMLスクロールバー デフォルトに戻す === */
+html, body {
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  scrollbar-width: auto !important;
+  -ms-overflow-style: auto !important;
+}
+
+/* WebKit - ページ全体のスクロールバー表示を許可 */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 12px !important;
+  height: 12px !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* 各スケジュールコンテナ側でスクロールを許可し、個別デザインを適用します */
+
+/* === Daily page: ensure time header scrolls with vertical page scroll === */
+.daily-schedule .schedule-time-header,
+.daily-schedule .schedule-time-column-base,
+.daily-schedule .time-column {
+  position: static !important;
+  top: auto !important;
+  z-index: auto !important;
+}
+
+/* === HTMLスクロールバー 非表示(最終オーバーライド) === */
+html, body {
+  overflow: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* === HTMLスクロールバー 縦を表示(最終オーバーライド) === */
+html, body {
+  overflow-y: auto !important;   /* 縦スクロール許可 */
+  overflow-x: hidden !important; /* 横は非表示のまま */
+  scrollbar-width: auto !important;
+  -ms-overflow-style: auto !important;
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 10px !important;
+  height: 10px !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+  background: #f5f5f5 !important;
+}
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  background: #c0c0c0 !important;
+  border-radius: 5px !important;
+}
+
+/* === HTMLスクロールバー 非表示(最終オーバーライド2) === */
+html, body {
+  overflow: hidden !important; /* 縦横とも非表示 */
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE/Edge */
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* === HTMLスクロール 完全ロック（最優先） === */
+html, body {
+  position: fixed !important;
+  inset: 0 !important;        /* top/right/bottom/left を 0 に */
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important; /* スクロール不可 */
+}
+
+/* === HTMLスクロールバー 極細(2px) 表示 === */
+html, body {
+  position: static !important;
+  inset: auto !important;
+  width: auto !important;
+  height: auto !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;   /* 縦スクロール許可 */
+  scrollbar-width: thin !important; /* Firefox */
+  -ms-overflow-style: -ms-autohiding-scrollbar !important; /* IE/Edge */
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 2px !important;   /* 極細 */
+  height: 2px !important;  /* 極細 */
+}
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.25) !important;
+  border-radius: 1px !important;
+}
+
+/* === Final: Page scroll hidden; containers scroll === */
+html, body {
+  position: fixed !important;
+  inset: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Allow scrolling inside main schedule containers */
+.excel-schedule-container,
+.daily-schedule,
+.schedule-table-container,
+.schedule-content,
+.all-employees-schedule .schedule-table-container,
+.equipment-schedule .schedule-table-container {
+  overflow: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* === Final: HTML vertical ultra-thin (2px) scrollbar === */
+html, body {
+  position: static !important;
+  inset: auto !important;
+  width: auto !important;
+  height: auto !important;
+  overflow-y: auto !important;   /* vertical enabled */
+  overflow-x: hidden !important; /* hide horizontal */
+  scrollbar-width: thin !important;      /* Firefox (closest to 2px) */
+  -ms-overflow-style: -ms-autohiding-scrollbar !important; /* IE/Edge */
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 1px !important;
+  height: 1px !important;
+}
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+  background: #f5f5f5 !important;
+}
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  background: #bdbdbd !important;
+  border-radius: 1px !important;
+}

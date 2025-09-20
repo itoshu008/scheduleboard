@@ -1,0 +1,1348 @@
+/* 右クリックスクロール用のカーソルスタイル */
+.daily-schedule {
+  cursor: grab;
+}
+
+/* 全社員スケジュール専用スケジュールテーブルコンテナ */
+.all-employees-schedule .schedule-table-container,
+.all-employees-schedule-container,
+.schedule-table-container.all-employees-schedule.schedule-grid-container {
+  /* 基本サイズ設定 */
+  width: 1900px;
+  max-width: 1900px;
+  min-width: 1900px;
+  height: auto;
+  min-height: 400px;
+  max-height: none;
+  
+  /* 位置設定 */
+  margin: 16px;
+  margin-top: 150px !important;
+  margin-left: 16px !important;
+  margin-right: 16px !important;
+  margin-bottom: 16px;
+  
+  /* スクロール設定 */
+  overflow: auto !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  
+  /* レイアウト設定 */
+  position: relative;
+  top: auto;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  flex: 1;
+  flex-grow: 1;
+  flex-shrink: 1;
+  flex-basis: auto;
+  
+  /* 表示設定 */
+  display: block;
+  visibility: visible;
+  opacity: 1;
+  z-index: 1;
+  
+  /* ボックスモデル設定 */
+  box-sizing: border-box;
+  padding: 0;
+  
+  /* アニメーション設定 */
+  transition: all 0.3s ease;
+  animation: none;
+  
+  /* ユーザー操作設定 */
+  user-select: auto;
+  pointer-events: auto;
+  resize: none;
+  
+  /* 印刷設定 */
+  page-break-inside: avoid;
+  break-inside: avoid;
+  
+  /* スクロール設定 - スクロールバーを有効化 */
+  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: auto;
+  scrollbar-color: #4285f4 #f8f9fa;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scroll-snap-type: none;
+  will-change: scroll-position;
+  transform: translateZ(0);
+  
+  /* スタイル設定 */
+  border: 2px solid var(--border-blue);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 4px 12px var(--shadow);
+  cursor: grab;
+  
+  /* カスタムプロパティ設定 */
+  --scroll-left: 0px;
+  --scroll-top: 0px;
+}
+
+.daily-schedule .schedule-table-container:active {
+  cursor: grabbing !important;
+}
+
+/* 親コンテナ - 動的サイズ */
+.schedule-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  padding: 0;
+  width: auto;
+  max-width: 100%;
+  min-width: 800px;
+  height: auto;
+  min-height: 400px;
+  max-height: none;
+  position: relative;
+  background: var(--background);
+}
+
+/* ユーザー名セルのスタイル - 150px幅 */
+.schedule-employee-cell {
+  width: 150px;
+  min-width: 150px;
+  background: #f8f9fa;
+  padding: 8px;
+  text-align: center;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-right: 1px solid var(--border-blue);
+  box-sizing: border-box;
+}
+
+/* スケジュールアイテムのスタイル - 全社員スケジュールと統一 */
+.schedule-item-base {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  transition: all 0.2s;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.schedule-item-base:hover {
+  z-index: 2;
+  box-shadow: 0 2px 8px rgba(0, 255, 255, 0.2);
+}
+
+.schedule-item-base.selected {
+  z-index: 30 !important;
+  border: 3px solid #fff !important;
+  box-shadow: 0 0 0 3px #007bff !important;
+  transform: scale(1.02) !important;
+}
+
+.schedule-item-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 4px;
+  color: white;
+  text-align: center;
+  overflow: hidden;
+}
+
+.schedule-item-title {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.schedule-item-time {
+  font-size: 9px;
+  opacity: 0.9;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.schedule-item-purpose {
+  font-size: 8px;
+  opacity: 0.8;
+  line-height: 1.0;
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* リサイズハンドルのスタイル - 全社員スケジュールと統一 */
+.resize-handle-base {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 15;
+  background-color: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 2px;
+  transition: all 0.2s ease;
+}
+
+.resize-handle-start {
+  left: -4px;
+}
+
+.resize-handle-end {
+  right: -4px;
+}
+
+.resize-handle-base:hover {
+  background-color: rgba(255, 255, 255, 0.5);
+  border-color: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+/* 親コンテナのレスポンシブ対応 */
+@media (max-width: 1200px) {
+  .schedule-content {
+    max-width: 98vw;
+    min-width: 600px;
+  }
+}
+
+@media (max-width: 768px) {
+  .schedule-content {
+    max-width: 100vw;
+    min-width: 400px;
+    max-height: none;
+  }
+}
+
+.daily-schedule:active {
+  cursor: all-scroll;
+}
+
+.daily-schedule:active {
+  cursor: grabbing;
+}
+
+.schedule-content:active {
+  cursor: grabbing;
+}
+
+/* 右クリックスクロール中のスクロールバー強調 */
+.schedule-content.scrolling {
+  scrollbar-color: var(--accent-blue) var(--light-blue);
+}
+
+.schedule-content.scrolling::-webkit-scrollbar-thumb {
+  background: var(--accent-blue) !important;
+  box-shadow: 0 0 8px rgba(0, 123, 255, 0.5);
+}
+
+/* 右クリックスクロール中のスクロールバー強調 */
+.schedule-table-container.scrolling {
+  scrollbar-color: var(--accent-blue) var(--light-blue);
+}
+
+.schedule-table-container.scrolling::-webkit-scrollbar-thumb {
+  background: var(--accent-blue) !important;
+  box-shadow: 0 0 8px rgba(0, 123, 255, 0.5);
+}
+
+/* Webkit系ブラウザ（Chrome、Safari、Edge）用のスクロールバー */
+.schedule-content::-webkit-scrollbar,
+.schedule-table-container::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.schedule-content::-webkit-scrollbar-track,
+.schedule-table-container::-webkit-scrollbar-track {
+  background: #f1f3f5;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  margin: 2px;
+}
+
+.schedule-content::-webkit-scrollbar-thumb,
+.schedule-table-container::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #4285f4 0%, #1a73e8 100%);
+  border-radius: 8px;
+  border: 2px solid #f1f3f5;
+  transition: all 0.3s ease;
+  min-height: 30px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.schedule-content::-webkit-scrollbar-thumb:hover,
+.schedule-table-container::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #1a73e8 0%, #1557b0 100%);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  transform: scale(1.05);
+}
+
+.schedule-content::-webkit-scrollbar-thumb:active,
+.schedule-table-container::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, #1557b0 0%, #0f4c8c 100%);
+}
+
+.schedule-content::-webkit-scrollbar-corner,
+.schedule-table-container::-webkit-scrollbar-corner {
+  background: #f1f3f5;
+  border: 1px solid #e9ecef;
+}
+
+/* スケジュールセルでもグラブカーソルを表示 */
+.time-cell-15min {
+  cursor: grab;
+}
+
+.time-cell-15min:active {
+  cursor: grabbing;
+}
+
+/* コントロールを固定 */
+.grid-top-controls {
+  position: sticky;
+  top: 80px; /* ヘッダーの高さ分下げる */
+  z-index: 999;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-blue);
+  padding: 8px 16px;
+}
+
+/* 既存のスタイル */
+.daily-schedule {
+  height: auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--background);
+  overflow: visible; /* stickyを有効にするため */
+}
+
+/* 日別スケジュールヘッダー - ブルーテーマ */
+.schedule-header {
+  background: var(--surface);
+  border-bottom: 2px solid var(--primary-blue);
+  box-shadow: 0 2px 8px var(--shadow);
+  padding: 16px 20px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  width: 100%;
+}
+
+.grid-top-controls {
+  position: relative;
+  top: auto;
+  left: auto;
+  right: auto;
+  z-index: 1000;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-blue);
+  width: 100%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.grid-controls-row {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.grid-controls-row .nav-btn {
+  padding: 12px 20px;
+  border: 2px solid var(--border-blue);
+  background: var(--surface);
+  color: var(--text-primary);
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  min-width: 120px;
+  height: 36px;
+  margin: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.grid-controls-row .nav-btn:hover {
+  background: var(--light-blue);
+  border-color: var(--accent-blue);
+  transform: translateY(-1px);
+}
+
+.grid-controls-row .nav-btn.active {
+  background: var(--accent-blue);
+  color: white;
+  border-color: var(--dark-blue);
+}
+
+/* ナビゲーションボタンの左右配置 */
+.nav-btn-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.nav-btn-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.grid-controls-row-second {
+  display: flex;
+  gap: 16px;
+  padding: 8px 12px;
+  justify-content: flex-start;
+  align-items: center;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border-blue);
+}
+
+.department-section, .employee-section, .date-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-label {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.department-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dept-btn {
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: 2px solid var(--border-blue);
+  background: var(--surface);
+  color: var(--text-primary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dept-btn:hover {
+  background: var(--light-blue);
+  border-color: var(--accent-blue);
+}
+
+.dept-btn.active {
+  background: var(--accent-blue);
+  color: white;
+  border-color: var(--dark-blue);
+}
+
+.date-controls {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.date-nav-btn {
+  padding: 8px 12px;
+  border: 1px solid var(--border-blue);
+  background: var(--surface);
+  color: var(--text-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.date-nav-btn:hover {
+  background: var(--light-blue);
+  border-color: var(--accent-blue);
+}
+
+.date-input {
+  padding: 8px 12px;
+  border: 1px solid var(--border-blue);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.schedule-table {
+  width: 100%;
+  display: grid; /* CSS Grid 化 */
+  grid-template-columns: 150px repeat(96, 20px);
+  grid-auto-rows: 60px;
+  border-collapse: separate;
+}
+
+/* テーブル要素をフラット化してグリッドに直接配置 */
+.schedule-table thead,
+.schedule-table tbody,
+.schedule-table tr {
+  display: contents;
+}
+
+.schedule-table th,
+.schedule-table td {
+  border: 1px solid #eee;
+  padding: 0;
+  margin: 0;
+  vertical-align: top;
+  box-sizing: border-box;
+}
+
+.employee-column {
+  width: 150px;
+  min-width: 150px;
+  background: var(--primary-blue);
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: center;
+  padding: 8px;
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  border-right: 2px solid var(--border-blue);
+}
+
+.time-column {
+  width: 80px;
+  min-width: 80px;
+  background: var(--primary-blue);
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: center;
+  font-size: 0.85rem;
+  padding: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  grid-column: span 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 2px solid var(--border-blue);
+}
+
+.employee-cell {
+  background: var(--light-blue);
+  padding: 8px;
+  text-align: center;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-right: 2px solid var(--border-blue);
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.employee-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.time-cell-15min {
+  position: relative;
+  border: 1px solid #eee;
+  background: var(--surface);
+  height: 40px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.time-cell-15min:hover {
+  background: var(--light-blue);
+}
+
+.time-cell-15min.selected {
+  background: var(--accent-blue);
+  opacity: 0.7;
+}
+
+.hour-border {
+  border-left: 2px solid var(--border-blue);
+}
+
+.schedule-item {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 1;
+}
+
+.schedule-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 2;
+}
+
+.schedule-item.selected {
+  z-index: 3;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.resize-handle {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 15;
+  transition: all 0.2s ease;
+}
+
+.resize-handle:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.resize-handle.resize-start {
+  left: -4px;
+  width: 8px;
+}
+
+.resize-handle.resize-end {
+  right: -4px;
+  width: 8px;
+}
+
+.error-message {
+  background: #ffebee;
+  color: #c62828;
+  padding: 16px;
+  border-radius: 8px;
+  margin: 16px;
+  border: 1px solid #ffcdd2;
+  text-align: center;
+}
+
+.loading-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  gap: 16px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  .grid-controls-row {
+    padding: 8px 12px;
+  }
+  
+  .grid-controls-row .nav-btn {
+    min-width: 80px;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+  }
+  
+  .grid-controls-row-second {
+    padding: 6px 8px;
+  }
+  
+  .dept-btn {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .schedule-header {
+    padding: 0 12px;
+  }
+  
+  .grid-controls-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .grid-controls-row-second {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .department-buttons {
+    flex-direction: column;
+  }
+  
+  .dept-btn {
+    width: 100%;
+  }
+}
+
+/* === スクロール制約解除（簡素化版） === */
+
+/* 基本的なスクロール制約を解除 */
+.daily-schedule,
+.daily-schedule *,
+.daily-schedule .schedule-content,
+.daily-schedule .schedule-table-container,
+.daily-schedule .schedule-grid {
+  overflow: auto;
+  max-height: none;
+  height: auto;
+  position: relative;
+  min-height: auto;
+}
+
+/* 時間ヘッダーの横スクロールを強制禁止 */
+.daily-schedule .time-header-fixed {
+  overflow: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  -webkit-overflow-scrolling: auto !important;
+  position: sticky !important;
+  transform: translateZ(0) !important;
+}
+
+/* 社員/時間ヘッダーの自然な固定 */
+.daily-schedule .employee-header-fixed {
+  overflow: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  -webkit-overflow-scrolling: auto !important;
+  position: sticky !important;
+  left: 0 !important;
+  top: 0 !important;
+  z-index: 100 !important;
+  transform: translateZ(0) !important;
+  will-change: auto !important;
+  backface-visibility: hidden !important;
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+  border-right: 1px solid #ccc !important;
+}
+
+/* 社員名セルとヘッダーの統一 */
+.daily-schedule .date-cell-fixed {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 50 !important;
+}
+
+/* 時間コンテナの横スライドを絶対禁止 */
+.daily-schedule .time-container {
+  overflow: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  -webkit-overflow-scrolling: auto !important;
+  position: fixed !important;
+  left: 150px !important;
+  top: 0 !important;
+  z-index: 9999 !important;
+  transform: none !important;
+  will-change: auto !important;
+  backface-visibility: hidden !important;
+  /* 横スライドを絶対に禁止 */
+  position: fixed !important;
+  left: 150px !important;
+  top: 0 !important;
+  z-index: 9999 !important;
+}
+
+.daily-schedule .time-container * {
+  overflow: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  position: relative !important;
+  z-index: 10000 !important;
+}
+
+/* 時間コンテナの横スライドを絶対禁止（グローバルレベル） */
+html body .daily-schedule .time-container,
+body .daily-schedule .time-container,
+.daily-schedule .time-container {
+  position: fixed !important;
+  left: 150px !important;
+  top: 0 !important;
+  z-index: 9999 !important;
+  transform: none !important;
+  transition: none !important;
+  animation: none !important;
+  /* 横スライドを絶対に禁止 */
+  position: fixed !important;
+  left: 150px !important;
+  top: 0 !important;
+  z-index: 9999 !important;
+}
+
+.daily-schedule .time-header-fixed * {
+  overflow: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+/* 社員/時間ヘッダーの固定（0:00の位置に固定） */
+.daily-schedule .employee-header-fixed {
+  overflow: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  -webkit-overflow-scrolling: auto !important;
+  position: sticky !important;
+  left: 0 !important;
+  top: 0 !important;
+  z-index: 100 !important;
+  transform: translateZ(0) !important;
+  will-change: auto !important;
+  backface-visibility: hidden !important;
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+  border-right: 1px solid #ccc !important;
+}
+
+/* 0:00の位置に確実に固定 */
+.daily-schedule .employee-header-fixed::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background-color: #ccc;
+  z-index: 101;
+}
+
+.daily-schedule .employee-header-fixed * {
+  overflow: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  position: relative !important;
+  z-index: 101 !important;
+}
+
+/* 時間バーを縦スクロールに合わせて動かす（sticky解除） */
+.daily-schedule .schedule-time-header,
+.daily-schedule .schedule-time-column-base,
+.daily-schedule .time-column {
+  position: static;
+  top: auto;
+}
+
+/* スクロールに追従するバナー */
+.scroll-banner {
+  position: sticky;
+  top: 0;
+  z-index: 1200;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-blue);
+  box-shadow: 0 2px 6px var(--shadow);
+}
+
+.scroll-banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+}
+
+/* 2px scrollbar - DailySchedule */
+.daily-schedule, .daily-schedule * {
+  scrollbar-width: thin;
+}
+
+.daily-schedule::-webkit-scrollbar,
+.daily-schedule *::-webkit-scrollbar,
+.daily-schedule .schedule-content::-webkit-scrollbar,
+.daily-schedule .schedule-table-container::-webkit-scrollbar,
+.daily-schedule .schedule-grid::-webkit-scrollbar {
+  width: 2px !important;
+  height: 2px !important;
+}
+
+.daily-schedule::-webkit-scrollbar-track,
+.daily-schedule *::-webkit-scrollbar-track,
+.daily-schedule .schedule-content::-webkit-scrollbar-track,
+.daily-schedule .schedule-table-container::-webkit-scrollbar-track,
+.daily-schedule .schedule-grid::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.daily-schedule::-webkit-scrollbar-thumb,
+.daily-schedule *::-webkit-scrollbar-thumb,
+.daily-schedule .schedule-content::-webkit-scrollbar-thumb,
+.daily-schedule .schedule-table-container::-webkit-scrollbar-thumb,
+.daily-schedule .schedule-grid::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.25) !important;
+  border-radius: 1px !important;
+}
+
+/* Final override: allow page scrollbars (do not hide here) */
+html, body {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scrollbar-width: auto !important;
+  -ms-overflow-style: auto !important;
+}
+
+/* === Excel風スケジュールコンテナ（日別版） === */
+/* ⚠️ 重要：この設定は日別スケジュール専用の完成形です */
+/* 他のページ（月別、全社員、設備）の変更時も、この設定を維持してください */
+/* 拘束設定：レイアウト、スクロールバー、サイズ等の変更禁止 */
+
+/* Excel風スケジュールコンテナの細いスマートスライダー */
+.daily-schedule .excel-schedule-container {
+  /* Firefox用 - 細いスライダー */
+  scrollbar-width: thin !important;
+  scrollbar-color: #888 #f1f1f1 !important;
+  
+  /* スクロール動作を滑らかに */
+  scroll-behavior: smooth !important;
+  overflow: scroll !important;
+  overflow-x: scroll !important;
+  overflow-y: scroll !important;
+}
+
+/* WebKit（Chrome/Safari）用 - 極細1pxスライダー */
+.daily-schedule .excel-schedule-container::-webkit-scrollbar {
+  width: 1px !important;
+  height: 1px !important;
+  background: #f8f8f8 !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  -webkit-appearance: none !important;
+}
+
+.daily-schedule .excel-schedule-container::-webkit-scrollbar:vertical {
+  width: 1px !important;
+  background: #f8f8f8 !important;
+}
+
+.daily-schedule .excel-schedule-container::-webkit-scrollbar:horizontal {
+  height: 1px !important;
+  background: #f8f8f8 !important;
+}
+
+.daily-schedule .excel-schedule-container::-webkit-scrollbar-track {
+  background: #f1f1f1 !important;
+  border-radius: 1px !important;
+  margin: 0 !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.daily-schedule .excel-schedule-container::-webkit-scrollbar-thumb {
+  background: #888 !important;
+  border-radius: 1px !important;
+  border: none !important;
+  transition: all 0.2s ease !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  min-height: 10px !important;
+  min-width: 10px !important;
+}
+
+.daily-schedule .excel-schedule-container::-webkit-scrollbar-thumb:hover {
+  background: #555 !important;
+  transform: scale(2.0) !important;
+}
+
+.daily-schedule .excel-schedule-container::-webkit-scrollbar-corner {
+  background: #f1f1f1 !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* === イベントバー選択状態（月別から完全移植） === */
+.daily-schedule .excel-schedule-item.selected {
+  box-shadow: 0 0 0 2px #2196f3, 0 4px 12px rgba(0,0,0,0.25);
+  z-index: 25;
+  border: 2px solid #2196f3;
+  transform: translateY(-1px) scale(1.02);
+}
+
+.daily-schedule .drag-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.7;
+  border: 2px dashed rgba(255, 255, 255, 0.8);
+  border-radius: 4px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.daily-schedule .resize-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.7;
+  border: 2px dashed rgba(255, 255, 255, 0.8);
+  border-radius: 4px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* === Excel風セルの統一スタイル（120px × 40px統一） === */
+
+/* 時間セル（15分間隔）- 20px × 40px */
+.daily-schedule .excel-time-cell {
+  width: 20px;
+  height: 40px;
+  border: 1px solid #e8e8e8;
+  background: #ffffff;
+  position: relative;
+  cursor: pointer;
+  font-size: 10px;
+  box-sizing: border-box;
+  transition: background-color 0.15s ease;
+  overflow: visible; /* イベントバーがセル外へはみ出しても見えるように */
+}
+
+.daily-schedule .excel-time-cell:hover {
+  background: #f8f9ff;
+  border-color: #d0d7ff;
+}
+
+/* 社員行（動的生成） */
+.daily-schedule .excel-date-row {
+  display: flex;
+  border-bottom: 1px solid #e0e0e0;
+  min-height: 40px;
+  background: #ffffff;
+  transition: background-color 0.15s ease;
+}
+
+.daily-schedule .excel-date-row:hover {
+  background: #fafbff;
+}
+
+/* 固定社員名セル（200px × 40px統一） */
+.daily-schedule .date-cell-fixed {
+  position: sticky;
+  left: 0;
+  z-index: 50;
+  width: 200px;
+  box-sizing: border-box;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 50%, #e9ecef 100%);
+  border: 1px solid #ccc;
+  border-right: 1px solid #ccc;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 12px 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #343a40;
+  text-align: right;
+  box-shadow: none;
+  transition: all 0.2s ease;
+  min-height: 40px;
+  height: 40px;
+}
+
+.daily-schedule .date-cell-fixed:hover {
+  background: linear-gradient(135deg, #f8f9ff 0%, #e6f2ff 50%, #d4edda 100%);
+  border-right-color: #495057;
+  box-shadow: 4px 0 8px rgba(0,0,0,0.12);
+  transform: translateX(1px);
+}
+
+/* 社員名テキストの美しい横書き表示 */
+.daily-schedule .employee-name-text {
+  margin: 0;
+  padding: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  width: 100%;
+  font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo UI', sans-serif;
+  letter-spacing: 0.8px;
+  font-weight: 700;
+  font-size: 13px;
+  color: #212529;
+  text-shadow: 0 1px 2px rgba(255,255,255,0.9);
+  background: linear-gradient(90deg, #495057 0%, #343a40 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: right;
+  line-height: 1.2;
+  
+  /* 強制的に横書き表示 */
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  unicode-bidi: normal !important;
+}
+
+.daily-schedule .date-cell-fixed:hover .employee-name-text {
+  letter-spacing: 1.2px;
+  transform: scale(1.08);
+  background: linear-gradient(90deg, #0d6efd 0%, #0a58ca 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 2px 4px rgba(13,110,253,0.3);
+}
+
+/* 4セル構成（15分間隔の独立セル） */
+
+/* スケジュールアイテム（美しいデザイン） */
+.daily-schedule .excel-schedule-item {
+  position: absolute;
+  top: 3px;
+  /* left: 1px; */ /* 15分間隔対応のため削除 */
+  height: 34px;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 10px;
+  color: white;
+  overflow: hidden;
+  cursor: pointer;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.daily-schedule .excel-schedule-item:hover {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  z-index: 15;
+}
+
+/* 固定ヘッダー（美しいグラデーション） */
+.daily-schedule .time-header-fixed {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 50%, #e9ecef 100%);
+  border-bottom: 3px solid #6c757d;
+  display: flex;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* 時間ヘッダーセル（美しく整理） */
+.daily-schedule .time-header-fixed > div:first-child {
+  /* 左上「社員/時間」セル */
+  background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+  border-right: 1px solid #ccc;
+  font-weight: 800;
+  color: #212529;
+  box-shadow: none;
+}
+
+.daily-schedule .time-header-fixed > div:last-child > div {
+  /* 時間セル */
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-right: 1px solid #dee2e6;
+  font-weight: 600;
+  color: #495057;
+  transition: all 0.2s ease;
+}
+
+.daily-schedule .time-header-fixed > div:last-child > div:hover {
+  background: linear-gradient(135deg, #e6f2ff 0%, #d1ecf1 100%);
+  color: #0d6efd;
+  transform: translateY(-1px);
+}
+
+/* コンテンツエリア */
+.daily-schedule .schedule-content-area {
+  position: relative;
+  background: #ffffff;
+}
+
+/* 月別スタイルを参考にしたスケジュールアイテム（日別版） */
+.daily-schedule .schedule-item {
+  position: absolute;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 11px;
+  color: white;
+  overflow: hidden;
+  cursor: pointer;
+  z-index: 5;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.daily-schedule .schedule-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.daily-schedule .schedule-item.selected {
+  border: 2px solid #ffd700 !important;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+}
+
+.daily-schedule .schedule-title {
+  font-weight: 700;
+  color: white;
+  text-align: center;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.daily-schedule .schedule-time {
+  font-size: 10px;
+  opacity: 0.9;
+  color: white;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* リサイズハンドル（日別版） */
+.daily-schedule .resize-handle {
+  position: absolute;
+  top: 0;
+  width: 12px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 15;
+  background-color: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 2px;
+  transition: all 0.2s ease;
+}
+
+.daily-schedule .resize-handle:hover {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+.daily-schedule .resize-handle.resize-start {
+  left: -4px;
+}
+
+.daily-schedule .resize-handle.resize-end {
+  right: -4px;
+}
+
+/* セル選択スタイル（月別から移植） */
+.daily-schedule .excel-time-cell.selected {
+  background-color: #e3f2fd !important;
+  border: 2px solid #2196f3 !important;
+  box-shadow: 0 0 8px rgba(33, 150, 243, 0.3) !important;
+  z-index: 5 !important;
+  position: relative !important;
+}
+
+.daily-schedule .excel-time-cell.selected::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at center, rgba(33, 150, 243, 0.1) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* セル選択時のホバー効果 */
+.daily-schedule .excel-time-cell:hover {
+  background-color: #f5f5f5 !important;
+  border-color: #ccc !important;
+  transition: all 0.15s ease;
+}
+
+.daily-schedule .excel-time-cell.selected:hover {
+  background-color: #e3f2fd !important;
+  border-color: #2196f3 !important;
+  box-shadow: 0 0 12px rgba(33, 150, 243, 0.4) !important;
+}
+
+/* スケジュールアイテムの選択状態強化 */
+.daily-schedule .excel-schedule-item.selected {
+  border: 2px solid #ffd700 !important;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.5) !important;
+  z-index: 20 !important;
+  transform: scale(1.02) !important;
+}

@@ -1,0 +1,121 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+  overflow: visible !important;
+  max-height: none !important;
+  height: auto !important;
+}
+
+.app-main {
+  flex: 1;
+  overflow: visible !important;
+  max-height: none !important;
+  height: auto !important;
+  min-height: 100vh !important;
+  scrollbar-width: auto !important;
+  -ms-overflow-style: auto !important;
+}
+
+/* 2px scrollbar - App containers */
+.app, .app-main { scrollbar-width: thin; }
+.app::-webkit-scrollbar, .app-main::-webkit-scrollbar { width: 2px !important; height: 2px !important; }
+.app::-webkit-scrollbar-track, .app-main::-webkit-scrollbar-track { background: transparent !important; }
+.app::-webkit-scrollbar-thumb, .app-main::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.25) !important; border-radius: 1px !important; }
+
+/* スクロールバーの強制表示 */
+.app::-webkit-scrollbar,
+.app-main::-webkit-scrollbar {
+  width: 20px !important;
+  height: 20px !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.app::-webkit-scrollbar-track,
+.app-main::-webkit-scrollbar-track {
+  background: #f1f1f1 !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.app::-webkit-scrollbar-thumb,
+.app-main::-webkit-scrollbar-thumb {
+  background: #888 !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* ローディング表示 */
+.app-loading {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid #e3e3e3;
+  border-top: 5px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.app-loading p {
+  font-size: 16px;
+  color: #666;
+}
+
+/* エラー表示 */
+.app-error {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+  text-align: center;
+  padding: 20px;
+}
+
+.app-error h2 {
+  color: #dc3545;
+  margin-bottom: 16px;
+}
+
+.app-error p {
+  color: #666;
+  margin-bottom: 24px;
+}
+
+/* レスポンシブデザイン */
+@media (max-width: 768px) {
+  .app {
+    min-height: 100vh;
+  }
+  
+  .app-loading,
+  .app-error {
+    padding: 10px;
+  }
+  
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border-width: 4px;
+  }
+}

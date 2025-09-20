@@ -1,0 +1,83 @@
+/* 設備スケジュール専用スタイル */
+
+/* 設備スケジュールコンテナ - 共通クラスを使用 */
+.equipment-schedule .schedule-table-container {
+  /* 共通クラスを継承 */
+  composes: schedule-container-base schedule-container-equipment schedule-scrollbar-base;
+}
+
+/* 設備スケジュールテーブル - 共通クラスを使用 */
+.equipment-schedule .schedule-table {
+  /* 共通クラスを継承 */
+  composes: schedule-table-base;
+}
+
+/* 設備スケジュールカラム - 共通クラスを使用 */
+.equipment-schedule .equipment-column {
+  /* 共通クラスを継承 */
+  composes: schedule-column-base;
+}
+
+.equipment-schedule .time-column {
+  /* 共通クラスを継承 */
+  composes: schedule-time-column-base;
+}
+
+/* 設備スケジュールセル - 共通クラスを使用 */
+.equipment-schedule .time-cell-15min {
+  /* 共通クラスを継承 */
+  composes: schedule-cell-base;
+}
+
+/* 設備スケジュールアイテム - 共通クラスを使用 */
+.equipment-schedule .schedule-item {
+  /* 共通クラスを継承 */
+  composes: schedule-item-base;
+}
+
+/* 設備スケジュールリサイズハンドル - 共通クラスを使用 */
+.equipment-schedule .resize-handle {
+  /* 共通クラスを継承 */
+  composes: resize-handle-base;
+}
+
+.equipment-schedule .resize-handle.resize-start {
+  composes: resize-handle-start;
+}
+
+.equipment-schedule .resize-handle.resize-end {
+  composes: resize-handle-end;
+}
+
+/* 設備スケジュール専用の追加スタイル */
+.equipment-schedule {
+  /* 設備スケジュール固有のスタイル */
+}
+
+/* 設備名表示 */
+.equipment-name {
+  font-size: 14px;
+  font-weight: bold;
+  color: #333;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 設備セル */
+.equipment-cell {
+  width: 150px;
+  min-width: 150px;
+  background: #f8f9fa;
+  padding: 3px;
+  text-align: center;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  height: 40px;
+}

@@ -1,0 +1,4 @@
+DB_HOST=localhost
+DB_USER=itoshu
+DB_PASS=zatint_6487
+DB_NAME=shuke

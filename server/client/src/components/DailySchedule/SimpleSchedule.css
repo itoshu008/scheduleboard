@@ -1,0 +1,62 @@
+/* Simple, clean schedule container (minimal overrides) */
+.simple-schedule {
+  position: relative;
+  width: 100%;
+  overflow: visible;
+}
+
+.simple-schedule .simple-inner {
+  position: relative;
+  margin: 0;
+  width: calc(100vw - 100px);
+  max-width: calc(100vw - 100px);
+  min-width: 600px;
+  overflow-x: auto;
+  overflow-y: visible; /* page handles vertical scroll */
+  border: 1px solid #e9ecef;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  box-sizing: border-box;
+}
+
+/* Disable sticky and complex positioning */
+.simple-schedule .schedule-time-header,
+.simple-schedule .schedule-time-column-base,
+.simple-schedule .time-column,
+.simple-schedule .schedule-employee-header,
+.simple-schedule .schedule-employee-cell {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  z-index: auto !important;
+}
+
+/* Grid sizing */
+.simple-schedule .schedule-grid {
+  display: grid;
+  grid-template-columns: 150px repeat(96, 20px) !important;
+  grid-auto-rows: 40px !important;
+  width: calc(150px + 96 * 20px);
+  min-width: calc(150px + 96 * 20px);
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+/* Cells */
+.simple-schedule .schedule-cell-base,
+.simple-schedule .schedule-time-cell,
+.simple-schedule .schedule-cell-15min {
+  height: 40px !important;
+  border: 1px solid #eee;
+  background: #fff;
+  padding: 0;
+  margin: 0;
+}
+
+/* Employee column */
+.simple-schedule .schedule-employee-cell {
+  width: 150px;
+  min-width: 150px;
+  border-right: 1px solid #e9ecef;
+  background: #f8f9fa;
+}

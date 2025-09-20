@@ -1,0 +1,45 @@
+/* Free scroll container (scoped to daily page) */
+.free-scroll-schedule {
+  position: relative;
+  width: 100%;
+  overflow: visible;
+}
+
+.free-scroll-schedule .free-scroll-inner {
+  position: relative !important;
+  margin: 0 !important;
+  width: calc(100vw - 100px) !important;
+  max-width: calc(100vw - 100px) !important;
+  min-width: 600px !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  -webkit-overflow-scrolling: touch !important;
+  box-sizing: border-box !important;
+}
+
+/* Time header: make it follow vertical page scroll */
+.free-scroll-schedule .schedule-time-header,
+.free-scroll-schedule .schedule-time-column-base,
+.free-scroll-schedule .time-column {
+  position: static !important;
+  top: auto !important;
+  z-index: auto !important;
+}
+
+/* Show horizontal scrollbar clearly inside container */
+.free-scroll-schedule .free-scroll-inner::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+
+.free-scroll-schedule .free-scroll-inner::-webkit-scrollbar-track {
+  background: #f1f3f5;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.free-scroll-schedule .free-scroll-inner::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #4285f4 0%, #1a73e8 100%);
+  border-radius: 8px;
+  border: 2px solid #f1f3f5;
+}
