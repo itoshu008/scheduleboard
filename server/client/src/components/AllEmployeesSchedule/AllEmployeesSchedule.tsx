@@ -627,6 +627,7 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
         end_datetime: typeof scheduleData.end_datetime === 'string' 
           ? new Date(scheduleData.end_datetime) 
           : scheduleData.end_datetime,
+        color: toApiColor(scheduleData.color),
       };
       
       await scheduleApi.create(processedData);

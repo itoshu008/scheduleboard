@@ -29,6 +29,15 @@ app.get('/api/health', (req, res) => {
   res.json({ message: 'OK' });
 });
 
+// --- TEMP: templates stub ---
+app.get('/api/templates', (req, res) => {
+  res.json([]); // 空配列で UI を生かす
+});
+
+// templates ルート（本実装）
+const templatesRouter = require('./routes/templates');
+app.use('/api/templates', templatesRouter);
+
 // API ルート（ビルド済みの dist から読み込み）。dist が無い場合は警告のみ
 try {
   app.use('/api/departments', require('./dist/routes/departments'));
