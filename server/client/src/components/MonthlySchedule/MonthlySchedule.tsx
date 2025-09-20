@@ -206,7 +206,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
           });
           
           const updateData = {
-            title: resizeData.schedule.title,
+            title: resizeData.schedule.title || '無題',
             color: toApiColor(resizeData.schedule.color),
             employee_id: resizeData.schedule.employee_id,
             start_datetime: resizeGhost.newStart,
@@ -246,7 +246,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       document.removeEventListener('mouseup', handleMouseUp);
       document.body.style.cursor = 'auto';
     };
-  }, [dragData, dragGhost, resizeData, resizeGhost, scheduleScale, reloadSchedules]);
+  }, [dragData, dragGhost, scheduleScale]);
 
 
   // リサイズゴースト
@@ -332,6 +332,14 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       const newStart = createTimeFromSlot(newDate, newSlot);
       const newEnd = new Date(newStart.getTime() + duration);
       
+      const updateData = {
+        title: schedule.title || '無題',
+        employee_id: schedule.employee_id,
+        start_datetime: newStart,
+        end_datetime: newEnd,
+        color: schedule.color
+      };
+
       console.log('Updating schedule position:', {
         id: schedule.id,
         oldDate: originalStart.toDateString(),
@@ -339,19 +347,25 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
         oldSlot: getTimeSlot(originalStart),
         newSlot,
         newStart: newStart.toISOString(),
-        newEnd: newEnd.toISOString()
+        newEnd: newEnd.toISOString(),
+        updateData: {
+          ...updateData,
+          start_datetime: newStart.toISOString(),
+          end_datetime: newEnd.toISOString()
+        }
       });
 
-      await scheduleApi.update(schedule.id, {
-        start_datetime: newStart,
-        end_datetime: newEnd
-      });
+      await scheduleApi.update(schedule.id, updateData);
 
       // スケジュール一覧を再読み込み
       await reloadSchedules();
       console.log('✅ Schedule moved successfully with fine precision');
     } catch (error) {
       console.error('Schedule move failed:', error);
+      if (error && typeof error === 'object' && 'response' in error) {
+        console.error('Error response:', (error as any).response?.data);
+        console.error('Error status:', (error as any).response?.status);
+      }
       alert('スケジュールの移動に失敗しました。');
     }
   };
@@ -695,6 +709,15 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       });
     };
 
+    document.addEventListener('mousemove', handleMouseMove);
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [dragData, dragGhost, resizeData, schedules]);
 
   // スケジュール操作関数
   const handleScheduleSave = async (scheduleData: any) => {
