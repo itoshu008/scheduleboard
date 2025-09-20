@@ -6,7 +6,7 @@ import { Employee, Schedule, ScheduleParticipant, Equipment, Template } from '..
 
 // 重複チェック用ユーティリティ
 import { checkAllParticipantsOverlap } from '../../utils/overlapUtils';
-import { templateApi } from '../../utils/api';
+import { getAll as getTemplates } from '../../api/templates';
 
 interface ScheduleRegistrationModalProps {
   selectedCells: Set<string>;
@@ -92,9 +92,12 @@ const ScheduleRegistrationModal: React.FC<ScheduleRegistrationModalProps> = ({
   useEffect(() => {
     (async () => {
       try {
-        const res = await templateApi.getAll();
-        setTemplates(Array.isArray(res.data) ? res.data : []);
-      } catch (e) {}
+        const templates = await getTemplates();
+        setTemplates(Array.isArray(templates) ? templates : []);
+      } catch (e) {
+        console.warn('Template loading failed:', e);
+        setTemplates([]); // エラー時は空配列
+      }
     })();
   }, []);
 
