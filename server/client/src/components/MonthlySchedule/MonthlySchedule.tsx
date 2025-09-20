@@ -96,9 +96,9 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
   const [showManagementTabs, setShowManagementTabs] = useState(false);
   const [currentRegistrationView, setCurrentRegistrationView] = useState<string | null>(null);
 
-  // schedules propsの変更を監視
+  // schedules propsの変更を監視（デバッグ用）
   useEffect(() => {
-    console.log('MonthlySchedule: schedules props changed, count:', schedules.length);
+    console.log('MonthlySchedule: schedules updated, count:', schedules.length);
   }, [schedules]);
 
   // 最新のschedulesを参照するためのref
@@ -106,11 +106,56 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
   useEffect(() => {
     schedulesRef.current = schedules;
   }, [schedules]);
+
+  // ドラッグ＆ドロップのマウスイベント処理
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!dragData) return;
+
+      const deltaX = e.clientX - dragData.startX;
+      const deltaY = e.clientY - dragData.startY;
+
+      // 5分間隔でスナップ
+      const cellWidth = scaledCellWidth;
+      const snappedX = snapToFineGrid(deltaX, cellWidth);
+      const newSlot = dragData.startSlot + pixelToFineSlot(snappedX, cellWidth);
+
+      // ドラッグゴーストを更新
+      setDragGhost({
+        schedule: dragData.schedule,
+        newSlot: Math.max(0, Math.min(95, newSlot)), // 0-95の範囲に制限
+        deltaX: snappedX,
+        deltaY
+      });
+    };
+
+    const handleMouseUp = () => {
+      if (dragData && dragGhost) {
+        // ドラッグ終了 - スケジュール更新
+        updateSchedulePosition(dragData.schedule, dragGhost.newSlot);
+      }
+      setDragData(null);
+      setDragGhost(null);
+    };
+
+    if (dragData) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'grabbing';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'auto';
+    };
+  }, [dragData, dragGhost, scaledCellWidth]);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [scheduleScale, setScheduleScale] = useState(100);
+
   
   // ドラッグ＆ドロップ関連の状態
   const [dragData, setDragData] = useState<{
@@ -183,6 +228,64 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
     const minute = (slot % 4) * 15;
     return { slot, hour, minute };
   });
+
+  // 5分間隔の細かいスナップ用関数
+  const snapToFineGrid = (pixelPosition: number, cellWidth: number) => {
+    const slotPosition = pixelPosition / cellWidth;
+    const fineSlot = Math.round(slotPosition * 3); // 15分を3分割して5分間隔
+    return (fineSlot / 3) * cellWidth;
+  };
+
+  const pixelToFineSlot = (pixelPosition: number, cellWidth: number) => {
+    const slotPosition = pixelPosition / cellWidth;
+    return Math.round(slotPosition * 3) / 3; // 5分間隔にスナップ
+  };
+
+  // 時刻からスロット番号を取得
+  const getTimeSlot = (date: Date) => {
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    return hours * 4 + Math.floor(minutes / 15);
+  };
+
+  // スロット番号から時刻を作成
+  const createTimeFromSlot = (baseDate: Date, slot: number) => {
+    const hours = Math.floor(slot / 4);
+    const minutes = (slot % 4) * 15;
+    return new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), hours, minutes);
+  };
+
+  // スケジュール位置更新
+  const updateSchedulePosition = async (schedule: Schedule, newSlot: number) => {
+    try {
+      const originalStart = new Date(schedule.start_datetime);
+      const originalEnd = new Date(schedule.end_datetime);
+      const duration = originalEnd.getTime() - originalStart.getTime();
+      
+      const newStart = createTimeFromSlot(originalStart, newSlot);
+      const newEnd = new Date(newStart.getTime() + duration);
+      
+      console.log('Updating schedule position:', {
+        id: schedule.id,
+        oldSlot: getTimeSlot(originalStart),
+        newSlot,
+        newStart: newStart.toISOString(),
+        newEnd: newEnd.toISOString()
+      });
+
+      await scheduleApi.update(schedule.id, {
+        start_datetime: newStart.toISOString(),
+        end_datetime: newEnd.toISOString()
+      });
+
+      // スケジュール一覧を再読み込み
+      await reloadSchedules();
+      console.log('✅ Schedule moved successfully with fine precision');
+    } catch (error) {
+      console.error('Schedule move failed:', error);
+      alert('スケジュールの移動に失敗しました。');
+    }
+  };
 
   // セルIDを生成する関数
   const getCellId = (date: Date, slot: number) => {
@@ -298,6 +401,19 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
     
     // セル選択状態をクリア（スケジュール選択のみ）
     setSelectedCells(new Set());
+
+    // ドラッグ開始
+    const startTime = new Date(schedule.start_datetime);
+    const startSlot = getTimeSlot(startTime);
+    const startDate = new Date(startTime.getFullYear(), startTime.getMonth(), startTime.getDate());
+    
+    setDragData({
+      schedule,
+      startX: e.clientX,
+      startY: e.clientY,
+      startSlot,
+      startDate
+    });
     
     // ドラッグ開始の閾値
     const DRAG_THRESHOLD = 5;
@@ -754,13 +870,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       console.log('MonthlySchedule: Current schedules count:', schedules.length);
       console.log('MonthlySchedule: Created schedule ID:', created.id);
       
-      // 作成されたスケジュールが実際にサーバーに存在するかテスト
-      try {
-        const testRes = await scheduleApi.getById(created.id);
-        console.log('MonthlySchedule: Created schedule verification:', testRes.status, testRes.data?.id);
-      } catch (e) {
-        console.warn('MonthlySchedule: Created schedule verification failed:', e);
-      }
+      // スケジュール作成成功
       // フロント側でも設備予約を同期（保険）
       if (Array.isArray(scheduleData.equipment_ids)) {
         for (const eid of scheduleData.equipment_ids) {
@@ -806,26 +916,16 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
         await reloadSchedules();
         console.log('MonthlySchedule: Reload completed');
         
-        // 少し待ってから再度確認
-        setTimeout(async () => {
+        // UI更新確認
+        setTimeout(() => {
           const currentSchedules = schedulesRef.current;
-          console.log('MonthlySchedule: Schedules after reload (ref):', currentSchedules.length);
-          // 作成したスケジュールが含まれているかチェック
           const foundSchedule = currentSchedules.find(s => s.id === created.id);
-          console.log('MonthlySchedule: Created schedule found in list:', !!foundSchedule);
-          if (!foundSchedule) {
-            console.warn('MonthlySchedule: Created schedule not found in reloaded list');
-            // 直接APIから最新データを確認
-            try {
-              const latestRes = await scheduleApi.getAll();
-              console.log('MonthlySchedule: Direct API check - total schedules:', latestRes.data?.length);
-              const foundInLatest = latestRes.data?.find(s => s.id === created.id);
-              console.log('MonthlySchedule: Created schedule found in direct API call:', !!foundInLatest);
-            } catch (e) {
-              console.error('MonthlySchedule: Direct API check failed:', e);
-            }
+          if (foundSchedule) {
+            console.log('✅ Schedule created successfully and UI updated');
+          } else {
+            console.warn('⚠️ Schedule created but UI not updated yet');
           }
-        }, 500); // 少し長めに待つ
+        }, 500);
       }
       
       setShowRegistrationTab(false);
@@ -1365,7 +1465,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
                               fontSize: scaledSmallFontSize,
                               color: 'white',
                               overflow: 'hidden',
-                              cursor: 'pointer'
+                              cursor: dragData?.schedule.id === schedule.id ? 'grabbing' : 'grab'
                             }}
                             onMouseDown={(e) => handleScheduleMouseDown(schedule, e)}
                             onDoubleClick={(e) => handleScheduleDoubleClick(schedule, e)}
