@@ -5,7 +5,7 @@ router.get('/', async (req, res, next) => {
   try {
     const pool = req.app.locals.pool;
     const [rows] = await pool.query(
-      'SELECT id, name, title, color, duration_minutes FROM schedule_templates ORDER BY id DESC'
+      'SELECT id, name, title, color, duration_minutes, created_at, updated_at FROM schedule_templates ORDER BY id DESC'
     );
     res.json(rows);
   } catch (e) { next(e); }

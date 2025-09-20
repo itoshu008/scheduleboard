@@ -113,16 +113,36 @@ export interface CreateEquipmentForm {
   display_order?: number;
 }
 
+// 共通型
+export type ISODateTime = string; // "2025-09-20T01:50:00.000Z" など
+
 // テンプレート型
 export interface Template {
   id: number;
   name: string;
   title: string;
-  color?: string | null;
-  created_at: string;
-  updated_at: string;
+  color: `#${string}`;
+  duration_minutes: number;
+  // サーバーが返さないこともあるので optional にして互換性を持たせる
+  created_at?: ISODateTime;
+  updated_at?: ISODateTime;
 }
 
+export interface CreateTemplateInput {
+  name: string;
+  title: string;
+  color?: `#${string}`;
+  duration_minutes?: number;
+}
+
+export interface UpdateTemplateInput {
+  name?: string;
+  title?: string;
+  color?: `#${string}`;
+  duration_minutes?: number;
+}
+
+// 後方互換性のため残す
 export interface CreateTemplateForm {
   name: string;
   title: string;
