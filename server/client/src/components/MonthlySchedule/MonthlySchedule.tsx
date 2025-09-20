@@ -42,6 +42,7 @@ import EmployeeRegistration from '../EmployeeRegistration/EmployeeRegistration';
 import EquipmentRegistration from '../EquipmentRegistration/EquipmentRegistration';
 import { CurrentTimeLineWrapper } from '../CurrentTimeLine/CurrentTimeLine';
 import { lightenColor } from '../../utils/colorUtils';
+import { safeHexColor } from '../../utils/color';
 
 interface MonthlyScheduleProps {
   selectedDepartment: Department | null;
@@ -481,7 +482,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
           });
 
           // リアルタイム更新（プレビュー）- 日別スケジュールから移植
-          const updatedSchedules = schedules.map(schedule => {
+          const updatedSchedules = (schedules ?? []).map(schedule => {
             if (schedule.id === resizeData.schedule.id) {
               return {
                 ...schedule,
@@ -1279,8 +1280,8 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
                             key={schedule.id}
                             className={`schedule-item ${selectedSchedule?.id === schedule.id ? 'selected' : ''}`}
                             style={{
-                              background: `linear-gradient(180deg, ${lightenColor(schedule.color, 25)} 0%, ${schedule.color} 100%)`,
-                              border: `1px solid ${lightenColor(schedule.color, -10)}`,
+                              background: `linear-gradient(180deg, ${lightenColor(schedule.color, 0.25)} 0%, ${safeHexColor(schedule.color)} 100%)`,
+                              border: `1px solid ${lightenColor(schedule.color, -0.10)}`,
                               width: `${width}px`,
                               position: 'absolute',
                               left: `${leftOffset}px`,
@@ -1438,7 +1439,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
               position: 'absolute',
               width: `${(getEndTimeSlot(dragGhost.end) - getTimeSlot(dragGhost.start)) * scaledCellWidth}px`,
               height: `${scaledRowHeight}px`,
-              backgroundColor: dragGhost.schedule.color,
+              backgroundColor: safeHexColor(dragGhost.schedule.color),
               border: '2px dashed rgba(255, 255, 255, 0.8)',
               borderRadius: '4px',
               pointerEvents: 'none',

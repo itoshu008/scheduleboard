@@ -6,6 +6,7 @@ import { Schedule } from '../../types';
 
 // ユーティリティ
 import { formatDateTime } from '../../utils/dateUtils';
+import { safeHexColor } from '../../utils/color';
 
 interface ScheduleActionModalProps {
   schedule: Schedule;
@@ -63,7 +64,7 @@ const ScheduleActionModal: React.FC<ScheduleActionModalProps> = ({
               <div className="schedule-header">
                 <div 
                   className="schedule-color-indicator" 
-                  style={{ backgroundColor: schedule.color }}
+                  style={{ backgroundColor: safeHexColor(schedule.color) }}
                 />
       <h3 className="schedule-title">{schedule.title || schedule.purpose}</h3>
               </div>

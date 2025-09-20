@@ -36,7 +36,7 @@ export interface Schedule {
   purpose?: string; // 後方互換性のため残す
   start_datetime: string;
   end_datetime: string;
-  color: string;
+  color?: string | null;
   created_at: string;
   updated_at: string;
   hasOverlap?: boolean; // 重複フラグ
@@ -80,7 +80,7 @@ export interface EquipmentReservation {
   title: string; // Scheduleとの互換性のため必須に変更
   start_datetime: string;
   end_datetime: string;
-  color: string;
+  color?: string | null;
   created_at: string;
   updated_at: string;
   hasOverlap?: boolean; // 重複フラグ
@@ -118,7 +118,7 @@ export interface Template {
   id: number;
   name: string;
   title: string;
-  color: string;
+  color?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -126,7 +126,7 @@ export interface Template {
 export interface CreateTemplateForm {
   name: string;
   title: string;
-  color: string;
+  color?: string | null;
 }
 
 export interface CreateEquipmentReservationForm {

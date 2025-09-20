@@ -66,7 +66,7 @@ export const checkEquipmentOverlap = (
 
 // スケジュールに重複フラグを追加
 export const markOverlappingSchedules = (schedules: Schedule[]): Schedule[] => {
-  return schedules.map(schedule => {
+  return (schedules ?? []).map(schedule => {
     const overlapping = checkScheduleOverlap(
       {
         employee_id: schedule.employee_id,

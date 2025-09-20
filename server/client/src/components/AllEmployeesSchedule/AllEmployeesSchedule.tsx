@@ -19,18 +19,7 @@ import { CurrentTimeLineWrapper } from '../CurrentTimeLine/CurrentTimeLine';
 import OverlapConfirmationDialog from '../OverlapConfirmationDialog/OverlapConfirmationDialog';
 import { checkScheduleOverlap, markOverlappingSchedules } from '../../utils/overlapUtils';
 
-// 日別から移植：色を明るくする関数
-const lightenColor = (color: string, percent: number): string => {
-  const num = parseInt(color.replace("#", ""), 16);
-  const amt = Math.round(2.55 * percent);
-  const R = (num >> 16) + amt;
-  const G = (num >> 8 & 0x00FF) + amt;
-  const B = (num & 0x0000FF) + amt;
-  return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
-    (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
-    (B < 255 ? B < 1 ? 0 : B : 255)
-  ).toString(16).slice(1);
-};
+import { safeHexColor, lightenColor } from '../../utils/color';
 
 interface AllEmployeesScheduleProps {
   selectedDate: Date;
@@ -1339,8 +1328,8 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                               left: '0px', // 4セル構成では各セルの左端から開始
                               width: `${width - 2}px`,
                               height: `${height}px`,
-                              background: `linear-gradient(180deg, ${lightenColor(schedule.color, 25)} 0%, ${schedule.color} 100%)`,
-                              border: selectedSchedule?.id === schedule.id ? '2px solid #2196f3' : `1px solid ${lightenColor(schedule.color, -10)}`,
+                              background: `linear-gradient(180deg, ${lightenColor(schedule.color, 0.25)} 0%, ${safeHexColor(schedule.color)} 100%)`,
+                              border: selectedSchedule?.id === schedule.id ? '2px solid #2196f3' : `1px solid ${lightenColor(schedule.color, -0.10)}`,
                               borderRadius: '4px',
                               padding: '2px 4px',
                               fontSize: '11px',
@@ -1544,8 +1533,8 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                             left: `${left}px`,
                             width: `${width}px`,
                             height: '40px', // セル高さと同じに修正
-                            background: `linear-gradient(180deg, ${lightenColor(schedule.color, 25)} 0%, ${schedule.color} 100%)`,
-                            border: `1px solid ${lightenColor(schedule.color, -10)}`,
+                            background: `linear-gradient(180deg, ${lightenColor(schedule.color, 0.25)} 0%, ${safeHexColor(schedule.color)} 100%)`,
+                            border: `1px solid ${lightenColor(schedule.color, -0.10)}`,
                             borderRadius: '6px',
                             padding: '2px 6px',
                             fontSize: '10px',
@@ -1700,7 +1689,7 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                 position: 'fixed',
                 width: `${(getEndTimeSlot(dragGhost.end) - getTimeSlot(dragGhost.start)) * 20}px`,
                 height: '40px',
-                backgroundColor: dragGhost.schedule.color,
+                backgroundColor: safeHexColor(dragGhost.schedule.color),
                 border: '2px dashed rgba(255, 255, 255, 0.8)',
                 borderRadius: '4px',
                 pointerEvents: 'none',
@@ -1768,7 +1757,7 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                   position: 'fixed',
                   width: `${width}px`,
                   height: '40px',
-                  backgroundColor: resizeGhost.schedule.color,
+                  backgroundColor: safeHexColor(resizeGhost.schedule.color),
                   border: '2px dashed rgba(255, 255, 255, 0.8)',
                   borderRadius: '4px',
                   pointerEvents: 'none',
