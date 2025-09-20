@@ -697,13 +697,21 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
   const handleRegistrationSave = async (scheduleData: any) => {
     try {
       console.log('MonthlySchedule: handleRegistrationSave called with:', scheduleData);
+      console.log('MonthlySchedule: selectedCells:', selectedCells);
       
-      // ScheduleRegistrationModalからのデータを直接使用
+      // セルの情報から日時を取得
+      const cellDateTime = getSelectedCellDateTime();
+      if (!cellDateTime) {
+        console.error('MonthlySchedule: No cell information available');
+        alert('セルの情報が取得できません。');
+        return;
+      }
+      
       const createData = {
         employee_id: scheduleData.employee_id,
         title: scheduleData.title,
-        start_datetime: new Date(scheduleData.start_datetime),
-        end_datetime: new Date(scheduleData.end_datetime),
+        start_datetime: cellDateTime.startDateTime,
+        end_datetime: cellDateTime.endDateTime,
         color: scheduleData.color || SCHEDULE_COLORS[0]
       };
 
@@ -755,6 +763,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
         }
       } else {
         // 同じ月でも再読み込みしてUIを更新
+        console.log('MonthlySchedule: Reloading schedules for same month');
         await reloadSchedules();
       }
       
