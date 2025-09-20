@@ -41,8 +41,7 @@ import DepartmentRegistration from '../DepartmentRegistration/DepartmentRegistra
 import EmployeeRegistration from '../EmployeeRegistration/EmployeeRegistration';
 import EquipmentRegistration from '../EquipmentRegistration/EquipmentRegistration';
 import { CurrentTimeLineWrapper } from '../CurrentTimeLine/CurrentTimeLine';
-import { lightenColor } from '../../utils/colorUtils';
-import { safeHexColor, toApiColor } from '../../utils/color';
+import { safeHexColor, lightenColor, toApiColor } from '../../utils/color';
 
 interface MonthlyScheduleProps {
   selectedDepartment: Department | null;
