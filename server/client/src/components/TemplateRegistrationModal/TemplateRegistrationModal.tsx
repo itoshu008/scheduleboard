@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import './TemplateRegistrationModal.css';
 import { Template, CreateTemplateForm, SCHEDULE_COLORS } from '../../types';
 import { templateApi } from '../../utils/api';
+import { safeHexColor } from '../../utils/color';
 
 interface TemplateRegistrationModalProps {
   isVisible: boolean;
@@ -183,7 +184,7 @@ const TemplateRegistrationModal: React.FC<TemplateRegistrationModalProps> = ({
                     <div className="template-info">
                       <div
                         className="template-color"
-                        style={{ backgroundColor: template.color }}
+                        style={{ backgroundColor: safeHexColor(template.color) }}
                       />
                       <div className="template-details">
                         <div className="template-name">{template.name}</div>

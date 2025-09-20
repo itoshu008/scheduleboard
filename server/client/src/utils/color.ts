@@ -12,7 +12,7 @@ export function safeHexColor(input: unknown, fallback: Hex = DEFAULT_HEX): Hex {
   // rgb/rgba(...)
   const m = s.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
   if (m) {
-    const [r, g, b] = m.slice(1, 4).map(Number).map(clamp);
+    const [r, g, b] = m.slice(1, 4).map(Number).map(n => clamp(n));
     return ('#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('')) as Hex;
   }
 

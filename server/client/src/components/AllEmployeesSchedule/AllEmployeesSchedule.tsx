@@ -538,7 +538,8 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
       const updateData = {
           ...scheduleData,
           start_datetime: new Date(scheduleData.start_datetime!),
-          end_datetime: new Date(scheduleData.end_datetime!)
+          end_datetime: new Date(scheduleData.end_datetime!),
+          color: toApiColor(scheduleData.color),
       };
       await scheduleApi.update(selectedSchedule.id, updateData);
       await loadSchedules();
@@ -949,7 +950,8 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
             const updatedSchedule = {
               ...resizeData.schedule,
               start_datetime: resizeGhost.newStart,
-              end_datetime: resizeGhost.newEnd
+              end_datetime: resizeGhost.newEnd,
+              color: toApiColor(resizeData.schedule.color),
             };
 
             await scheduleApi.update(resizeData.schedule.id, updatedSchedule);

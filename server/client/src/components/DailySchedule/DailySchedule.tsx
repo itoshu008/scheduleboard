@@ -205,7 +205,8 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
       const updateData = {
         ...scheduleData,
         start_datetime: new Date(scheduleData.start_datetime!),
-        end_datetime: new Date(scheduleData.end_datetime!)
+        end_datetime: new Date(scheduleData.end_datetime!),
+        color: toApiColor(scheduleData.color),
       };
       await scheduleApi.update(selectedSchedule.id, updateData);
       await loadSchedules();
