@@ -95,6 +95,17 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
   const [showRegistrationTab, setShowRegistrationTab] = useState(false);
   const [showManagementTabs, setShowManagementTabs] = useState(false);
   const [currentRegistrationView, setCurrentRegistrationView] = useState<string | null>(null);
+
+  // schedules propsの変更を監視
+  useEffect(() => {
+    console.log('MonthlySchedule: schedules props changed, count:', schedules.length);
+  }, [schedules]);
+
+  // 最新のschedulesを参照するためのref
+  const schedulesRef = useRef(schedules);
+  useEffect(() => {
+    schedulesRef.current = schedules;
+  }, [schedules]);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -797,9 +808,10 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
         
         // 少し待ってから再度確認
         setTimeout(async () => {
-          console.log('MonthlySchedule: Schedules after reload:', schedules.length);
+          const currentSchedules = schedulesRef.current;
+          console.log('MonthlySchedule: Schedules after reload (ref):', currentSchedules.length);
           // 作成したスケジュールが含まれているかチェック
-          const foundSchedule = schedules.find(s => s.id === created.id);
+          const foundSchedule = currentSchedules.find(s => s.id === created.id);
           console.log('MonthlySchedule: Created schedule found in list:', !!foundSchedule);
           if (!foundSchedule) {
             console.warn('MonthlySchedule: Created schedule not found in reloaded list');
@@ -813,7 +825,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
               console.error('MonthlySchedule: Direct API check failed:', e);
             }
           }
-        }, 100);
+        }, 500); // 少し長めに待つ
       }
       
       setShowRegistrationTab(false);
