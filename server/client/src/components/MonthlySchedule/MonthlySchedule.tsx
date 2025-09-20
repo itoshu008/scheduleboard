@@ -459,8 +459,9 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
         
         setDragGhost({
           schedule,
-          start: startTime,
-          end: new Date(schedule.end_datetime)
+          newSlot: getTimeSlot(startTime),
+          deltaX: 0,
+          deltaY: 0
         });
 
         // 初期マウス位置をイベントバーの中央に設定
@@ -566,8 +567,9 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
           
           setDragGhost({
             schedule: dragData.schedule,
-            start: newStart,
-            end: newEnd
+            newSlot: newStartSlot,
+            deltaX: e.clientX - dragData.startX,
+            deltaY: e.clientY - dragData.startY
           });
 
           // マウス位置を更新（ドラッグゴースト表示用）
@@ -633,34 +635,43 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
 
       // ドラッグ終了処理
       if (dragData && dragGhost) {
+        // 新しい時間を計算
+        const originalStart = new Date(dragData.schedule.start_datetime);
+        const originalEnd = new Date(dragData.schedule.end_datetime);
+        const originalDuration = originalEnd.getTime() - originalStart.getTime();
+        
+        const newStart = createTimeFromSlot(dragData.startDate, dragGhost.newSlot);
+        const newEnd = new Date(newStart.getTime() + originalDuration);
+        
         console.log('MonthlySchedule: Drag ended, updating schedule:', {
           scheduleId: dragData.schedule.id,
-          newStart: dragGhost.start,
-          newEnd: dragGhost.end
+          newSlot: dragGhost.newSlot,
+          newStart: newStart.toISOString(),
+          newEnd: newEnd.toISOString()
         });
         
         try {
-          // 元のスケジュールデータを保持して更新（Date オブジェクトとして送信）
+          // 元のスケジュールデータを保持して更新
           const updateData = {
-              title: dragData.schedule.title,
-              color: toApiColor(dragData.schedule.color),
+            title: dragData.schedule.title,
+            color: toApiColor(dragData.schedule.color),
             employee_id: dragData.schedule.employee_id,
-            start_datetime: dragGhost.start,
-            end_datetime: dragGhost.end
+            start_datetime: newStart,
+            end_datetime: newEnd
           };
           
           console.log('MonthlySchedule: Sending update data:', {
             scheduleId: dragData.schedule.id,
             updateData: {
               ...updateData,
-              start_datetime: dragGhost.start.toISOString(),
-              end_datetime: dragGhost.end.toISOString()
+              start_datetime: newStart.toISOString(),
+              end_datetime: newEnd.toISOString()
             }
           });
           
           await scheduleApi.update(dragData.schedule.id, updateData);
           console.log('MonthlySchedule: Schedule update successful');
-            await reloadSchedules();
+          await reloadSchedules();
         } catch (error) {
           console.error('スケジュール移動エラー:', error);
           if (error && typeof error === 'object' && 'response' in error) {
@@ -1609,44 +1620,60 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
         </div>
         
         {/* ドラッグゴースト */}
-        {dragGhost && mousePosition && (
-          <div
-            className="drag-ghost"
-            style={{
-              position: 'absolute',
-              width: `${(getEndTimeSlot(dragGhost.end) - getTimeSlot(dragGhost.start)) * scaledCellWidth}px`,
-              height: `${scaledRowHeight}px`,
-              backgroundColor: safeHexColor(dragGhost.schedule.color),
-              border: '2px dashed rgba(255, 255, 255, 0.8)',
-              borderRadius: '4px',
-              pointerEvents: 'none',
-              zIndex: 1000,
-              opacity: 0.7,
-              left: `${scaledDateColumnWidth + getTimeSlot(dragGhost.start) * scaledCellWidth}px`,
-              top: `${80 + monthDates.findIndex(date => 
-                date.getFullYear() === dragGhost.start.getFullYear() && 
-                date.getMonth() === dragGhost.start.getMonth() && 
-                date.getDate() === dragGhost.start.getDate()
-              ) * scaledRowHeight}px`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontSize: `${scaledSmallFontSize}px`,
-              fontWeight: 'bold',
-              boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)'
-            }}
-            title={`${dragGhost.schedule.title}\n${formatTime(dragGhost.start)} - ${formatTime(dragGhost.end)}`}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', textAlign: 'center' }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '1px', fontSize: `${Math.max(8, scaledSmallFontSize - 1)}px` }}>
-                📅 {dragGhost.start.getDate()}日 {dragGhost.schedule.title || '無題'}
-          </div>
-              <div style={{ fontSize: `${Math.max(6, scaledSmallFontSize - 2)}px`, opacity: 0.9 }}>
-                {formatTime(dragGhost.start)} - {formatTime(dragGhost.end)}
+        {dragGhost && dragData && (
+          (() => {
+            // 新しい時間を計算
+            const originalStart = new Date(dragData.schedule.start_datetime);
+            const originalEnd = new Date(dragData.schedule.end_datetime);
+            const originalDuration = originalEnd.getTime() - originalStart.getTime();
+            
+            const newStart = createTimeFromSlot(dragData.startDate, dragGhost.newSlot);
+            const newEnd = new Date(newStart.getTime() + originalDuration);
+            
+            const startSlot = getTimeSlot(newStart);
+            const endSlot = getEndTimeSlot(newEnd);
+            const width = (endSlot - startSlot) * scaledCellWidth;
+            
+            return (
+              <div
+                className="drag-ghost"
+                style={{
+                  position: 'absolute',
+                  width: `${width}px`,
+                  height: `${scaledRowHeight}px`,
+                  backgroundColor: safeHexColor(dragGhost.schedule.color),
+                  border: '2px dashed rgba(255, 255, 255, 0.8)',
+                  borderRadius: '4px',
+                  pointerEvents: 'none',
+                  zIndex: 1000,
+                  opacity: 0.7,
+                  left: `${scaledDateColumnWidth + startSlot * scaledCellWidth}px`,
+                  top: `${80 + monthDates.findIndex(date => 
+                    date.getFullYear() === newStart.getFullYear() && 
+                    date.getMonth() === newStart.getMonth() && 
+                    date.getDate() === newStart.getDate()
+                  ) * scaledRowHeight}px`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: `${scaledSmallFontSize}px`,
+                  fontWeight: 'bold',
+                  boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)'
+                }}
+                title={`${dragGhost.schedule.title}\n${formatTime(newStart)} - ${formatTime(newEnd)}`}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', textAlign: 'center' }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: '1px', fontSize: `${Math.max(8, scaledSmallFontSize - 1)}px` }}>
+                    📅 {newStart.getDate()}日 {dragGhost.schedule.title || '無題'}
+                  </div>
+                  <div style={{ fontSize: `${Math.max(6, scaledSmallFontSize - 2)}px`, opacity: 0.9 }}>
+                    {formatTime(newStart)} - {formatTime(newEnd)}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()
         )}
       </div>
 
