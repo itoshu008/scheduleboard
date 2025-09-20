@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Daily Schedule API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { padding: 10px; margin: 5px; cursor: pointer; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Daily Schedule API Test</h1>
+    
+    <button onclick="testDailyAll()">Test /api/schedules/daily/all/2025-09-20</button>
+    <button onclick="testDailyDepartment()">Test /api/schedules/daily/department/1/2025-09-20</button>
+    
+    <div id="result"></div>
+
+    <script>
+        async function testDailyAll() {
+            const result = document.getElementById('result');
+            try {
+                result.innerHTML = '<p>Testing /api/schedules/daily/all/2025-09-20...</p>';
+                
+                const response = await fetch('/api/schedules/daily/all/2025-09-20');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.innerHTML = `
+                        <div class="success">
+                            <h3>✅ Success - Daily All Schedules</h3>
+                            <p>Status: ${response.status}</p>
+                            <p>Count: ${Array.isArray(data) ? data.length : 'Not an array'} schedules</p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${data.error || 'Unknown error'}`);
+                }
+            } catch (error) {
+                result.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Error - Daily All Schedules</h3>
+                        <pre>${error.message}</pre>
+                    </div>
+                `;
+            }
+        }
+
+        async function testDailyDepartment() {
+            const result = document.getElementById('result');
+            try {
+                result.innerHTML = '<p>Testing /api/schedules/daily/department/1/2025-09-20...</p>';
+                
+                const response = await fetch('/api/schedules/daily/department/1/2025-09-20');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.innerHTML = `
+                        <div class="success">
+                            <h3>✅ Success - Daily Department Schedules</h3>
+                            <p>Status: ${response.status}</p>
+                            <p>Count: ${Array.isArray(data) ? data.length : 'Not an array'} schedules</p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${data.error || 'Unknown error'}`);
+                }
+            } catch (error) {
+                result.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Error - Daily Department Schedules</h3>
+                        <pre>${error.message}</pre>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -7,10 +7,9 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'https://zatint1991.com', // サーバのNginxへ中継
+        target: 'http://127.0.0.1:3001', // ローカルのバックエンドサーバー
         changeOrigin: true,
-        secure: true,                      // Let's Encrypt なので true
-        headers: { Host: 'zatint1991.com' },
+        secure: false,
         // rewrite は不要（そのまま転送）
       },
     },
