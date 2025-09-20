@@ -929,7 +929,8 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       }
       
       setShowRegistrationTab(false);
-      setSelectedCells(new Set());
+      // セル選択は維持する（連続登録を可能にするため）
+      // setSelectedCells(new Set());
     } catch (error) {
       console.error('スケジュール登録エラー:', error);
       console.error('エラーの詳細:', error instanceof Error ? error.message : error);
@@ -942,7 +943,8 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
 
   const handleRegistrationCancel = () => {
     setShowRegistrationTab(false);
-    setSelectedCells(new Set());
+    // セル選択は維持する（ユーザーが再度登録できるように）
+    // setSelectedCells(new Set());
   };
 
   // キーボードショートカット
@@ -1660,7 +1662,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
                   zIndex: 1000,
                   opacity: 0.7,
                   left: `${scaledDateColumnWidth + startSlot * scaledCellWidth}px`,
-                  top: `${42 + dateIndex * scaledRowHeight}px`, // ヘッダー高さ調整（15px下に移動）
+                  top: `${49 + dateIndex * scaledRowHeight}px`, // ヘッダー高さ調整（22px下に移動）
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
