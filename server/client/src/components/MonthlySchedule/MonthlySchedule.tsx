@@ -741,6 +741,15 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       console.log('MonthlySchedule: Created schedule response:', created);
       console.log('MonthlySchedule: API response status:', createRes.status);
       console.log('MonthlySchedule: Current schedules count:', schedules.length);
+      console.log('MonthlySchedule: Created schedule ID:', created.id);
+      
+      // 作成されたスケジュールが実際にサーバーに存在するかテスト
+      try {
+        const testRes = await scheduleApi.getById(created.id);
+        console.log('MonthlySchedule: Created schedule verification:', testRes.status, testRes.data?.id);
+      } catch (e) {
+        console.warn('MonthlySchedule: Created schedule verification failed:', e);
+      }
       // フロント側でも設備予約を同期（保険）
       if (Array.isArray(scheduleData.equipment_ids)) {
         for (const eid of scheduleData.equipment_ids) {
@@ -785,9 +794,25 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
         console.log('MonthlySchedule: Schedules before reload:', schedules.length);
         await reloadSchedules();
         console.log('MonthlySchedule: Reload completed');
+        
         // 少し待ってから再度確認
-        setTimeout(() => {
+        setTimeout(async () => {
           console.log('MonthlySchedule: Schedules after reload:', schedules.length);
+          // 作成したスケジュールが含まれているかチェック
+          const foundSchedule = schedules.find(s => s.id === created.id);
+          console.log('MonthlySchedule: Created schedule found in list:', !!foundSchedule);
+          if (!foundSchedule) {
+            console.warn('MonthlySchedule: Created schedule not found in reloaded list');
+            // 直接APIから最新データを確認
+            try {
+              const latestRes = await scheduleApi.getAll();
+              console.log('MonthlySchedule: Direct API check - total schedules:', latestRes.data?.length);
+              const foundInLatest = latestRes.data?.find(s => s.id === created.id);
+              console.log('MonthlySchedule: Created schedule found in direct API call:', !!foundInLatest);
+            } catch (e) {
+              console.error('MonthlySchedule: Direct API check failed:', e);
+            }
+          }
         }, 100);
       }
       

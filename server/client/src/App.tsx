@@ -88,8 +88,13 @@ const AppContent: React.FC = () => {
   // スケジュール再読み込み関数
   const reloadSchedules = async () => {
     try {
+      console.log('App: reloadSchedules called');
       const schedulesRes = await scheduleApi.getAll();
-      setSchedules(Array.isArray(schedulesRes.data) ? schedulesRes.data : []);
+      console.log('App: scheduleApi.getAll response:', schedulesRes.status, schedulesRes.data?.length);
+      const newSchedules = Array.isArray(schedulesRes.data) ? schedulesRes.data : [];
+      console.log('App: Setting schedules count:', newSchedules.length);
+      setSchedules(newSchedules);
+      console.log('App: reloadSchedules completed');
     } catch (err) {
       console.error('スケジュール読み込みエラー:', err);
     }
