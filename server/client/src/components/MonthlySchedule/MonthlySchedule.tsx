@@ -107,6 +107,39 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
     schedulesRef.current = schedules;
   }, [schedules]);
 
+  // 基本状態
+  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
+  const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [scheduleScale, setScheduleScale] = useState(100);
+
+  // ドラッグ＆ドロップ関連の状態
+  const [dragData, setDragData] = useState<{
+    schedule: Schedule;
+    startX: number;
+    startY: number;
+    startSlot: number;
+    startDate: Date;
+  } | null>(null);
+  
+  // リサイズ関連の状態
+  const [resizeData, setResizeData] = useState<{
+    schedule: Schedule;
+    edge: 'start' | 'end';
+    startX: number;
+    originalStart: Date;
+    originalEnd: Date;
+  } | null>(null);
+  
+  // ドラッグゴースト
+  const [dragGhost, setDragGhost] = useState<{
+    schedule: Schedule;
+    newSlot: number;
+    deltaX: number;
+    deltaY: number;
+  } | null>(null);
+
   // ドラッグ＆ドロップのマウスイベント処理
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -116,7 +149,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       const deltaY = e.clientY - dragData.startY;
 
       // 5分間隔でスナップ
-      const cellWidth = scaledCellWidth;
+      const cellWidth = scheduleScale / 100 * 20; // scaledCellWidthの代替
       const snappedX = snapToFineGrid(deltaX, cellWidth);
       const newSlot = dragData.startSlot + pixelToFineSlot(snappedX, cellWidth);
 
@@ -149,38 +182,8 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       document.removeEventListener('mouseup', handleMouseUp);
       document.body.style.cursor = 'auto';
     };
-  }, [dragData, dragGhost, scaledCellWidth]);
-  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
-  const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [scheduleScale, setScheduleScale] = useState(100);
+  }, [dragData, dragGhost, scheduleScale]);
 
-  
-  // ドラッグ＆ドロップ関連の状態
-  const [dragData, setDragData] = useState<{
-    schedule: Schedule;
-    startX: number;
-    startY: number;
-    startSlot: number;
-    startDate: Date;
-  } | null>(null);
-  
-  // リサイズ関連の状態
-  const [resizeData, setResizeData] = useState<{
-    schedule: Schedule;
-    edge: 'start' | 'end';
-    startX: number;
-    originalStart: Date;
-    originalEnd: Date;
-  } | null>(null);
-  
-  // ドラッグゴースト
-  const [dragGhost, setDragGhost] = useState<{
-    schedule: Schedule;
-    start: Date;
-    end: Date;
-  } | null>(null);
 
   // リサイズゴースト
   const [resizeGhost, setResizeGhost] = useState<{
@@ -274,8 +277,8 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       });
 
       await scheduleApi.update(schedule.id, {
-        start_datetime: newStart.toISOString(),
-        end_datetime: newEnd.toISOString()
+        start_datetime: newStart,
+        end_datetime: newEnd
       });
 
       // スケジュール一覧を再読み込み
@@ -870,7 +873,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       console.log('MonthlySchedule: Current schedules count:', schedules.length);
       console.log('MonthlySchedule: Created schedule ID:', created.id);
       
-      // スケジュール作成成功
+      console.log('✅ Schedule created successfully:', created.id);
       // フロント側でも設備予約を同期（保険）
       if (Array.isArray(scheduleData.equipment_ids)) {
         for (const eid of scheduleData.equipment_ids) {
