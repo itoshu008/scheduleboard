@@ -754,7 +754,8 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
           await reloadSchedules();
         }
       } else {
-        // 同じ月は楽観反映を優先し、再読み込みは行わない（体感速度向上）
+        // 同じ月でも再読み込みしてUIを更新
+        await reloadSchedules();
       }
       
       setShowRegistrationTab(false);
