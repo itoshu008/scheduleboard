@@ -337,7 +337,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
         employee_id: schedule.employee_id,
         start_datetime: newStart,
         end_datetime: newEnd,
-        color: schedule.color
+        color: toApiColor(schedule.color)
       };
 
       console.log('Updating schedule position:', {
