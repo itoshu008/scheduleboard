@@ -24,7 +24,8 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "dev": "vite",
-    "build:vite": "vite build"
+    "build:vite": "vite build",
+    "check:api-base": "grep -RInE \"https?://(127\\.0\\.0\\.1|localhost|162\\.43\\.86\\.239|zatint1991\\.com)/api\" src && (echo '❌ 直URL検出: /api は相対で'; exit 1) || echo '✅ /api 相対運用 OK'"
   },
   "eslintConfig": {
     "extends": [
