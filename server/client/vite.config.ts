@@ -7,10 +7,10 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:3001', // ローカルのバックエンドサーバー
-        changeOrigin: true,
-        secure: false,
-        // rewrite は不要（そのまま転送）
+        target: 'https://zatint1991.com',
+        changeOrigin: true,   // Host ヘッダをターゲットに合わせる
+        secure: false,        // ← まずは false で 502 を回避（通ったら true に戻す）
+        rewrite: (p) => p,    // /api をそのまま維持（Nginx 側も /api 前提）
       },
     },
   },
