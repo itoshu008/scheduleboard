@@ -136,6 +136,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
   const [dragGhost, setDragGhost] = useState<{
     schedule: Schedule;
     newSlot: number;
+    newDate: Date;
     deltaX: number;
     deltaY: number;
   } | null>(null);
@@ -148,24 +149,31 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       const deltaX = e.clientX - dragData.startX;
       const deltaY = e.clientY - dragData.startY;
 
-      // 5分間隔でスナップ
-      const cellWidth = scheduleScale / 100 * 20; // scaledCellWidthの代替
-      const snappedX = snapToFineGrid(deltaX, cellWidth);
-      const newSlot = dragData.startSlot + pixelToFineSlot(snappedX, cellWidth);
+      // 時間軸の移動（横方向）
+      const cellWidth = scheduleScale / 100 * 20;
+      const slotDelta = Math.round(deltaX / cellWidth);
+      const newSlot = Math.max(0, Math.min(95, dragData.startSlot + slotDelta));
+
+      // 日付軸の移動（縦方向）
+      const rowHeight = scheduleScale / 100 * 40;
+      const dateDelta = Math.round(deltaY / rowHeight);
+      const newDate = new Date(dragData.startDate);
+      newDate.setDate(newDate.getDate() + dateDelta);
 
       // ドラッグゴーストを更新
       setDragGhost({
         schedule: dragData.schedule,
-        newSlot: Math.max(0, Math.min(95, newSlot)), // 0-95の範囲に制限
-        deltaX: snappedX,
-        deltaY
+        newSlot: newSlot,
+        newDate: newDate,
+        deltaX: deltaX,
+        deltaY: deltaY
       });
     };
 
     const handleMouseUp = () => {
       if (dragData && dragGhost) {
         // ドラッグ終了 - スケジュール更新
-        updateSchedulePosition(dragData.schedule, dragGhost.newSlot);
+        updateSchedulePosition(dragData.schedule, dragGhost.newDate, dragGhost.newSlot);
       }
       setDragData(null);
       setDragGhost(null);
@@ -258,18 +266,20 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
     return new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), hours, minutes);
   };
 
-  // スケジュール位置更新
-  const updateSchedulePosition = async (schedule: Schedule, newSlot: number) => {
+  // スケジュール位置更新（日付と時間の両方対応）
+  const updateSchedulePosition = async (schedule: Schedule, newDate: Date, newSlot: number) => {
     try {
       const originalStart = new Date(schedule.start_datetime);
       const originalEnd = new Date(schedule.end_datetime);
       const duration = originalEnd.getTime() - originalStart.getTime();
       
-      const newStart = createTimeFromSlot(originalStart, newSlot);
+      const newStart = createTimeFromSlot(newDate, newSlot);
       const newEnd = new Date(newStart.getTime() + duration);
       
       console.log('Updating schedule position:', {
         id: schedule.id,
+        oldDate: originalStart.toDateString(),
+        newDate: newDate.toDateString(),
         oldSlot: getTimeSlot(originalStart),
         newSlot,
         newStart: newStart.toISOString(),
@@ -460,6 +470,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
         setDragGhost({
           schedule,
           newSlot: getTimeSlot(startTime),
+          newDate: new Date(startTime),
           deltaX: 0,
           deltaY: 0
         });
@@ -568,6 +579,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
           setDragGhost({
             schedule: dragData.schedule,
             newSlot: newStartSlot,
+            newDate: newDate,
             deltaX: e.clientX - dragData.startX,
             deltaY: e.clientY - dragData.startY
           });
@@ -640,7 +652,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
         const originalEnd = new Date(dragData.schedule.end_datetime);
         const originalDuration = originalEnd.getTime() - originalStart.getTime();
         
-        const newStart = createTimeFromSlot(dragData.startDate, dragGhost.newSlot);
+        const newStart = createTimeFromSlot(dragGhost.newDate, dragGhost.newSlot);
         const newEnd = new Date(newStart.getTime() + originalDuration);
         
         console.log('MonthlySchedule: Drag ended, updating schedule:', {
@@ -1627,12 +1639,25 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
             const originalEnd = new Date(dragData.schedule.end_datetime);
             const originalDuration = originalEnd.getTime() - originalStart.getTime();
             
-            const newStart = createTimeFromSlot(dragData.startDate, dragGhost.newSlot);
+            const newStart = createTimeFromSlot(dragGhost.newDate, dragGhost.newSlot);
             const newEnd = new Date(newStart.getTime() + originalDuration);
             
             const startSlot = getTimeSlot(newStart);
             const endSlot = getEndTimeSlot(newEnd);
             const width = (endSlot - startSlot) * scaledCellWidth;
+            
+            // 日付インデックスを取得（月の範囲外でも処理）
+            const targetDate = dragGhost.newDate;
+            let dateIndex = monthDates.findIndex(date => 
+              date.getFullYear() === targetDate.getFullYear() && 
+              date.getMonth() === targetDate.getMonth() && 
+              date.getDate() === targetDate.getDate()
+            );
+            
+            // 月の範囲外の場合は表示しない
+            if (dateIndex === -1) {
+              return null;
+            }
             
             return (
               <div
@@ -1648,11 +1673,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
                   zIndex: 1000,
                   opacity: 0.7,
                   left: `${scaledDateColumnWidth + startSlot * scaledCellWidth}px`,
-                  top: `${80 + monthDates.findIndex(date => 
-                    date.getFullYear() === newStart.getFullYear() && 
-                    date.getMonth() === newStart.getMonth() && 
-                    date.getDate() === newStart.getDate()
-                  ) * scaledRowHeight}px`,
+                  top: `${32 + dateIndex * scaledRowHeight}px`, // ヘッダー高さ32pxに修正
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
