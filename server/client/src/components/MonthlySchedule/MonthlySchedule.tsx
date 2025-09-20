@@ -1660,7 +1660,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
                   zIndex: 1000,
                   opacity: 0.7,
                   left: `${scaledDateColumnWidth + startSlot * scaledCellWidth}px`,
-                  top: `${27 + dateIndex * scaledRowHeight}px`, // ヘッダー高さ調整（5px上に移動）
+                  top: `${32 + dateIndex * scaledRowHeight}px`, // ヘッダー高さ調整（5px下に移動）
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
