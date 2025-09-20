@@ -4,10 +4,10 @@ const path = require('path');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = 4001; // ← 変更禁止（Nginx設定に合わせる）
 
 // ミドルウェア
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
 // リクエストの処理時間を計測してログ出力
@@ -29,27 +29,7 @@ app.get('/api/health', (req, res) => {
   res.json({ message: 'OK' });
 });
 
-// templates ルート（スタブ実装）
-app.get('/api/templates', (req, res) => {
-  console.log('Templates API called - returning empty array');
-  res.json([]); // 空配列で UI を生かす
-});
-
-// 他のテンプレート操作もスタブで実装
-app.post('/api/templates', (req, res) => {
-  console.log('Template create called - returning mock data');
-  res.status(201).json({ id: 1, name: 'Mock', title: 'Mock Template', color: '#81ECEC', duration_minutes: 60 });
-});
-
-app.put('/api/templates/:id', (req, res) => {
-  console.log('Template update called - returning mock data');
-  res.json({ id: parseInt(req.params.id), ...req.body });
-});
-
-app.delete('/api/templates/:id', (req, res) => {
-  console.log('Template delete called - returning success');
-  res.status(204).end();
-});
+// templates ルートは下記のルーター経由で処理
 
 // API ルート（ビルド済みの dist から読み込み）。dist が無い場合は警告のみ
 try {
@@ -61,6 +41,30 @@ try {
 } catch (e) {
   console.warn('dist ルートの読み込みに失敗しました。API は無効です。', e && e.message ? e.message : e);
 }
+
+// templates ルートを追加（既存のスタブを統合）
+try {
+  app.use('/api/templates', require('./routes/templates'));
+} catch (e) {
+  console.warn('templates ルートの読み込みに失敗しました。', e && e.message ? e.message : e);
+}
+
+// 404ハンドラー（存在しない /api/* に対して）
+app.all('/api/*', (req, res) => {
+  res.status(404).json({
+    error: 'Not Found',
+    path: req.originalUrl,
+    hint: [
+      'GET /api/health',
+      'GET /api/departments',
+      'GET /api/employees',
+      'GET /api/equipment',
+      'GET /api/schedules',
+      'GET /api/schedules/daily/all/:date',
+      'GET /api/templates'
+    ]
+  });
+});
 
 // SPA ルーティング（最後に配置）
 app.get('*', (req, res) => {
