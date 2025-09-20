@@ -1405,7 +1405,11 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
                     >
                       {/* スケジュールアイテム */}
                       {(cellSchedules ?? []).map(schedule => {
-                        const originalStartSlot = getTimeSlot(new Date(schedule.start_datetime));
+                        const scheduleStartTime = new Date(schedule.start_datetime);
+                        const scheduleEndTime = new Date(schedule.end_datetime);
+                        const originalStartSlot = getTimeSlot(scheduleStartTime);
+                        
+                        // スケジュールの開始スロットでのみ描画
                         if (originalStartSlot !== slot) return null;
                         
                         
@@ -1446,8 +1450,14 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
                           }
                         }
                         
+                        // 正確な位置計算：スケジュールの開始時刻に基づく位置調整
+                        const scheduleStartSlot = getTimeSlot(startTime);
+                        const cellStartSlot = slot;
+                        const slotOffset = scheduleStartSlot - cellStartSlot;
+                        
                         const leftOffset = isResizing && resizeGhost && resizeGhost.schedule.id === schedule.id && resizeGhost.edge === 'start' ? 
-                          (getTimeSlot(resizeGhost.newStart) - originalStartSlot) * scaledCellWidth : 0;
+                          (getTimeSlot(resizeGhost.newStart) - originalStartSlot) * scaledCellWidth : 
+                          slotOffset * scaledCellWidth;
                         
                         return (
                           <div
@@ -1459,13 +1469,16 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
                               width: `${width}px`,
                               position: 'absolute',
                               left: `${leftOffset}px`,
-                              height: '100%',
+                              top: '1px',
+                              height: 'calc(100% - 2px)',
                               borderRadius: 4,
                               padding: '2px 4px',
                               fontSize: scaledSmallFontSize,
                               color: 'white',
                               overflow: 'hidden',
-                              cursor: dragData?.schedule.id === schedule.id ? 'grabbing' : 'grab'
+                              cursor: dragData?.schedule.id === schedule.id ? 'grabbing' : 'grab',
+                              boxSizing: 'border-box',
+                              zIndex: 10
                             }}
                             onMouseDown={(e) => handleScheduleMouseDown(schedule, e)}
                             onDoubleClick={(e) => handleScheduleDoubleClick(schedule, e)}
