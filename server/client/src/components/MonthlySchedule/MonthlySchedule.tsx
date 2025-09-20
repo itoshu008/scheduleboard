@@ -243,14 +243,11 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
     setIsSelecting(false);
     setSelectionStart(null);
     
-    // 1セルのみの場合は選択を解除（ワンクリック無反応）
-    if (selectedCells.size === 1) {
-      setSelectedCells(new Set());
-    }
     // 2セル以上選択時は登録タブ表示（日別スケジュールから移植）
-    else if (selectedCells.size >= 2) {
+    if (selectedCells.size >= 2) {
       setShowRegistrationTab(true);
     }
+    // 1セルのみの場合は選択を維持（ダブルクリックで登録タブを開く）
   };
 
   // セルダブルクリックで新規登録
@@ -661,11 +658,19 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
 
   // 選択されたセルから日時を取得
   const getSelectedCellDateTime = () => {
-    if (selectedCells.size === 0) return null;
+    console.log('getSelectedCellDateTime: selectedCells.size =', selectedCells.size);
+    console.log('getSelectedCellDateTime: selectedCells =', Array.from(selectedCells));
+    
+    if (selectedCells.size === 0) {
+      console.log('getSelectedCellDateTime: No cells selected');
+      return null;
+    }
 
     const cellIds = Array.from(selectedCells ?? []).sort();
+    console.log('getSelectedCellDateTime: cellIds =', cellIds);
     const firstCellId = cellIds[0];
     const lastCellId = cellIds[cellIds.length - 1];
+    console.log('getSelectedCellDateTime: firstCellId =', firstCellId, 'lastCellId =', lastCellId);
 
     const firstParts = firstCellId.split('-');
     const lastParts = lastCellId.split('-');
@@ -1521,6 +1526,8 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
 
       {showRegistrationTab && (() => {
         console.log('MonthlySchedule: Rendering ScheduleRegistrationModal - selectedDate:', selectedDate.toDateString(), 'selectedCells:', selectedCells);
+        const cellDateTime = getSelectedCellDateTime();
+        console.log('MonthlySchedule: getSelectedCellDateTime result:', cellDateTime);
         return null;
       })()}
       {showRegistrationTab && (
