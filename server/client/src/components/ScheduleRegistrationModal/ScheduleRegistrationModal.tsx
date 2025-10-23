@@ -1,674 +1,1149 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import './ScheduleRegistrationModal.css';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Employee, Equipment, Schedule } from '../../types';
+import { api } from '../../api';
+import { toServerISO } from '../../utils/datetime';
 
-// 型定義
-import { Employee, Schedule, ScheduleParticipant, Equipment, Template } from '../../types';
-
-// 重複チェック用ユーティリティ
-import { checkAllParticipantsOverlap } from '../../utils/overlapUtils';
+// ヘルパー関数
+const addMinutes = (d: Date, mins: number) => new Date(d.getTime() + mins * 60000);
+const pad = (n: number) => String(n).padStart(2, '0');
+const HHmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const toYMD = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const toHM = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const toLocalYMD = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+const toOffsetISOString = (d: Date) => {
+  const tz = -d.getTimezoneOffset();
+  const sign = tz >= 0 ? "+" : "-";
+  const hh = pad(Math.trunc(Math.abs(tz) / 60));
+  const mm = pad(Math.abs(tz) % 60);
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 19);
+  return `${local}${sign}${hh}:${mm}`;
+};
 
 interface ScheduleRegistrationModalProps {
-  selectedCells: Set<string>;
-  employees: Employee[];
-  equipments?: Equipment[]; // 設備リスト
-  selectedDate: Date;
-  colors: string[];
-  initialData?: {
-    startDateTime: Date;
-    endDateTime: Date;
-    employeeId: number;
-  } | null;
-  existingSchedules?: Schedule[]; // 重複チェック用
-  title?: string; // カスタムタイトル
-  onSave: (scheduleData: Partial<Schedule>) => void;
-  onCancel: () => void;
+  isOpen: boolean;
+  onClose: () => void;
+  defaultStart: Date;
+  defaultEnd: Date;
+  selectedDepartmentId: number;
+  defaultEmployeeId?: number;
+  employees?: Employee[];
+  equipments?: Equipment[];
+  colors?: string[];
+  title?: string; // タイトルをカスタマイズ可能に
+  initialValues?: {
+    title?: string;
+    description?: string;
+    color?: string;
+    scheduleId?: number;
+  };
+  onCreated: (created: any) => void;
 }
 
-const ScheduleRegistrationModal: React.FC<ScheduleRegistrationModalProps> = ({
-  selectedCells,
-  employees,
-  equipments = [],
-  selectedDate,
-  colors,
-  initialData,
-  existingSchedules = [],
-  title = 'スケジュール登録',
-  onSave,
-  onCancel
-}) => {
-  // 基本情報
-  const [purpose, setPurpose] = useState('新規スケジュール');
-  const [selectedColor, setSelectedColor] = useState(colors[0]);
+// セルIDから日時を解析する関数（完全に作り直し）
+const parseCellDateTime = (cellId: string, fallbackDate: Date, selectedCellsSize: number = 1, slotMinutes: number = 15) => {
+  console.log('🔍 parseCellDateTime 開始:', { cellId, fallbackDate, selectedCellsSize, slotMinutes });
   
-  // 担当者選択（デフォルトで最初の社員を選択）
-  const [assigneeId, setAssigneeId] = useState<number | null>(
-    initialData?.employeeId || (employees.length > 0 ? employees[0].id : null)
-  );
+  const parts = cellId.split('-');
+  console.log('🔍 セルID分割:', parts);
+  
+  if (parts.length < 4) {
+    console.log('🔍 セルID形式が無効、フォールバックを使用');
+    return {
+      date: fallbackDate,
+      startTime: '09:00',
+      endTime: '10:00',
+      dateYMD: toLocalYMD(fallbackDate)
+    };
+  }
+  
+  // セルID形式: YYYY-MM-DD-slot
+  const year = parseInt(parts[0]);
+  const month = parseInt(parts[1]) - 1; // 月は0から始まる
+  const day = parseInt(parts[2]);
+  const slot = parseInt(parts[3]);
+  
+  const date = new Date(year, month, day);
+  
+  // スロットから時間を計算（slot 0 = 0:00, slot 1 = 0:15, ...）
+  const startHour = Math.floor(slot / 4);
+  const startMinute = (slot % 4) * 15;
+  
+  // 選択されたセル数に基づいて終了時間を計算
+  const totalMinutes = slotMinutes * selectedCellsSize;
+  const startDateTime = new Date(date);
+  startDateTime.setHours(startHour, startMinute, 0, 0);
+  const endDateTime = addMinutes(startDateTime, totalMinutes);
+  
+  const result = {
+    date,
+    startTime: `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`,
+    endTime: HHmm(endDateTime),
+    dateYMD: toLocalYMD(date)
+  };
+  
+  console.log('🔍 parseCellDateTime 結果:', {
+    ...result,
+    slot,
+    startHour,
+    startMinute,
+    totalMinutes,
+    endHour: endDateTime.getHours(),
+    endMinute: endDateTime.getMinutes()
+  });
+  
+  return result;
+};
+
+const ScheduleRegistrationModal: React.FC<ScheduleRegistrationModalProps> = ({
+  isOpen,
+  onClose,
+  defaultStart,
+  defaultEnd,
+  selectedDepartmentId,
+  defaultEmployeeId,
+  employees = [],
+  equipments = [],
+  colors = ['#3174ad', '#ff9800', '#4caf50', '#e91e63', '#9c27b0', '#607d8b', '#795548', '#ff5722'],
+  title,
+  initialValues,
+  onCreated
+}) => {
+  console.log('🚀 ScheduleRegistrationModal 初期化:', {
+    isOpen,
+    defaultStart,
+    defaultEnd,
+    selectedDepartmentId,
+    defaultEmployeeId
+  });
+
+  // 編集モードの判定を安定させる（初期値で固定）
+  const isEditMode = useMemo(() => {
+    const editMode = !!(initialValues?.scheduleId);
+    console.log('🔒 ScheduleRegistrationModal: Edit mode locked to:', editMode, 'scheduleId:', initialValues?.scheduleId);
+    return editMode;
+  }, [initialValues?.scheduleId]);
+
+  // 基本情報（編集モードの場合は初期値を設定）
+  const [purpose, setPurpose] = useState(initialValues?.title || '新規スケジュール');
+  const [selectedColor, setSelectedColor] = useState(initialValues?.color || '#3498db');
+  
+  // purposeの変更を追跡
+  React.useEffect(() => {
+    console.log('📝 ScheduleRegistrationModal: Purpose changed to:', purpose);
+  }, [purpose]);
+  
+  console.log('🔄 ScheduleRegistrationModal: Component initialized with:', {
+    initialValues,
+    purpose,
+    selectedColor,
+    isEditMode,
+    hasScheduleId: !!initialValues?.scheduleId,
+    scheduleIdValue: initialValues?.scheduleId,
+    titleValue: initialValues?.title
+  });
+  
+  // 編集モードの詳細確認
+  if (isEditMode) {
+    console.log('✅ ScheduleRegistrationModal: EDIT MODE DETECTED');
+    console.log('✅ ScheduleRegistrationModal: Schedule ID:', initialValues?.scheduleId);
+    console.log('✅ ScheduleRegistrationModal: Initial title:', initialValues?.title);
+  } else {
+    console.log('❌ ScheduleRegistrationModal: NEW MODE');
+    console.log('❌ ScheduleRegistrationModal: initialValues:', initialValues);
+  }
+  
+  // 担当者は参加者の最初の人を自動設定
   
   // 参加者管理
-  const [participants, setParticipants] = useState<Employee[]>([]);
+  const [participants, setParticipants] = useState<{ id: number; name: string }[]>([]);
   const [participantSearchTerm, setParticipantSearchTerm] = useState('');
   const [showParticipantDropdown, setShowParticipantDropdown] = useState(false);
   
-  // 重複検出と表示
-  const [participantOverlaps, setParticipantOverlaps] = useState<{ employee: Employee; overlappingSchedules: Schedule[] }[]>([]);
-
   // 設備管理
-  const [selectedEquipments, setSelectedEquipments] = useState<Equipment[]>([]);
+  const [selectedEquipments, setSelectedEquipments] = useState<{ id: number; name: string }[]>([]);
   const [equipmentSearchTerm, setEquipmentSearchTerm] = useState('');
   const [showEquipmentDropdown, setShowEquipmentDropdown] = useState(false);
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   
   // 重複実行防止
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // ドラッグ機能は削除
+  // タブ管理
+  const [activeTab, setActiveTab] = useState<'participants' | 'equipment'>('participants');
   
-  // 現在時刻と現在時刻+15分を計算
-  const getCurrentTime = () => {
-    const now = new Date();
-    const startTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    
-    const endTime = new Date(now.getTime() + 15 * 60000); // +15分
-    const endTimeStr = `${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}`;
-    
-    return { startTime, endTimeStr };
-  };
-
-  const { startTime: currentStartTime, endTimeStr: currentEndTime } = getCurrentTime();
-
-  const [scheduleEntries, setScheduleEntries] = useState([
-    {
-      id: 1,
-      date: initialData ? new Date(initialData.startDateTime.getFullYear(), initialData.startDateTime.getMonth(), initialData.startDateTime.getDate()) : new Date(), // 仮の日付、useEffectで正しい日付に更新
-      startTime: initialData ? '' : currentStartTime,
-      endTime: initialData ? '' : currentEndTime
-    }
-  ]);
+  // 選択中の状態管理（タブ固定用）
+  const [isSelectingParticipants, setIsSelectingParticipants] = useState(false);
+  const [isSelectingEquipments, setIsSelectingEquipments] = useState(false);
   
-  // テンプレート読み込み（一時的に無効化）
-  useEffect(() => {
-    console.log('Template loading disabled - setting empty array');
-    setTemplates([]); // 一時的に空配列を設定
-  }, []);
+  // スクロール中の状態管理
+  const [isScrollingParticipants, setIsScrollingParticipants] = useState(false);
+  const [isScrollingEquipments, setIsScrollingEquipments] = useState(false);
 
-  // initialDataの処理
-  useEffect(() => {
-    if (initialData) {
-      console.log('ScheduleRegistrationModal: Processing initialData');
-      const startHour = initialData.startDateTime.getHours();
-      const startMinute = initialData.startDateTime.getMinutes();
-      const endHour = initialData.endDateTime.getHours();
-      const endMinute = initialData.endDateTime.getMinutes();
-      setScheduleEntries([{
-        id: 1,
-        date: new Date(initialData.startDateTime.getFullYear(), initialData.startDateTime.getMonth(), initialData.startDateTime.getDate()),
-        startTime: `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`,
-        endTime: `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`
-      }]);
-    }
-  }, [initialData]);
+  // 入力state（完全制御）
+  const [dateYMD, setDateYMD] = React.useState<string>(toYMD(defaultStart));
+  const [startHM, setStartHM] = React.useState<string>(toHM(defaultStart));
+  const [endHM, setEndHM] = React.useState<string>(toHM(defaultEnd));
 
-  // selectedCellsの処理
-  useEffect(() => {
-    if (selectedCells.size > 0) {
-      const cellIds = Array.from(selectedCells ?? []);
-      // セルIDから日付情報を取得（月別スケジュール形式: YYYY-MM-DD-slot）
-      const firstCellId = cellIds[0];
-      const parts = firstCellId.split('-');
-      
-      let cellDate: Date;
-      if (parts.length >= 4) {
-        // 月別スケジュール形式の場合
-        const year = parseInt(parts[0]);
-        const month = parseInt(parts[1]) - 1; // 0ベース
-        const day = parseInt(parts[2]);
-        cellDate = new Date(year, month, day);
-        
-        
-        const slots = cellIds.map(id => parseInt(id.split('-')[3])).sort((a, b) => a - b);
-        const startSlot = Math.min(...slots);
-        const endSlot = Math.max(...slots) + 1;
-        const startHour = Math.floor(startSlot / 4);
-        const startMinute = (startSlot % 4) * 15;
-        const endHour = Math.floor(endSlot / 4);
-        const endMinuteCalc = (endSlot % 4) * 15;
-        
-        setScheduleEntries([{
-          id: 1,
-          date: cellDate,
-          startTime: `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`,
-          endTime: `${endHour.toString().padStart(2, '0')}:${endMinuteCalc.toString().padStart(2, '0')}`
-        }]);
-      } else {
-        // 他のスケジュール形式の場合（従来の処理）
-        cellDate = new Date(); // 現在の日付をデフォルトとして使用
-        const slots = cellIds.map(id => parseInt(id.split('-')[1])).sort((a, b) => a - b);
-        const startSlot = Math.min(...slots);
-        const endSlot = Math.max(...slots) + 1;
-        const startHour = Math.floor(startSlot / 4);
-        const startMinute = (startSlot % 4) * 15;
-        const endHour = Math.floor(endSlot / 4);
-        const endMinuteCalc = (endSlot % 4) * 15;
-        
-        setScheduleEntries([{
-          id: 1,
-          date: cellDate,
-          startTime: `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`,
-          endTime: `${endHour.toString().padStart(2, '0')}:${endMinuteCalc.toString().padStart(2, '0')}`
-        }]);
-      }
-    }
-  }, [selectedCells]);
-
-  // selectedDateのフォールバック処理（初回のみ）
-  useEffect(() => {
-    if (selectedCells.size === 0 && !initialData) {
-      setScheduleEntries([{
-        id: 1,
-        date: selectedDate,
-        startTime: currentStartTime,
-        endTime: currentEndTime
-      }]);
-    }
-  }, [selectedDate, initialData]); // selectedCells.sizeを削除
-
-  // 参加者関連の関数
-  const addParticipant = (employee: Employee) => {
-    if (!participants.some(p => p.id === employee.id) && employee.id !== assigneeId) {
-      setParticipants([...participants, employee]);
-    }
-    setParticipantSearchTerm('');
-    setShowParticipantDropdown(false);
-  };
-
-  const removeParticipant = (employeeId: number) => {
-    setParticipants(participants.filter(p => p.id !== employeeId));
-  };
-
-  const filteredEmployees = employees.filter(emp => 
-    emp.name.toLowerCase().includes(participantSearchTerm.toLowerCase()) &&
-    !participants.some(p => p.id === emp.id) &&
-    emp.id !== assigneeId
-  );
-
-  // 設備関連の関数
-  const addEquipment = (equipment: Equipment) => {
-    if (!selectedEquipments.some(e => e.id === equipment.id)) {
-      setSelectedEquipments([...selectedEquipments, equipment]);
-    }
-    setEquipmentSearchTerm('');
-    setShowEquipmentDropdown(false);
-  };
-
-  const removeEquipment = (equipmentId: number) => {
-    setSelectedEquipments(selectedEquipments.filter(e => e.id !== equipmentId));
-  };
-
-  const filteredEquipments = equipments.filter(eq => 
-    eq.name.toLowerCase().includes(equipmentSearchTerm.toLowerCase()) &&
-    !selectedEquipments.some(selected => selected.id === eq.id)
-  );
-
-  // 参加者重複チェック
-  const checkParticipantOverlaps = useCallback(() => {
-    if (!assigneeId || scheduleEntries.length === 0) {
-      setParticipantOverlaps([]);
-      return;
-    }
-
-    const entry = scheduleEntries[0]; // 最初のエントリで重複チェック
-    if (!entry.startTime || !entry.endTime) {
-      setParticipantOverlaps([]);
-      return;
-    }
-
-    const startDateTime = new Date(entry.date);
-    const [startHour, startMinute] = entry.startTime.split(':').map(Number);
-    startDateTime.setHours(startHour, startMinute, 0, 0);
-
-    const endDateTime = new Date(entry.date);
-    const [endHour, endMin] = entry.endTime.split(':').map(Number);
-    endDateTime.setHours(endHour, endMin, 0, 0);
-
-    const scheduleData = {
-      assignee_id: assigneeId,
-      start_datetime: startDateTime.toISOString(),
-      end_datetime: endDateTime.toISOString()
-    };
-
-    const overlaps = checkAllParticipantsOverlap(
-      scheduleData,
-      participants,
-      existingSchedules,
-      employees
-    );
-
-    setParticipantOverlaps(overlaps);
-  }, [assigneeId, participants, existingSchedules, employees]);
-
-  // スケジュール時間や参加者が変更された時に重複チェック
-  // 一時的に無効化して無限ループを防ぐ
-  /*
-  useEffect(() => {
-    checkParticipantOverlaps();
-  }, [checkParticipantOverlaps, scheduleEntries]);
-  */
-
-  const handleSave = async () => {
-    // 重複実行を防止
-    if (isSubmitting) {
-      console.log('スケジュール登録処理中です。重複実行を防止します。');
-      return;
-    }
-    
-    if (!purpose.trim() || !assigneeId) {
-      alert('用件が未入力です。');
-      return;
-    }
-
-    console.log('スケジュール登録開始:', {
-      scheduleEntriesCount: scheduleEntries.length,
-      scheduleEntries: scheduleEntries,
-      assigneeId: assigneeId,
-      purpose: purpose
+  // モーダルopen/選択変更で再初期化
+  React.useEffect(() => {
+    console.log('🔄 ScheduleRegistrationModal: useEffect triggered', { 
+      isOpen, 
+      initialValues,
+      hasInitialValues: !!initialValues,
+      scheduleId: initialValues?.scheduleId 
     });
-
-    // 各エントリーをチェック
-    for (const entry of scheduleEntries) {
-      if (!entry.startTime || !entry.endTime) {
-        alert('時間が未入力です。');
-        return;
-      }
-
-      const startDateTime = new Date(entry.date);
-      const [startHour, startMinute] = entry.startTime.split(':').map(Number);
-      startDateTime.setHours(startHour, startMinute, 0, 0);
-
-      const endDateTime = new Date(entry.date);
-      const [endHour, endMin] = entry.endTime.split(':').map(Number);
-      endDateTime.setHours(endHour, endMin, 0, 0);
-
-      if (startDateTime >= endDateTime) {
-        alert('終了時間は開始時間より後にしてください。');
-        return;
-      }
+    
+    if (!isOpen) {
+      console.log('🔄 ScheduleRegistrationModal: Modal is closed, skipping initialization');
+      return;
     }
+    
+    setDateYMD(toYMD(defaultStart));
+    setStartHM(toHM(defaultStart));
+    setEndHM(toHM(defaultEnd));
+    
+    // 編集モードの場合は初期値を再設定
+    if (isEditMode && initialValues) {
+      console.log('🔄 ScheduleRegistrationModal: Setting initial values for edit mode:', initialValues);
+      console.log('🔥 ScheduleRegistrationModal: Setting purpose to:', initialValues.title);
+      console.log('🔥 ScheduleRegistrationModal: Purpose value details:', {
+        originalTitle: initialValues.title,
+        titleType: typeof initialValues.title,
+        titleLength: initialValues.title?.length,
+        willSetTo: initialValues.title || '新規スケジュール'
+      });
+      setPurpose(initialValues.title || '新規スケジュール');
+      setSelectedColor(initialValues.color || '#3498db');
+    } else {
+      console.log('🔄 ScheduleRegistrationModal: Setting default values for new mode');
+      console.log('🔥 ScheduleRegistrationModal: initialValues was:', initialValues);
+      setPurpose('新規スケジュール');
+      setSelectedColor('#3498db');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialValues]);
 
+  // 開始時間変更時の処理（15分刻み制約を解除）
+  const onStartChange = (v: string) => {
+    setStartHM(v);
+    const [sh, sm] = v.split(':').map(Number);
+    const [eh, em] = endHM.split(':').map(Number);
+    const startM = sh*60+sm, endM = eh*60+em;
+    
+    // 終了時間が開始時間以下の場合のみ、最小1分後に調整
+    if (endM <= startM) {
+      const mm = startM + 1; // 最小1分後
+      setEndHM(`${pad(Math.floor(mm/60)%24)}:${pad(mm%60)}`);
+    }
+  };
+
+  // defaultEmployeeIdが設定されている場合、自動的に参加者に追加
+  useEffect(() => {
+    if (participants.length > 0) return;
+    if (employees.length === 0) return;
+    const targetId = defaultEmployeeId ?? employees[0].id;
+    const target = employees.find(emp => emp.id === targetId) || employees[0];
+    if (target) {
+      setParticipants([{ id: target.id, name: target.name }]);
+    }
+  }, [defaultEmployeeId, employees, participants.length]);
+
+  // 保存処理
+  const submit = async () => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
     
     try {
-      // 各エントリーを順次保存（非同期処理を順次実行）
-      for (const entry of scheduleEntries) {
-        const startDateTime = new Date(entry.date);
-        const [startHour, startMinute] = entry.startTime.split(':').map(Number);
-        startDateTime.setHours(startHour, startMinute, 0, 0);
-
-        const endDateTime = new Date(entry.date);
-        const [endHour, endMin] = entry.endTime.split(':').map(Number);
-        endDateTime.setHours(endHour, endMin, 0, 0);
-
-        const saveData = {
-          employee_id: assigneeId!,
-          title: purpose.trim(),
-          start_datetime: startDateTime.toISOString(),
-          end_datetime: endDateTime.toISOString(),
-          color: selectedColor,
-          assignee_id: assigneeId,
-          // participant_ids: participants.map(p => p.id), // 参加者機能無効化
-          equipment_ids: selectedEquipments.map(e => e.id) // 設備IDリスト
-        };
-
-        console.log('スケジュール保存中:', saveData);
-        await onSave(saveData);
-        console.log('スケジュール保存完了');
+      console.log(isEditMode ? '🚀 更新処理開始' : '🚀 登録処理開始');
+      
+      if (participants.length === 0) {
+        alert('参加者を1人以上選択してください');
+        return;
       }
+      
+      // Date のまま構築し、送信直前だけ ISO 化（UTC）
+      const [y, m, d] = dateYMD.split('-').map(Number);
+      const [sh, sm] = startHM.split(':').map(Number);
+      const [eh, em] = endHM.split(':').map(Number);
+      const startDate = new Date(y, (m || 1) - 1, d || 1, sh || 0, sm || 0, 0, 0);
+      const endDate   = new Date(y, (m || 1) - 1, d || 1, eh || 0, em || 0, 0, 0);
+      const startISO = toServerISO(startDate);
+      const endISO   = toServerISO(endDate);
+      
+      const payload = {
+        title: purpose,
+        purpose: purpose,
+        employee_id: participants[0].id, // 参加者の最初の人を担当者に設定
+        equipment_id: 0,
+        start_datetime: startISO,
+        end_datetime: endISO,
+        color: selectedColor,
+        department_id: selectedDepartmentId,
+      };
+      
+      console.log('📝 ScheduleRegistrationModal: Form values at submit:', {
+        purpose,
+        selectedColor,
+        participants: participants.map(p => ({ id: p.id, name: p.name })),
+        startISO,
+        endISO,
+        selectedDepartmentId,
+        isEditMode,
+        scheduleId: initialValues?.scheduleId,
+        originalTitle: initialValues?.title,
+        newTitle: purpose
+      });
+      
+      console.log(isEditMode ? '🚀 更新ペイロード(form):' : '🚀 登録ペイロード(form):', payload);
+      
+      // 編集モードかどうかで処理を分岐
+      console.log('🔥 ScheduleRegistrationModal: Checking edit mode - isEditMode:', isEditMode);
+      console.log('🔥 ScheduleRegistrationModal: initialValues:', initialValues);
+      
+      if (isEditMode && initialValues?.scheduleId) {
+        // 編集モード: 更新API呼び出し
+        console.log('✅ ScheduleRegistrationModal: EDIT MODE - Changing schedule:', initialValues.scheduleId);
+        console.log('🔄 ScheduleRegistrationModal: Change payload:', payload);
+        console.log('🔄 ScheduleRegistrationModal: Initial values:', initialValues);
+        console.log('🔄 ScheduleRegistrationModal: API URL:', `/schedules/${initialValues.scheduleId}`);
+        console.log('🔄 ScheduleRegistrationModal: Request method: PUT');
+        
+        const response = await api.put(`/schedules/${initialValues.scheduleId}`, payload);
+        const updated = response.data;
+        console.log('🔄 ScheduleRegistrationModal: Change response:', updated);
+        console.log('🔄 ScheduleRegistrationModal: Response status:', response.status);
+        console.log('🔄 ScheduleRegistrationModal: Full response object:', response);
+        console.log('🔄 ScheduleRegistrationModal: Response data type:', typeof updated);
+        console.log('🔄 ScheduleRegistrationModal: Response data keys:', Object.keys(updated || {}));
+        
+        // 編集モードであることを明示するためにフラグを追加
+        const updatedWithFlag = { ...updated, _wasUpdated: true };
+        console.log('🔄 ScheduleRegistrationModal: Calling onCreated with changed data:', updatedWithFlag);
+        onCreated(updatedWithFlag);
+      } else {
+        // 新規登録モード: 作成API呼び出し
+        console.log('❌ ScheduleRegistrationModal: NEW SCHEDULE MODE - Creating schedule (SHOULD BE EDIT!)');
+        console.log('❌ ScheduleRegistrationModal: Why is this NEW mode? initialValues:', initialValues);
+        const response = await api.post('/schedules', payload);
+        const created = response.data;
+        console.log('✨ ScheduleRegistrationModal: Create response:', created);
+        onCreated(created);
+      }
+      onClose();
     } catch (error) {
-      console.error('スケジュール登録エラー:', error);
-      alert('スケジュールの登録に失敗しました。');
+      console.error('❌ 保存例外:', error);
+      const errorMessage = isEditMode 
+        ? 'スケジュールの更新に失敗しました' 
+        : 'スケジュールの登録に失敗しました';
+      alert(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const addScheduleEntry = () => {
-    const newId = Math.max(...scheduleEntries.map(entry => entry.id)) + 1;
-    const firstEntry = scheduleEntries[0];
-    setScheduleEntries([...scheduleEntries, {
-      id: newId,
-      date: new Date(firstEntry.date.getFullYear(), firstEntry.date.getMonth(), firstEntry.date.getDate()),
-      startTime: firstEntry.startTime,
-      endTime: firstEntry.endTime
-    }]);
-  };
-
-  const removeScheduleEntry = (id: number) => {
-    if (scheduleEntries.length > 1) {
-      setScheduleEntries(scheduleEntries.filter(entry => entry.id !== id));
-    }
-  };
-
-  const updateScheduleEntry = (id: number, field: 'date' | 'startTime' | 'endTime', value: string | Date) => {
-    setScheduleEntries(scheduleEntries.map(entry => 
-      entry.id === id ? { ...entry, [field]: value } : entry
-    ));
-  };
-
-  // ドラッグ機能は削除
-
-
+  if (!isOpen) return null;
 
   return (
-    <div className="schedule-registration-modal-overlay">
-      <div className="schedule-registration-modal">
-        <div className="modal-header">
-          <h3 className="header-title-left">{title}</h3>
-          <button className="close-btn" onClick={onCancel}>×</button>
+    <div className="modal-overlay" style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10000
+    }}>
+      <div className="modal-content" style={{
+        backgroundColor: 'white',
+        borderRadius: '16px',
+        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+        width: '90vw',
+        maxWidth: '1200px',
+        height: '80vh',
+        maxHeight: '700px',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}>
+        {/* ヘッダー */}
+        <div className="modal-header" style={{
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
+          padding: '20px 30px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          borderTopLeftRadius: '16px',
+          borderTopRightRadius: '16px'
+        }}>
+        <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '600' }}>
+          ✨ {initialValues?.scheduleId ? 'スケジュール変更' : (title || 'スケジュール登録')}
+        </h2>
+          <button 
+            className="close-button" 
+            onClick={onClose}
+            style={{
+              background: 'rgba(255, 255, 255, 0.2)',
+              border: 'none',
+              color: 'white',
+              fontSize: '24px',
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            ×
+          </button>
         </div>
+        
+        {/* メインコンテンツ - 横向きレイアウト */}
+        <div className="modal-body" style={{
+          display: 'flex',
+          flex: 1,
+          overflow: 'hidden'
+        }}>
+          {/* 左側: 基本情報 */}
+          <div className="left-panel" style={{
+            width: '50%',
+            padding: '30px',
+            borderRight: '1px solid #e9ecef',
+            overflowY: 'auto',
+            background: '#f8f9fa'
+          }}>
+            <div style={{ marginBottom: '25px' }}>
+              <h3 style={{ 
+                margin: '0 0 15px 0', 
+                color: '#495057', 
+                fontSize: '18px',
+                fontWeight: '600',
+                borderBottom: '2px solid #667eea',
+                paddingBottom: '8px'
+              }}>
+                📝 基本情報
+              </h3>
+            </div>
 
-
-
-        <div className="tab-content">
-          {/* 担当者選択 */}
-              <div className="form-row">
-                <div className="form-group">
-                  <label>担当者:</label>
-                  <select 
-                    value={assigneeId || ''} 
-                    onChange={(e) => setAssigneeId(e.target.value ? Number(e.target.value) : null)}
-                  >
-                    <option value="">担当者を選択してください</option>
-                    {employees
-                      .sort((a, b) => (a.employee_number || '').localeCompare(b.employee_number || ''))
-                      .map(emp => (
-                        <option key={emp.id} value={emp.id}>
-                          {emp.name} ({emp.employee_number})
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="schedule-entries">
-              {scheduleEntries.map((entry, index) => (
-                <div key={entry.id} className="schedule-entry">
-                  <div className="entry-header">
-                    <span className="entry-number">スケジュール {index + 1}</span>
-                    {scheduleEntries.length > 1 && (
-                      <button 
-                        className="remove-entry-btn" 
-                        onClick={() => removeScheduleEntry(entry.id)}
-                        title="削除"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>日付:</label>
-                                              <input
-                          type="date" 
-                          value={`${entry.date.getFullYear()}-${String(entry.date.getMonth() + 1).padStart(2, '0')}-${String(entry.date.getDate()).padStart(2, '0')}`} 
-                          onChange={(e) => {
-                            // タイムゾーンオフセットを考慮して日付を正しく設定（ローカル）
-                            const [year, month, day] = e.target.value.split('-').map(Number);
-                            updateScheduleEntry(entry.id, 'date', new Date(year, month - 1, day));
-                          }} 
-                        />
-                    </div>
-                  </div>
-                  <div className="time-fields-row">
-                    <div className="form-group">
-                      <label>開始時間:</label>
-                      <input 
-                        type="time" 
-                        value={entry.startTime} 
-                        onChange={(e) => updateScheduleEntry(entry.id, 'startTime', e.target.value)} 
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>終了時間:</label>
-                      <input 
-                        type="time" 
-                        value={entry.endTime} 
-                        onChange={(e) => updateScheduleEntry(entry.id, 'endTime', e.target.value)} 
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-              
-              <div className="add-entry-section">
-                <button className="add-entry-btn" onClick={addScheduleEntry}>
-                  <span>+</span> スケジュールを追加
-                </button>
+            {/* 担当者名（色の上に表示） */}
+            <div className="form-group" style={{ marginBottom: '16px' }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '6px', 
+                fontWeight: '600', 
+                color: '#495057' 
+              }}>
+                担当者
+              </label>
+              <div style={{
+                width: '100%',
+                padding: '10px 12px',
+                border: '2px solid #e9ecef',
+                borderRadius: '8px',
+                fontSize: '14px',
+                background: '#fff',
+                color: '#333'
+              }}>
+                {participants.length > 0 ? participants[0].name : '未選択'}
               </div>
             </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label>用件:</label>
-                <input type="text" value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="用件を入力してください" maxLength={50} />
-                {/* テンプレート選択 */}
-                <div style={{ marginTop: 8 }}>
-                  <label style={{ marginRight: 8 }}>テンプレート:</label>
-                  <select
-                    value={selectedTemplateId}
-                    onChange={(e) => {
-                      const tid = e.target.value;
-                      setSelectedTemplateId(tid);
-                      const tpl = templates.find(t => String(t.id) === tid);
-                      if (tpl) {
-                        setPurpose(tpl.title);
-                        // 色も合わせる
-                        if (tpl.color) setSelectedColor(tpl.color);
-                      }
+            {/* 色選択（一番先頭） */}
+            <div className="form-group" style={{ marginBottom: '20px' }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '8px', 
+                fontWeight: '600', 
+                color: '#495057' 
+              }}>
+                色
+              </label>
+              <div className="color-picker" style={{ 
+                display: 'flex', 
+                gap: '8px', 
+                flexWrap: 'wrap' 
+              }}>
+                {colors.map(color => (
+                  <button
+                    key={color}
+                    className={`color-option ${selectedColor === color ? 'selected' : ''}`}
+                    style={{ 
+                      backgroundColor: color,
+                      width: '32px',
+                      height: '32px',
+                      border: selectedColor === color ? '3px solid #333' : '2px solid #e9ecef',
+                      borderRadius: '50%',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      transform: selectedColor === color ? 'scale(1.1)' : 'scale(1)'
                     }}
-                  >
-                    <option value="">未選択</option>
-                    {templates.map(t => (
-                      <option key={t.id} value={String(t.id)}>{t.name}（{t.title}）</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="form-group">
-                <label>色:</label>
-                <div className="color-palette">
-                  {colors.map((color, index) => (
-                    <button key={`${color}-${index}`} className={`color-btn ${selectedColor === color ? 'selected' : ''}`} style={{ backgroundColor: color }} onClick={() => setSelectedColor(color)} />
-                  ))}
-                </div>
+                    onClick={() => setSelectedColor(color)}
+                  />
+                ))}
               </div>
             </div>
 
-            {/* 参加者・設備予約BOX */}
-            <div className="participants-equipment-container">
-              {/* 参加者BOX（左側） - 非表示 */}
-              {false && (
-                <div className="participants-box">
-                  <h4>参加者 ({participants.length}人)</h4>
-                
-                {/* 重複警告表示 */}
-                {participantOverlaps.length > 0 && (
-                  <div className="overlap-warning">
-                    <div className="overlap-header">
-                      <span className="warning-icon">⚠️</span>
-                      <span className="warning-text">スケジュール重複が検出されました</span>
-                    </div>
-                    <div className="overlap-details">
-                      {participantOverlaps.map(overlap => (
-                        <div key={overlap.employee.id} className="overlap-item">
-                          <span className="overlap-employee">{overlap.employee.name}</span>
-                          <span className="overlap-count">
-                            {overlap.overlappingSchedules.length}件の重複
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* 参加者追加 */}
-                <div className="participant-add-section">
-                  <div className="participant-search">
-                    <input
-                      type="text"
-                      placeholder="社員名で検索..."
-                      value={participantSearchTerm}
-                      onChange={(e) => {
-                        setParticipantSearchTerm(e.target.value);
-                        setShowParticipantDropdown(e.target.value.length > 0);
-                      }}
-                      onFocus={() => setShowParticipantDropdown(participantSearchTerm.length > 0)}
-                    />
-                    <button 
-                      className="add-participant-btn"
-                      onClick={() => setShowParticipantDropdown(!showParticipantDropdown)}
-                    >
-                      + 参加者を追加
-                    </button>
-                  </div>
+            {/* テンプレートボタン */}
+            <div className="form-group" style={{ marginBottom: '20px' }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '8px', 
+                fontWeight: '600', 
+                color: '#495057' 
+              }}>
+                テンプレート
+              </label>
+              <button
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  border: '2px solid #28a745',
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, #28a745 0%, #34ce57 100%)',
+                  color: 'white',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 2px 4px rgba(40, 167, 69, 0.3)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(40, 167, 69, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(40, 167, 69, 0.3)';
+                }}
+              >
+                📋 テンプレートから選択
+              </button>
+            </div>
+
+            {/* 目的 */}
+            <div className="form-group" style={{ marginBottom: '20px' }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '8px', 
+                fontWeight: '600', 
+                color: '#495057' 
+              }}>
+                目的
+              </label>
+              <input
+                type="text"
+                value={purpose}
+                onChange={(e) => {
+                  console.log('📝 ScheduleRegistrationModal: Purpose changed from', purpose, 'to', e.target.value);
+                  setPurpose(e.target.value);
+                }}
+                placeholder="スケジュールの目的を入力"
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  border: '2px solid #e9ecef',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  transition: 'border-color 0.3s ease',
+                  outline: 'none'
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                onBlur={(e) => e.target.style.borderColor = '#e9ecef'}
+              />
+            </div>
+            
+            {/* 日時 */}
+            <div className="form-group" style={{ marginBottom: '20px' }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '8px', 
+                fontWeight: '600', 
+                color: '#495057' 
+              }}>
+                日付
+              </label>
+              <input
+                type="date"
+                value={dateYMD}
+                onChange={(e) => setDateYMD(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  border: '2px solid #e9ecef',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  transition: 'border-color 0.3s ease',
+                  outline: 'none'
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                onBlur={(e) => e.target.style.borderColor = '#e9ecef'}
+              />
+            </div>
+            
+            <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '8px', 
+                  fontWeight: '600', 
+                  color: '#495057' 
+                }}>
+                  開始時間
+                </label>
+                <input
+                  type="time"
+                  value={startHM}
+                  onChange={(e) => onStartChange(e.target.value)}
+                  step={60}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '2px solid #e9ecef',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    transition: 'border-color 0.3s ease',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                  onBlur={(e) => e.target.style.borderColor = '#e9ecef'}
+                />
+              </div>
+              
+              <div className="form-group" style={{ flex: 1 }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '8px', 
+                  fontWeight: '600', 
+                  color: '#495057' 
+                }}>
+                  終了時間
+                </label>
+                <input
+                  type="time"
+                  value={endHM}
+                  onChange={(e) => setEndHM(e.target.value)}
+                  step={60}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '2px solid #e9ecef',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    transition: 'border-color 0.3s ease',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                  onBlur={(e) => e.target.style.borderColor = '#e9ecef'}
+                />
+              </div>
+            </div>
+            
+            {/* 担当者欄は削除 - 参加者の最初の人が自動的に担当者になります */}
+            
+          </div>
+
+          {/* 右側: タブコンテンツ */}
+          <div className="right-panel" style={{
+            width: '50%',
+            display: 'flex',
+            flexDirection: 'column',
+            background: 'white'
+          }}>
+            {/* 参加者・設備管理セクション（2段横並び） */}
+            <div style={{ display: 'flex', gap: '20px', marginBottom: '30px' }}>
+              {/* 参加者管理セクション */}
+              <div className="management-section" style={{
+                flex: 1,
+                border: '2px solid #e9ecef',
+                borderRadius: '12px',
+                background: 'white',
+                overflow: 'hidden',
+                minHeight: '600px'
+              }}>
+                <div className="section-header" style={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  padding: '15px 20px',
+                  fontWeight: '600',
+                  fontSize: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  👥 参加者管理
+                </div>
+                <div className="section-content" style={{ padding: '20px', minHeight: '500px' }}>
+                {/* 参加者検索・追加 */}
+                <div style={{ marginBottom: '15px', position: 'relative' }}>
+                  <input
+                    type="text"
+                    value={participantSearchTerm}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      console.log('🔍 参加者検索入力:', {
+                        value: value,
+                        showDropdown: value.length > 0
+                      });
+                      setParticipantSearchTerm(value);
+                      setShowParticipantDropdown(value.length > 0);
+                    }}
+                    placeholder="参加者を検索..."
+                    style={{
+                      width: '100%',
+                      padding: '10px 15px',
+                      border: '2px solid #e9ecef',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      transition: 'border-color 0.3s ease'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#667eea';
+                      setShowParticipantDropdown(true);
+                      setIsSelectingParticipants(true);
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e9ecef';
+                      // 少し遅延させてドロップダウンを閉じる
+                      setTimeout(() => {
+                        setShowParticipantDropdown(false);
+                        setIsSelectingParticipants(false);
+                      }, 200);
+                    }}
+                  />
                   
+                  {/* 参加者ドロップダウン */}
                   {showParticipantDropdown && (
-                    <div className="participant-dropdown">
-                      {filteredEmployees.length > 0 ? (
-                        filteredEmployees.slice(0, 10).map(emp => (
-                          <div 
-                            key={emp.id} 
-                            className="participant-option"
-                            onClick={() => addParticipant(emp)}
+                    <div 
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        background: 'white',
+                        border: '1px solid #e9ecef',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                        zIndex: 1000,
+                        maxHeight: '800px',
+                        overflowY: 'auto',
+                        marginTop: '4px'
+                      }}
+                      onScroll={() => setIsScrollingParticipants(true)}
+                      onMouseDown={() => setIsScrollingParticipants(true)}
+                      onMouseUp={() => setIsScrollingParticipants(false)}
+                      onTouchStart={() => setIsScrollingParticipants(true)}
+                      onTouchEnd={() => setIsScrollingParticipants(false)}
+                      onMouseLeave={() => setIsScrollingParticipants(false)}
+                    >
+                      {(() => {
+                        const filtered = employees
+                          .filter(emp => 
+                            emp.name.toLowerCase().includes(participantSearchTerm.toLowerCase()) &&
+                            !participants.find(p => p.id === emp.id)
+                          );
+                        console.log('参加者フィルタリング結果:', filtered);
+                        console.log('参加者全データ:', employees.map(emp => ({ id: emp.id, name: emp.name })));
+                        console.log('検索条件:', participantSearchTerm.toLowerCase());
+                        return filtered.map(employee => (
+                          <div
+                            key={employee.id}
+                            style={{
+                              padding: '12px 16px',
+                              cursor: 'pointer',
+                              transition: 'background-color 0.3s ease',
+                              borderBottom: '1px solid #f8f9fa'
+                            }}
+                            onClick={() => {
+                              setParticipants([...participants, employee]);
+                              setParticipantSearchTerm('');
+                              setShowParticipantDropdown(false);
+                              setIsSelectingParticipants(false);
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                           >
-                            <span className="emp-name">{emp.name}</span>
-                            <span className="emp-number">({emp.employee_number})</span>
-                            <span className="emp-dept">{emp.department_name}</span>
+                            {employee.name}
                           </div>
-                        ))
-                      ) : (
-                        <div className="no-options">該当する社員が見つかりません</div>
+                        ));
+                      })()}
+                      {(() => {
+                        return employees.filter(emp => 
+                          emp.name.toLowerCase().includes(participantSearchTerm.toLowerCase()) &&
+                          !participants.find(p => p.id === emp.id)
+                        ).length === 0;
+                      })() && (
+                        <div style={{
+                          padding: '12px 16px',
+                          color: '#6c757d',
+                          fontStyle: 'italic',
+                          textAlign: 'center'
+                        }}>
+                          該当する参加者が見つかりません
+                        </div>
                       )}
                     </div>
                   )}
                 </div>
-
-                {/* 参加者リスト */}
-                <div className="participants-list">
-                  {participants.length === 0 ? (
-                    <div className="no-participants">参加者が設定されていません</div>
-                  ) : (
-                    participants.map(participant => (
-                      <div key={participant.id} className="participant-item">
-                        <div className="participant-info">
-                          <span className="participant-name">{participant.name}</span>
-                          <span className="participant-number">({participant.employee_number})</span>
-                          <span className="participant-dept">{participant.department_name}</span>
-                        </div>
-                        <button 
-                          className="remove-participant-btn"
-                          onClick={() => removeParticipant(participant.id)}
-                          title="参加者から削除"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-              )}
-
-            {/* 設備予約BOX（右側） */}
-            <div className="equipment-box">
-              <h4>設備予約 ({selectedEquipments.length}件)</h4>
-              
-              {/* 設備追加 */}
-              <div className="equipment-add-section">
-                <div className="equipment-search">
-                  <input
-                    type="text"
-                    placeholder="設備名で検索..."
-                    value={equipmentSearchTerm}
-                    onChange={(e) => {
-                      setEquipmentSearchTerm(e.target.value);
-                      setShowEquipmentDropdown(e.target.value.length > 0);
-                    }}
-                    onFocus={() => setShowEquipmentDropdown(equipmentSearchTerm.length > 0)}
-                  />
-                  <button 
-                    className="add-equipment-btn"
-                    onClick={() => setShowEquipmentDropdown(!showEquipmentDropdown)}
-                  >
-                    + 設備を追加
-                  </button>
-                </div>
                 
-                {showEquipmentDropdown && (
-                  <div className="equipment-dropdown">
-                    {filteredEquipments.length > 0 ? (
-                      filteredEquipments.slice(0, 10).map(eq => (
-                        <div 
-                          key={eq.id} 
-                          className="equipment-option"
-                          onClick={() => addEquipment(eq)}
-                        >
-                          <span className="eq-name">{eq.name}</span>
-                          <span className="eq-desc">{eq.description}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="no-options">該当する設備が見つかりません</div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* 設備リスト */}
-              <div className="equipment-list">
-                {selectedEquipments.length === 0 ? (
-                  <div className="no-equipments">設備が設定されていません</div>
-                ) : (
-                  selectedEquipments.map(equipment => (
-                    <div key={equipment.id} className="equipment-item">
-                      <div className="equipment-info">
-                        <span className="equipment-name">{equipment.name}</span>
-                        <span className="equipment-desc">{equipment.description}</span>
-                      </div>
-                      <button 
-                        className="remove-equipment-btn"
-                        onClick={() => removeEquipment(equipment.id)}
-                        title="設備から削除"
+                {/* 参加者リスト */}
+                <div 
+                  className="participants-list" 
+                  style={{
+                    maxHeight: '600px',
+                    overflowY: 'auto',
+                    border: '1px solid #e9ecef',
+                    borderRadius: '8px',
+                    background: '#f8f9fa'
+                  }}
+                  onScroll={() => setIsScrollingParticipants(true)}
+                  onMouseDown={() => setIsScrollingParticipants(true)}
+                  onMouseUp={() => setIsScrollingParticipants(false)}
+                  onTouchStart={() => setIsScrollingParticipants(true)}
+                  onTouchEnd={() => setIsScrollingParticipants(false)}
+                  onMouseLeave={() => setIsScrollingParticipants(false)}
+                >
+                  {participants.map(participant => (
+                    <div key={participant.id} style={{
+                      padding: '10px 15px',
+                      borderBottom: '1px solid #e9ecef',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      background: 'white'
+                    }}>
+                      <span style={{ fontWeight: '500' }}>{participant.name}</span>
+                      <button
+                        onClick={() => setParticipants(participants.filter(p => p.id !== participant.id))}
+                        style={{
+                          background: '#dc3545',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '4px 8px',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          transition: 'background 0.3s ease'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#c82333'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = '#dc3545'}
                       >
-                        ×
+                        削除
                       </button>
                     </div>
-                  ))
-                )}
+                  ))}
+                  {participants.length === 0 && (
+                    <div style={{
+                      padding: '20px',
+                      textAlign: 'center',
+                      color: '#6c757d',
+                      fontStyle: 'italic'
+                    }}>
+                      参加者が選択されていません
+                    </div>
+                  )}
+                </div>
+                </div>
+              </div>
+
+              {/* 設備管理セクション */}
+              <div className="management-section" style={{
+                flex: 1,
+                border: '2px solid #e9ecef',
+                borderRadius: '12px',
+                background: 'white',
+                overflow: 'hidden',
+                minHeight: '600px'
+              }}>
+                <div className="section-header" style={{
+                  background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
+                  color: 'white',
+                  padding: '15px 20px',
+                  fontWeight: '600',
+                  fontSize: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  🏢 設備管理
+                </div>
+                <div className="section-content" style={{ padding: '20px', minHeight: '500px' }}>
+                {/* 設備検索・追加 */}
+                <div style={{ marginBottom: '15px', position: 'relative' }}>
+                  <input
+                    type="text"
+                    value={equipmentSearchTerm}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      console.log('🔍 設備検索入力:', {
+                        value: value,
+                        showDropdown: value.length > 0
+                      });
+                      setEquipmentSearchTerm(value);
+                      setShowEquipmentDropdown(value.length > 0);
+                    }}
+                    placeholder="設備を検索..."
+                    style={{
+                      width: '100%',
+                      padding: '10px 15px',
+                      border: '2px solid #e9ecef',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      transition: 'border-color 0.3s ease'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#28a745';
+                      setShowEquipmentDropdown(true);
+                      setIsSelectingEquipments(true);
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e9ecef';
+                      // 少し遅延させてドロップダウンを閉じる
+                      setTimeout(() => {
+                        setShowEquipmentDropdown(false);
+                        setIsSelectingEquipments(false);
+                      }, 200);
+                    }}
+                  />
+                  
+                  {/* 設備ドロップダウン */}
+                  {showEquipmentDropdown && (
+                    <div 
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        background: 'white',
+                        border: '1px solid #e9ecef',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                        zIndex: 1000,
+                        maxHeight: '800px',
+                        overflowY: 'auto',
+                        marginTop: '4px'
+                      }}
+                      onScroll={() => setIsScrollingEquipments(true)}
+                      onMouseDown={() => setIsScrollingEquipments(true)}
+                      onMouseUp={() => setIsScrollingEquipments(false)}
+                      onTouchStart={() => setIsScrollingEquipments(true)}
+                      onTouchEnd={() => setIsScrollingEquipments(false)}
+                      onMouseLeave={() => setIsScrollingEquipments(false)}
+                    >
+                      {(() => {
+                        const filtered = equipments
+                          .filter(eq => 
+                            eq.name.toLowerCase().includes(equipmentSearchTerm.toLowerCase()) &&
+                            !selectedEquipments.find(e => e.id === eq.id)
+                          );
+                        console.log('設備フィルタリング結果:', filtered);
+                        console.log('設備全データ:', equipments.map(eq => ({ id: eq.id, name: eq.name })));
+                        console.log('設備検索条件:', equipmentSearchTerm.toLowerCase());
+                        return filtered.map(equipment => (
+                          <div
+                            key={equipment.id}
+                            style={{
+                              padding: '12px 16px',
+                              cursor: 'pointer',
+                              transition: 'background-color 0.3s ease',
+                              borderBottom: '1px solid #f8f9fa'
+                            }}
+                            onClick={() => {
+                              setSelectedEquipments([...selectedEquipments, equipment]);
+                              setEquipmentSearchTerm('');
+                              setShowEquipmentDropdown(false);
+                              setIsSelectingEquipments(false);
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                          >
+                            {equipment.name}
+                          </div>
+                        ));
+                      })()}
+                      {(() => {
+                        return equipments.filter(eq => 
+                          eq.name.toLowerCase().includes(equipmentSearchTerm.toLowerCase()) &&
+                          !selectedEquipments.find(e => e.id === eq.id)
+                        ).length === 0;
+                      })() && (
+                        <div style={{
+                          padding: '12px 16px',
+                          color: '#6c757d',
+                          fontStyle: 'italic',
+                          textAlign: 'center'
+                        }}>
+                          該当する設備が見つかりません
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                
+                {/* 設備リスト */}
+                <div 
+                  className="equipment-list" 
+                  style={{
+                    maxHeight: '600px',
+                    overflowY: 'auto',
+                    border: '1px solid #e9ecef',
+                    borderRadius: '8px',
+                    background: '#f8f9fa'
+                  }}
+                  onScroll={() => setIsScrollingEquipments(true)}
+                  onMouseDown={() => setIsScrollingEquipments(true)}
+                  onMouseUp={() => setIsScrollingEquipments(false)}
+                  onTouchStart={() => setIsScrollingEquipments(true)}
+                  onTouchEnd={() => setIsScrollingEquipments(false)}
+                  onMouseLeave={() => setIsScrollingEquipments(false)}
+                >
+                  {selectedEquipments.map(equipment => (
+                    <div key={equipment.id} style={{
+                      padding: '10px 15px',
+                      borderBottom: '1px solid #e9ecef',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      background: 'white'
+                    }}>
+                      <span style={{ fontWeight: '500' }}>{equipment.name}</span>
+                      <button
+                        onClick={() => setSelectedEquipments(selectedEquipments.filter(e => e.id !== equipment.id))}
+                        style={{
+                          background: '#dc3545',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '4px 8px',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          transition: 'background 0.3s ease'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#c82333'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = '#dc3545'}
+                      >
+                        削除
+                      </button>
+                    </div>
+                  ))}
+                  {selectedEquipments.length === 0 && (
+                    <div style={{
+                      padding: '20px',
+                      textAlign: 'center',
+                      color: '#6c757d',
+                      fontStyle: 'italic'
+                    }}>
+                      設備が選択されていません
+                    </div>
+                  )}
+                </div>
+                </div>
               </div>
             </div>
           </div>
-
-            <div className="form-actions">
-              <button 
-                className="cancel-btn" 
-                onClick={onCancel}
-                disabled={isSubmitting}
-              >
-                キャンセル
-              </button>
-              <button 
-                className="save-btn" 
-                onClick={handleSave}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? '登録中...' : '登録'}
-              </button>
-            </div>
+        </div>
+        
+        {/* フッター */}
+        <div className="modal-footer" style={{
+          padding: '20px 30px',
+          borderTop: '1px solid #e9ecef',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: '15px',
+          background: '#f8f9fa'
+        }}>
+          <button 
+            className="cancel-button" 
+            onClick={onClose}
+            style={{
+              padding: '12px 24px',
+              border: '2px solid #6c757d',
+              borderRadius: '8px',
+              background: 'white',
+              color: '#6c757d',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#6c757d';
+              e.currentTarget.style.color = 'white';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'white';
+              e.currentTarget.style.color = '#6c757d';
+            }}
+          >
+            キャンセル
+          </button>
+          <button 
+            className="save-button" 
+            onClick={submit}
+            disabled={isSubmitting}
+            style={{
+              padding: '12px 24px',
+              border: 'none',
+              borderRadius: '8px',
+              background: isSubmitting 
+                ? '#6c757d' 
+                : (isEditMode 
+                    ? 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)' 
+                    : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'),
+              color: 'white',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+              transition: 'all 0.3s ease',
+              boxShadow: isEditMode 
+                ? '0 4px 12px rgba(243, 156, 18, 0.3)' 
+                : '0 4px 12px rgba(102, 126, 234, 0.3)'
+            }}
+            onMouseEnter={(e) => {
+              if (!isSubmitting) {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = isEditMode 
+                  ? '0 6px 16px rgba(243, 156, 18, 0.4)' 
+                  : '0 6px 16px rgba(102, 126, 234, 0.4)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isSubmitting) {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = isEditMode 
+                  ? '0 4px 12px rgba(243, 156, 18, 0.3)' 
+                  : '0 4px 12px rgba(102, 126, 234, 0.3)';
+              }
+            }}
+          >
+            {isSubmitting 
+              ? (isEditMode ? '更新中...' : '登録中...') 
+              : (isEditMode ? '✨ 更新' : '✨ 登録')
+            }
+          </button>
         </div>
       </div>
-
-
     </div>
   );
 };

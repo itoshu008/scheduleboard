@@ -1,4 +1,5 @@
-import { api } from '../lib/api';
+import { api } from '../api';
+import { dayRangeLocal, toServerISO } from './datetime';
 import { 
   Department, 
   Employee, 
@@ -101,7 +102,15 @@ export const scheduleApi = {
     return await api.get<Schedule[]>(`/schedules/daily/department/${departmentId}/${date}?_t=${timestamp}`);
   },
   getDailyAll: async (date: string): Promise<import('axios').AxiosResponse<Schedule[]>> => {
-    return await api.get<Schedule[]>(`/schedules/daily/all/${date}`);
+    // 互換キーを両方送付
+    const { start, end } = dayRangeLocal(date);
+    const params: any = {
+      date,
+      scope: 'all',
+      start: toServerISO(start),
+      end: toServerISO(end),
+    };
+    return await api.get<Schedule[]>('/schedules', { params });
   },
   create: async (data: CreateScheduleForm): Promise<import('axios').AxiosResponse<Schedule>> => {
     const payload = {

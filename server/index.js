@@ -60,6 +60,7 @@ app.all('/api/*', (req, res) => {
       'GET /api/employees',
       'GET /api/equipment',
       'GET /api/schedules',
+      'GET /api/schedules/daily-all?date=YYYY-MM-DD',
       'GET /api/schedules/daily/all/:date',
       'GET /api/templates'
     ]

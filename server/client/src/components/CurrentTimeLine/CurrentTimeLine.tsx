@@ -305,18 +305,8 @@ const CurrentTimeLine: React.FC<CurrentTimeLineProps> = ({
   // 常に表示する
   const forceShow = true;
   
-  // デバッグ情報を追加
-  console.log('CurrentTimeLine Render Debug:', {
-    pageType,
-    isVisible,
-    forceShow,
-    currentTime: currentTime.toLocaleTimeString(),
-    selectedDate: selectedDate.toLocaleDateString(),
-    willRender: isVisible || forceShow
-  });
   
   if (!isVisible && !forceShow) {
-    console.log('CurrentTimeLine: Not rendering due to visibility check');
     return null;
   }
 
@@ -330,20 +320,8 @@ const CurrentTimeLine: React.FC<CurrentTimeLineProps> = ({
   // 時間範囲チェックを緩和
   const forceTimeRange = true;
   
-  // デバッグ情報を追加
-  console.log('CurrentTimeLine Time Range Debug:', {
-    pageType,
-    currentHour,
-    currentMinutes,
-    startHour,
-    endHour,
-    isInTimeRange,
-    forceTimeRange,
-    willRender: isInTimeRange || forceTimeRange
-  });
   
   if (!isInTimeRange && !forceTimeRange) {
-    console.log('CurrentTimeLine: Not rendering due to time range check');
     return null;
   }
   
@@ -410,26 +388,10 @@ const CurrentTimeLine: React.FC<CurrentTimeLineProps> = ({
           const minuteOffset = (minuteInSlot / 15) * actualCellWidth;
           actualLeft += minuteOffset;
           
-          console.log(`Cell Position Debug (${pageType}):`, {
-            targetSlot,
-            actualLeft,
-            minuteInSlot,
-            minuteOffset,
-            finalLeft: actualLeft,
-            currentTime: currentTime.toLocaleTimeString(),
-            cellFound: !!targetCell
-          });
         }
       }
     }
     
-    console.log('Position Calculation Debug:', {
-      cellPosition,
-      actualCellWidth,
-      timeColumnWidth,
-      actualLeft,
-      targetSlot: Math.floor(cellPosition)
-    });
     
     // グリッドコンテナの高さを取得（動的高さ対応）
     let gridHeight = gridContainerRef?.current ? 
@@ -475,13 +437,6 @@ const CurrentTimeLine: React.FC<CurrentTimeLineProps> = ({
           let employeeRowHeight = cellHeight;
           if (targetId && gridContainerRef?.current) {
             const employeeRow = gridContainerRef.current.querySelector(`tr[data-employee-id="${targetId}"]`) as HTMLElement | null;
-            console.log('Daily Schedule Debug:', { 
-              targetId, 
-              employeeRow, 
-              gridContainerRef: gridContainerRef.current,
-              allRows: gridContainerRef.current.querySelectorAll('tbody tr').length,
-              allEmployeeRows: gridContainerRef.current.querySelectorAll('tr[data-employee-id]').length
-            });
             
             if (employeeRow) {
               // より確実な位置計算方法
@@ -535,13 +490,6 @@ const CurrentTimeLine: React.FC<CurrentTimeLineProps> = ({
           let employeeRowHeight = cellHeight;
           if (targetId && gridContainerRef?.current) {
             const employeeRow = gridContainerRef.current.querySelector(`tr[data-employee-id="${targetId}"]`) as HTMLElement | null;
-            console.log('All Employees Schedule Debug:', { 
-              targetId, 
-              employeeRow, 
-              gridContainerRef: gridContainerRef.current,
-              allRows: gridContainerRef.current.querySelectorAll('tbody tr').length,
-              allEmployeeRows: gridContainerRef.current.querySelectorAll('tr[data-employee-id]').length
-            });
             
             if (employeeRow) {
               // より確実な位置計算方法

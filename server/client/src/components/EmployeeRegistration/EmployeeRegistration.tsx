@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './EmployeeRegistration.css';
 import { Employee, Department } from '../../types';
-import { employeeApi, departmentApi } from '../../utils/api';
+import { api } from '../../api';
 
 interface EmployeeRegistrationProps {
   onClose: () => void;
@@ -26,8 +26,8 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onClose }) 
     try {
       setLoading(true);
       const [employeesResponse, departmentsResponse] = await Promise.all([
-        employeeApi.getAll(),
-        departmentApi.getAll()
+        api.get('/employees'),
+        api.get('/departments')
       ]);
       setEmployees(employeesResponse.data);
       setDepartments(departmentsResponse.data);
@@ -46,7 +46,7 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onClose }) 
     }
 
     try {
-      await employeeApi.create({
+      await api.post('/employees', {
         employee_number: newEmployee.employee_number.trim(),
         name: newEmployee.name.trim(),
         department_id: parseInt(newEmployee.department_id)
@@ -67,7 +67,7 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onClose }) 
     }
 
     try {
-      await employeeApi.update(editingEmployee.id, {
+      await api.put(`/employees/${editingEmployee.id}`, {
         employee_number: editingEmployee.employee_number.trim(),
         name: editingEmployee.name.trim(),
         department_id: editingEmployee.department_id
@@ -85,7 +85,7 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onClose }) 
     if (!window.confirm('この社員を削除しますか？')) return;
 
     try {
-      await employeeApi.delete(employeeId);
+      await api.delete(`/employees/${employeeId}`);
       await loadData();
       alert('社員を削除しました。');
     } catch (error) {

@@ -1,7 +1,16 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Employee, Schedule, Department, Equipment, SCHEDULE_COLORS } from '../../types';
-import { scheduleApi, employeeApi, equipmentApi } from '../../utils/api';
-import { formatDate, getTimeFromSlot } from '../../utils/dateUtils';
+import { api } from '../../api';
+import {
+  toLocalISODateTime,
+  parseLocalDateTimeString,
+  buildLocalDateTime,
+  formatLocal,
+  formatDate,
+  getTimeFromSlot,
+  getTimeSlot,
+  getEndTimeSlot
+} from '../../utils/dateUtils';
 import { CELL_WIDTH_PX, DAILY_BAR_HEIGHT_PX } from '../../utils/uiConstants';
 import ScheduleFormModal from '../ScheduleFormModal/ScheduleFormModal';
 import ScheduleActionModal from '../ScheduleActionModal/ScheduleActionModal';
@@ -13,6 +22,12 @@ import DepartmentRegistration from '../DepartmentRegistration/DepartmentRegistra
 import EmployeeRegistration from '../EmployeeRegistration/EmployeeRegistration';
 import EquipmentRegistration from '../EquipmentRegistration/EquipmentRegistration';
 import ScaleControl from '../ScaleControl/ScaleControl';
+import EventBar from '../EventBar/EventBar';
+
+// 共通フック
+import { useScheduleCellSelection } from '../../hooks/useScheduleCellSelection';
+import { useScheduleDrag } from '../../hooks/useScheduleDrag';
+import { useScheduleDragResize } from '../../hooks/useScheduleDragResize';
 
 import './DailySchedule.css';
 import './DailyScheduleContainer.css';
@@ -55,7 +70,9 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
+  const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(
+    departments.length > 0 ? departments[0] : null
+  );
   
   const [forceShowToolbar, setForceShowToolbar] = useState<boolean>(() => {
     try {
@@ -68,11 +85,23 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
   const [scheduleScale, setScheduleScale] = useState(1);
   const [isScaling, setIsScaling] = useState(false);
   
-  // 選択状態
-  const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
-  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
-  const [isSelecting, setIsSelecting] = useState(false);
-  const [selectionAnchor, setSelectionAnchor] = useState<{ employeeId: number; slot: number } | null>(null);
+  // 共通フックを使用
+  const {
+    selectedCells,
+    isSelecting,
+    selectionAnchor,
+    selectedSchedule,
+    setSelectedCells,
+    setIsSelecting,
+    setSelectionAnchor,
+    setSelectedSchedule,
+    handleCellMouseDown: commonHandleCellMouseDown,
+    handleCellMouseEnter: commonHandleCellMouseEnter,
+    handleCellMouseUp: commonHandleCellMouseUp,
+    handleCellDoubleClick: commonHandleCellDoubleClick,
+    getSelectedCellDateTime: commonGetSelectedCellDateTime,
+    clearSelection
+  } = useScheduleCellSelection();
 
   // モーダル状態
   const [showScheduleForm, setShowScheduleForm] = useState(false);
@@ -81,15 +110,70 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
   const [showManagementTabs, setShowManagementTabs] = useState(false);
   const [currentRegistrationView, setCurrentRegistrationView] = useState<string | null>(null);
   
-  // ドラッグ&ドロップ状態（月別から移植）
-  const [dragData, setDragData] = useState<{
-    schedule: Schedule;
-    startX: number;
-    startY: number;
-    originalStart: Date;
-    originalEnd: Date;
+  // 選択確定処理の安定化
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectionSnapshot, setSelectionSnapshot] = useState<{
+    startDateTime: Date;
+    endDateTime: Date;
+    employeeId: number;
+    employeeName?: string;
   } | null>(null);
   
+  // フィルタされた社員リストを事前に計算
+  const filteredEmployees = selectedDepartment 
+    ? employees.filter(emp => emp.department_id === selectedDepartment.id)
+    : [];
+  
+  // 社員ID計算関数
+  const getEmployeeIdFromDelta = (originalEmployeeId: number, delta: number) => {
+    // 現在の社員のインデックスを取得
+    const currentIndex = filteredEmployees.findIndex((emp: any) => emp.id === originalEmployeeId);
+    if (currentIndex === -1) return originalEmployeeId; // 見つからない場合は元のIDを返す
+    
+    // 新しいインデックスを計算（境界チェック付き）
+    const newIndex = Math.max(0, Math.min(filteredEmployees.length - 1, currentIndex + delta));
+    return filteredEmployees[newIndex].id;
+  };
+  
+  // 月別スケジュールから移植した完璧なドラッグ・リサイズ機能
+  const {
+    dragData: newDragData,
+    dragGhost: newDragGhost,
+    resizeData: newResizeData,
+    resizeGhost: newResizeGhost,
+    isResizing: newIsResizing,
+    mousePosition: newMousePosition,
+    handleScheduleMouseDown: newHandleScheduleMouseDown,
+    handleResizeMouseDown: newHandleResizeMouseDown
+  } = useScheduleDragResize({
+    scaledCellWidth: CELL_WIDTH_PX * scheduleScale,
+    scaledRowHeight: 40 * scheduleScale, // 日別は社員間移動可能
+    onUpdateSchedule: async (scheduleId: number, updateData: any) => {
+      await api.put(`/schedules/${scheduleId}`, updateData);
+    },
+    onReloadSchedules: async () => {
+      await loadSchedules();
+    },
+    employees: filteredEmployees, // フィルタされた社員リスト
+    getEmployeeIdFromDelta // 外部で定義した関数を渡す
+  });
+
+  // ドラッグ機能の共通フック（既存、後で削除予定）
+  const {
+    isDragging,
+    dragData,
+    dragGhost,
+    mousePosition,
+    setDragData,
+    setDragGhost,
+    setMousePosition,
+    handleScheduleMouseDown: commonHandleScheduleMouseDown,
+    handleMouseMove: commonHandleMouseMove,
+    handleMouseUp: commonHandleMouseUp,
+    clearDrag
+  } = useScheduleDrag();
+
+  // リサイズ機能（既存のまま）
   const [resizeData, setResizeData] = useState<{
     schedule: Schedule;
     edge: 'start' | 'end';
@@ -99,12 +183,6 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
     initialPosition: { x: number; y: number };
   } | null>(null);
   
-  const [dragGhost, setDragGhost] = useState<{
-    schedule: Schedule;
-    start: Date;
-    end: Date;
-  } | null>(null);
-  
   const [resizeGhost, setResizeGhost] = useState<{
     schedule: Schedule;
     edge: 'start' | 'end';
@@ -112,11 +190,8 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
     newEnd: Date;
     position: { x: number; y: number };
   } | null>(null);
-  
-  const [mousePosition, setMousePosition] = useState<{ x: number; y: number } | null>(null);
   const [pendingOperation, setPendingOperation] = useState<{ type: 'drag' | 'resize'; timeoutId: NodeJS.Timeout } | null>(null);
   
-  const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [containerMarginTop, setContainerMarginTop] = useState<number>(0);
@@ -171,7 +246,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
     try {
       setLoading(true);
       setError(null);
-      const response = await scheduleApi.getDailyAll(formatDate(selectedDate));
+      const response = await api.get('/schedules', { params: { date: formatDate(selectedDate), scope: 'all' } });
       setSchedules(markOverlappingSchedules(Array.isArray(response.data) ? response.data : []));
     } catch (err) {
       console.error('スケジュール読み込みエラー:', err);
@@ -184,7 +259,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
   // 設備データ読み込み
   const loadEquipments = useCallback(async () => {
     try {
-      const response = await equipmentApi.getAll();
+      const response = await api.get('/equipment');
       setEquipments(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       console.error('設備データ読み込みエラー:', err);
@@ -208,7 +283,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
         end_datetime: new Date(scheduleData.end_datetime!),
         color: toApiColor(scheduleData.color),
       };
-      await scheduleApi.update(selectedSchedule.id, updateData);
+      await api.put(`/schedules/${selectedSchedule.id}`, updateData);
       await loadSchedules();
       setShowScheduleForm(false);
       setSelectedSchedule(null);
@@ -223,7 +298,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
   // スケジュール削除
   const handleScheduleDelete = useCallback(async (scheduleId: number) => {
     try {
-      await scheduleApi.delete(scheduleId);
+      await api.delete(`/schedules/${scheduleId}`);
       await loadSchedules();
       setShowScheduleAction(false);
       setSelectedSchedule(null);
@@ -256,10 +331,12 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
         color: toApiColor(scheduleData.color),
       };
       
-      await scheduleApi.create(processedData);
+      await api.post('/schedules', processedData);
       await loadSchedules();
       setShowRegistrationTab(false);
+      // 保存成功後にだけ選択をクリア
       setSelectedCells(new Set());
+      setIsModalOpen(false);
     } catch (err) {
       console.error('スケジュール登録エラー:', err);
       setError('スケジュールの登録に失敗しました。');
@@ -272,6 +349,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
   const handleRegistrationCancel = useCallback(() => {
     setShowRegistrationTab(false);
     setSelectedCells(new Set());
+    setIsModalOpen(false);
   }, []);
 
   // 重複確認
@@ -337,70 +415,158 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
     ];
   }, [contextMenuTarget, selectedSchedule, clipboard]);
 
-  // 選択セル日時取得
+  // 選択セル日時取得（直接実装）
   const getSelectedCellDateTime = useCallback(() => {
+    console.log('🔍 DailySchedule getSelectedCellDateTime: 開始', {
+      selectedCellsSize: selectedCells.size,
+      selectedCells: Array.from(selectedCells)
+    });
+    
     if (selectedCells.size === 0) return null;
-    
-    // 選択されたセルから時間スロットを抽出し、ソート
-    const cellIds = Array.from(selectedCells ?? []);
-    const slots = cellIds.map(id => {
-      const [employeeId, slot] = id.split('-').map(Number);
-      return { employeeId, slot };
-    }).sort((a, b) => a.slot - b.slot);
-    
-    const firstSlot = slots[0];
-    const lastSlot = slots[slots.length - 1];
-    const employee = employees.find(emp => emp.id === firstSlot.employeeId);
-    if (!employee) return null;
 
-    const startTime = getTimeFromSlot(firstSlot.slot);
-    const endTime = getTimeFromSlot(lastSlot.slot + 1); // 最後のセルの終了時刻
+    const cellIds = Array.from(selectedCells);
+    console.log('🔍 DailySchedule getSelectedCellDateTime: ソート前', { cellIds });
     
-    return {
-      startDateTime: new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), startTime.hour, startTime.minute),
-      endDateTime: new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), endTime.hour, endTime.minute),
-      employeeId: firstSlot.employeeId
+    // セルIDを数値的にソート（スロット番号で正しく並べる）
+    const sortedCellIds = cellIds.sort((a, b) => {
+      const aParts = a.split('-');
+      const bParts = b.split('-');
+      if (aParts.length === 5 && bParts.length === 5) {
+        const aSlot = parseInt(aParts[4]);
+        const bSlot = parseInt(bParts[4]);
+        return aSlot - bSlot;
+      }
+      return a.localeCompare(b);
+    });
+    
+    const firstCellId = sortedCellIds[0];
+    const lastCellId = sortedCellIds[sortedCellIds.length - 1];
+    
+    console.log('🔍 DailySchedule getSelectedCellDateTime: ソート後', {
+      sortedCellIds,
+      firstCellId,
+      lastCellId
+    });
+
+    const parseCellId = (id: string) => {
+      const parts = id.split('-');
+      if (parts.length === 5) { // YYYY-MM-DD-employeeId-slot
+        return {
+          year: parseInt(parts[0]),
+          month: parseInt(parts[1]) - 1,
+          day: parseInt(parts[2]),
+          employeeId: parseInt(parts[3]),
+          slot: parseInt(parts[4])
+        };
+      }
+      return null;
     };
-  }, [selectedCells, employees, selectedDate]);
 
-  // セル選択（月別から強化移植）
-  const handleCellMouseDown = useCallback((employeeId: number, slot: number) => {
-    const cellId = `${employeeId}-${slot}`;
+    const firstCell = parseCellId(firstCellId);
+    const lastCell = parseCellId(lastCellId);
     
+    console.log('🔍 DailySchedule getSelectedCellDateTime: パース結果', {
+      firstCell,
+      lastCell,
+      firstCellId,
+      lastCellId
+    });
+
+    if (!firstCell || !lastCell) return null;
+
+    // 全社員スケジュールと同じ方法で時間を計算
+    const startTime = getTimeFromSlot(firstCell.slot);
+    const endTime = getTimeFromSlot(lastCell.slot + 1);
+    
+    // 日付は selectedDate から取得（全社員スケジュールと同じ方法）
+    const year = selectedDate.getFullYear();
+    const month = selectedDate.getMonth();
+    const day = selectedDate.getDate();
+    
+    const startDateTime = new Date(year, month, day, startTime.hour, startTime.minute);
+    const endDateTime = new Date(year, month, day, endTime.hour, endTime.minute);
+
+    const targetEmployee = employees.find(emp => emp.id === firstCell.employeeId);
+
+    console.log('🔍 DailySchedule getSelectedCellDateTime: 最終結果', {
+      firstCell,
+      lastCell,
+      startTime,
+      endTime,
+      year,
+      month,
+      day,
+      selectedDate,
+      startDateTime,
+      endDateTime,
+      employeeId: firstCell.employeeId,
+      employeeName: targetEmployee?.name || '不明'
+    });
+
+    return {
+      startDateTime,
+      endDateTime,
+      employeeId: firstCell.employeeId,
+      employeeName: targetEmployee?.name || '不明'
+    };
+  }, [selectedCells, employees]);
+
+  // セル選択（直接実装）
+  const handleCellMouseDown = useCallback((employeeId: number, slot: number) => {
+    if (isDragging) return; // ドラッグ中は選択無効
+
+    const cellId = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}-${employeeId}-${slot}`;
+    console.log('🔍 DailySchedule: handleCellMouseDown', { 
+      employeeId, 
+      slot, 
+      cellId, 
+      selectedDate,
+      selectedDateString: selectedDate.toDateString(),
+      selectedDateLocal: toLocalISODateTime(selectedDate),
+      year: selectedDate.getFullYear(),
+      month: selectedDate.getMonth() + 1,
+      day: selectedDate.getDate()
+    });
+
     // スケジュール選択をクリア
     setSelectedSchedule(null);
-    
+
     // セル選択開始
     setSelectedCells(new Set([cellId]));
     setIsSelecting(true);
     setSelectionAnchor({ employeeId, slot });
-  }, []);
+  }, [isDragging, selectedDate, setSelectedSchedule, setSelectedCells, setIsSelecting, setSelectionAnchor]);
 
   const handleCellMouseEnter = useCallback((employeeId: number, slot: number) => {
     if (!isSelecting || !selectionAnchor) return;
-    
+
     const newSelectedCells = new Set<string>();
     const startEmployee = Math.min(selectionAnchor.employeeId, employeeId);
     const endEmployee = Math.max(selectionAnchor.employeeId, employeeId);
     const startSlot = Math.min(selectionAnchor.slot, slot);
     const endSlot = Math.max(selectionAnchor.slot, slot);
 
-    // フィルタリングされた社員リストから実際のemployeeIdを取得
-    const filteredEmployees = employees.filter(emp => 
-      !selectedDepartment || emp.department_id === selectedDepartment.id
-    );
-    
-    for (let empIndex = 0; empIndex < filteredEmployees.length; empIndex++) {
-      const emp = filteredEmployees[empIndex];
-      if (emp.id >= startEmployee && emp.id <= endEmployee) {
-        for (let s = startSlot; s <= endSlot; s++) {
-          newSelectedCells.add(`${emp.id}-${s}`);
-        }
+    // 選択範囲のセルを生成
+    for (let empId = startEmployee; empId <= endEmployee; empId++) {
+      for (let s = startSlot; s <= endSlot; s++) {
+        const cellId = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}-${empId}-${s}`;
+        newSelectedCells.add(cellId);
       }
     }
-    
+    console.log('🔍 DailySchedule: handleCellMouseEnter', { 
+      employeeId,
+      slot,
+      startEmployee,
+      endEmployee,
+      startSlot,
+      endSlot,
+      newSelectedCells: Array.from(newSelectedCells),
+      newSelectedCellsSize: newSelectedCells.size, 
+      isSelecting, 
+      selectionAnchor 
+    });
     setSelectedCells(newSelectedCells);
-  }, [isSelecting, selectionAnchor, employees, selectedDepartment]);
+  }, [isSelecting, selectionAnchor, selectedDate, setSelectedCells]);
 
   const handleCellMouseUp = useCallback(() => {
     setIsSelecting(false);
@@ -410,15 +576,50 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
     if (selectedCells.size >= 2) {
       setShowRegistrationTab(true);
     }
-  }, [selectedCells.size]);
+  }, [selectedCells.size, setIsSelecting, setSelectionAnchor]);
+
+  // 1) window mouseup で必ず選択終了
+  useEffect(() => {
+    const onUp = () => setIsSelecting(false);
+    window.addEventListener('mouseup', onUp);
+    return () => window.removeEventListener('mouseup', onUp);
+  }, []);
+
+  // 2) 選択確定時に1回だけモーダルを開く
+  useEffect(() => {
+    if (!isSelecting && selectedCells.size > 0) {
+      console.log('🔍 DailySchedule: 選択確定、モーダルを開く', { selectedCellsSize: selectedCells.size });
+      try {
+        const snap = getSelectedCellDateTime();
+        if (snap) {
+          setSelectionSnapshot(snap as any);
+        }
+      } catch (e) {
+        console.warn('selection snapshot failed:', e);
+      }
+      setIsModalOpen(true);
+    }
+  }, [isSelecting, selectedCells.size]);
+
+  // 3) 選択セルから日時を算出（既存の getSelectedCellDateTime を利用）
+  const selection = useMemo(() => {
+    if (selectedCells.size === 0) return null;
+    const result = getSelectedCellDateTime();
+    console.log('🔍 DailySchedule selection useMemo:', {
+      selectedCellsSize: selectedCells.size,
+      selectedCells: Array.from(selectedCells),
+      result
+    });
+    return result;
+  }, [selectedCells, getSelectedCellDateTime]);
 
   // セル選択のダブルクリック（新規登録）
   const handleCellDoubleClick = useCallback((employeeId: number, slot: number) => {
-    const cellId = `${employeeId}-${slot}`;
+    const cellId = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}-${employeeId}-${slot}`;
     setSelectedCells(new Set([cellId]));
     setSelectedSchedule(null);
     setShowRegistrationTab(true);
-  }, []);
+  }, [selectedDate, setSelectedCells, setSelectedSchedule]);
 
   // 背景クリックでセル選択解除
   const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
@@ -478,7 +679,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
   const handleSchedulePaste = useCallback(async () => {
     if (!clipboard || !selectedDepartment) return;
     
-    let targetDate = selectedDate;
+    const targetDate = selectedDate;
     let targetEmployeeId = selectedDepartment.id; // 日別では部署IDを使用
     
     // セルが選択されている場合は、その位置にペースト
@@ -506,7 +707,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
         color: toApiColor(clipboard.color)
       };
       
-      await scheduleApi.create(newSchedule);
+      await api.post('/schedules', newSchedule);
       await loadSchedules();
     } catch (error) {
       console.error('スケジュールペーストエラー:', error);
@@ -594,8 +795,8 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
         // 初期マウス位置をイベントバーの中央に設定
         setMousePosition({ x: initialGhostX, y: initialGhostY });
         
-        setIsDragging(true);
-        document.body.classList.add('dragging');
+        // 共通フックのマウス移動処理を使用
+        commonHandleMouseMove(moveEvent, employees, selectedDate, 'daily');
         
         // クリーンアップ
         document.removeEventListener('mousemove', handleMouseMove);
@@ -603,12 +804,18 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
       }
     };
     
-    const handleMouseUp = () => {
+    const handleMouseUp = async () => {
       // クリーンアップ
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
       
-      if (!dragInitiated) {
+      if (dragInitiated) {
+        // 共通フックのマウスアップ処理を使用
+        await commonHandleMouseUp(async (scheduleId, updateData) => {
+          await api.put(`/schedules/${scheduleId}`, updateData);
+          await loadSchedules();
+        });
+      } else {
         // console.log('Daily - Click completed for schedule:', schedule.id);
       }
     };
@@ -624,6 +831,13 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
     loadSchedules();
     loadEquipments();
   }, [loadSchedules, loadEquipments]);
+
+  // 部署の初期選択
+  useEffect(() => {
+    if (departments.length > 0 && !selectedDepartment) {
+      setSelectedDepartment(departments[0]);
+    }
+  }, [departments, selectedDepartment]);
 
   // キーボードショートカット（月別から完全移植）
   useEffect(() => {
@@ -705,9 +919,6 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
           
           // 新しい社員を計算
           const originalEmployee = employees.find(emp => emp.id === dragData.schedule.employee_id);
-          const filteredEmployees = employees.filter(emp => 
-            !selectedDepartment || emp.department_id === selectedDepartment.id
-          );
           
           let newEmployeeId = dragData.schedule.employee_id;
           if (originalEmployee) {
@@ -738,8 +949,8 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
             employeeRows,
             originalEmployeeId: dragData.schedule.employee_id,
             newEmployeeId,
-            newStart: ghostStart.toISOString(),
-            newEnd: ghostEnd.toISOString()
+            newStart: toLocalISODateTime(ghostStart),
+            newEnd: toLocalISODateTime(ghostEnd)
           });
           
         } else if (resizeData && isResizing && !isDragging) {
@@ -772,8 +983,8 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
             if (schedule.id === resizeData.schedule.id) {
               return {
                 ...schedule,
-                start_datetime: newStart.toISOString(),
-                end_datetime: newEnd.toISOString()
+                start_datetime: toLocalISODateTime(newStart),
+                end_datetime: toLocalISODateTime(newEnd)
               } as Schedule;
             }
             return schedule;
@@ -784,8 +995,8 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
           console.log('🔧 RESIZE_REALTIME_UPDATE:', {
             scheduleId: resizeData.schedule.id,
             edge: resizeData.edge,
-            newStart: newStart.toISOString(),
-            newEnd: newEnd.toISOString(),
+            newStart: toLocalISODateTime(newStart),
+            newEnd: toLocalISODateTime(newEnd),
             deltaX,
             timeSlots
           });
@@ -800,7 +1011,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
         if (!dragGhost) {
           console.log('⚠️ DRAG_MOUSEUP - ゴーストなし、クリーンアップのみ');
           setDragData(null);
-          setIsDragging(false);
+          // setIsDragging は共通フックで管理されるため削除
           setDragGhost(null);
           setMousePosition(null);
           document.body.classList.remove('dragging');
@@ -811,8 +1022,8 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
           scheduleId: dragData.schedule.id,
           originalEmployeeId: dragData.schedule.employee_id,
           newEmployeeId: dragGhost.schedule.employee_id,
-          newStart: dragGhost.start.toISOString(),
-          newEnd: dragGhost.end.toISOString()
+          newStart: toLocalISODateTime(dragGhost.start),
+          newEnd: toLocalISODateTime(dragGhost.end)
         });
 
         // 300ms遅延でドラッグ実行
@@ -821,7 +1032,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
           const newEnd = new Date(dragGhost.end);
           
           try {
-            await scheduleApi.update(dragData.schedule.id, {
+            await api.put(`/schedules/${dragData.schedule.id}`, {
               employee_id: dragGhost.schedule.employee_id, // 新しい社員IDを使用
               title: dragData.schedule.title,
               color: toApiColor(dragData.schedule.color),
@@ -835,7 +1046,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
             alert('スケジュールの移動に失敗しました。');
           } finally {
             setDragData(null);
-            setIsDragging(false);
+            // setIsDragging は共通フックで管理されるため削除
             setDragGhost(null);
             setMousePosition(null);
             document.body.classList.remove('dragging');
@@ -846,7 +1057,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
         setPendingOperation({ type: 'drag', timeoutId });
         
         // 即座にドラッグ状態とゴーストを解除
-        setIsDragging(false);
+        // setIsDragging は共通フックで管理されるため削除
         setDragGhost(null);
         setMousePosition(null);
         document.body.classList.remove('dragging');
@@ -871,7 +1082,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
 
         // 即座にAPIに保存
         try {
-          await scheduleApi.update(resizeData.schedule.id, {
+          await api.put(`/schedules/${resizeData.schedule.id}`, {
             employee_id: resizeData.schedule.employee_id,
             title: resizeData.schedule.title,
             color: toApiColor(resizeData.schedule.color),
@@ -942,7 +1153,6 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
       {/* ヘッダー */}
       <div className="schedule-header" ref={headerRef}>
         <h2 style={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px', margin: 0 }}>
-          日別スケジュール管理
           <span style={{ fontSize: '18px', fontWeight: 'normal', color: '#666' }}>
             {selectedDate.toLocaleDateString('ja-JP', { 
               year: 'numeric', 
@@ -960,14 +1170,17 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
       {/* ナビゲーションコントロール */}
       <div className="grid-top-controls" ref={controlsRef}>
         <div className="grid-controls-row">
-          <div className="nav-btn-left">
-            <button className="nav-btn" onClick={() => (window.location.href = '/monthly')}>月別</button>
-            <button className="nav-btn active" onClick={() => (window.location.href = '/daily')}>日別</button>
-            <button className="nav-btn" onClick={() => (window.location.href = '/all-employees')}>全社員</button>
-            <button className="nav-btn" onClick={() => (window.location.href = '/equipment')}>設備</button>
+          <div className="nav-btn-left" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+            
+            {/* ナビゲーションボタン */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button className="nav-btn" onClick={() => (window.location.href = '/monthly')}>月別</button>
+              <button className="nav-btn active" onClick={() => (window.location.href = '/daily')}>日別</button>
+              <button className="nav-btn" onClick={() => (window.location.href = '/all-employees')}>全社員</button>
+              <button className="nav-btn" onClick={() => (window.location.href = '/equipment')}>設備</button>
+            </div>
           </div>
           <div className="nav-btn-right">
-            <button className="nav-btn" onClick={() => setShowRegistrationTab(true)}>スケジュール登録</button>
             <button 
               className="nav-btn management-btn" 
               onClick={() => setShowManagementTabs(true)}
@@ -979,7 +1192,6 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
         </div>
         <div className="grid-controls-row-second">
           <div className="date-section">
-            <span className="section-label">日付:</span>
             <div className="date-controls">
               <button 
                 className="date-nav-btn day-btn" 
@@ -1012,21 +1224,57 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
               >
                 本日
               </button>
+              <button 
+                className="nav-btn registration-btn" 
+                onClick={() => setShowRegistrationTab(true)}
+                style={{ 
+                  backgroundColor: '#dc3545', 
+                  color: 'white',
+                  fontSize: '16px',
+                  padding: '12px 20px',
+                  minWidth: 'auto',
+                  border: 'none',
+                  borderRadius: '25px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  boxShadow: '0 4px 8px rgba(220, 53, 69, 0.3)',
+                  transition: 'all 0.3s ease',
+                  marginLeft: '15px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#c82333';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 12px rgba(220, 53, 69, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#dc3545';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(220, 53, 69, 0.3)';
+                }}
+              >
+                ✨ スケジュール新規登録
+              </button>
             </div>
           </div>
         </div>
         <div className="grid-controls-row-third">
           <div className="department-section">
-            <span className="section-label">部署:</span>
             <div className="department-buttons">
               {departments.map(dept => (
                 <button
                   key={dept.id}
                   className={`dept-btn ${selectedDepartment?.id === dept.id ? 'active' : ''}`}
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    onDepartmentChange(dept);
+                    console.log('🔍 DailySchedule: 部署選択', {
+                      selectedDept: dept.name,
+                      deptId: dept.id,
+                      totalEmployees: employees.length,
+                      deptEmployees: employees.filter(emp => emp.department_id === dept.id).length
+                    });
+                    await onDepartmentChange(dept);
+                    setSelectedDepartment(dept);
                   }}
                 >
                   {dept.name}
@@ -1172,7 +1420,15 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                  }}
                >
                {/* 社員行とスケジュールセル（月別の日付行を社員行に変更） */}
-              {employees.filter(emp => !selectedDepartment || emp.department_id === selectedDepartment.id).map((employee, employeeIndex) => (
+              {selectedDepartment ? (() => {
+                console.log('🔍 DailySchedule: 部署フィルタリング', {
+                  selectedDepartment: selectedDepartment.name,
+                  selectedDepartmentId: selectedDepartment.id,
+                  totalEmployees: employees.length,
+                  filteredEmployees: filteredEmployees.length,
+                  filteredEmployeeNames: filteredEmployees.map(emp => emp.name)
+                });
+                return filteredEmployees.map((employee, employeeIndex) => (
                 <div key={`employee-${employeeIndex}`} className="excel-date-row" style={{
                   display: 'flex',
                   borderBottom: '1px solid #ccc',
@@ -1224,8 +1480,13 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                       return startSlot <= slot && slot < endSlot;
                     });
 
-                    const cellId = `${employee.id}-${slot}`;
+                    const cellId = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}-${employee.id}-${slot}`;
                     const isSelected = selectedCells.has(cellId);
+                    
+                    // デバッグ用（最初の数セルのみ）
+                    if (employeeIndex === 0 && slot < 5) {
+                      console.log('🔍 Cell render:', { cellId, isSelected, selectedCellsSize: selectedCells.size });
+                    }
 
                     return (
                                                <div
@@ -1247,10 +1508,27 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                           data-time={`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`}
                           onMouseDown={(e) => {
                             if (e.button !== 0) return; // 左クリック以外はセル選択無効化（右・中）
+                            
+                            // ReusableEventBar（schedule-item）がクリックされた場合はセル選択をスキップ
+                            const target = e.target as HTMLElement;
+                            const scheduleItem = target.closest('.schedule-item');
+                            if (scheduleItem) {
+                              console.log('🚫 セルのonMouseDown: ReusableEventBarがクリックされたためスキップ');
+                              return;
+                            }
+                            
                             e.stopPropagation();
                             handleCellMouseDown(employee.id, slot);
                           }}
-                          onMouseEnter={() => handleCellMouseEnter(employee.id, slot)}
+                          onMouseEnter={(e) => {
+                            // ReusableEventBar（schedule-item）がホバーされた場合はセル選択をスキップ
+                            const target = e.target as HTMLElement;
+                            const scheduleItem = target.closest('.schedule-item');
+                            if (scheduleItem) {
+                              return;
+                            }
+                            handleCellMouseEnter(employee.id, slot);
+                          }}
                           onMouseUp={handleCellMouseUp}
                           onDoubleClick={() => {
                             handleCellDoubleClick(employee.id, slot);
@@ -1326,10 +1604,19 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                       });
 
                       return rowSchedules.map(schedule => {
-                        const startSlot = getTimeSlot(new Date(schedule.start_datetime));
-                        const endSlot = getEndTimeSlot(new Date(schedule.end_datetime));
-                        const left = startSlot * 20;
-                        const width = (endSlot - startSlot) * 20;
+                        // リサイズ中は新しい時間を使用
+                        let startTime = new Date(schedule.start_datetime);
+                        let endTime = new Date(schedule.end_datetime);
+                        
+                        if (newIsResizing && newResizeGhost && newResizeGhost.schedule.id === schedule.id) {
+                          startTime = newResizeGhost.newStart;
+                          endTime = newResizeGhost.newEnd;
+                        }
+                        
+                        const startSlot = getTimeSlot(startTime);
+                        const endSlot = getEndTimeSlot(endTime);
+                        const left = startSlot * 20 * scheduleScale;
+                        const width = (endSlot - startSlot) * 20 * scheduleScale;
                         
                         // デバッグ情報（リサイズ中のスケジュールのみ）
                         if (resizeData && resizeData.schedule.id === schedule.id) {
@@ -1343,57 +1630,138 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                             employeeIndex
                           });
                         }
+                        // 日別スケジュール専用のイベントバー（位置計算を直接行う）
                         return (
                           <div
                             key={`row-item-${schedule.id}`}
-                            className={`excel-schedule-item ${selectedSchedule?.id === schedule.id ? 'selected' : ''}`}
+                            className={`schedule-item ${selectedSchedule?.id === schedule.id ? 'selected' : ''}`}
                             style={{
+                              background: `linear-gradient(180deg, ${lightenColor(safeHexColor(schedule.color), 25)} 0%, ${safeHexColor(schedule.color)} 100%)`,
+                              border: `1px solid ${lightenColor(safeHexColor(schedule.color), -10)}`,
+                              width: `${width}px`,
+                              left: `${left}px`, // 直接leftを使用
                               position: 'absolute',
-                              top: 2,
-                              left,
-                              width: Math.max(2, width - 2),
-                              height: 36,
-                              background: `linear-gradient(180deg, ${lightenColor(schedule.color, 0.25)} 0%, ${safeHexColor(schedule.color)} 100%)`,
-                              border: selectedSchedule?.id === schedule.id ? '2px solid #2196f3' : `1px solid ${lightenColor(schedule.color, -0.10)}`,
+                              height: '36px',
+                              top: '2px',
                               borderRadius: 4,
                               padding: '2px 4px',
                               fontSize: 11,
                               color: 'white',
                               overflow: 'hidden',
                               cursor: 'pointer',
-                              zIndex: selectedSchedule?.id === schedule.id ? 1100 : 1000,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontWeight: 'bold',
-                              textShadow: '1px 1px 1px rgba(0,0,0,0.5)',
-                              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                              pointerEvents: 'auto'
+                              zIndex: 10000, // 非常に高いz-indexでセルより前面に
+                              pointerEvents: 'auto' // 明示的にマウスイベントを受け取る
                             }}
-                            onMouseDown={(e) => handleScheduleMouseDown(schedule, e)}
-                            onDoubleClick={(e) => handleScheduleDoubleClick(schedule, e)}
-                            onContextMenu={(e) => handleScheduleContextMenu(schedule, e)}
+                            onMouseDown={(e) => {
+                              console.log('🎯 イベントバー クリック:', schedule.id, schedule.title);
+                              
+                              // リサイズ中は選択を無効化
+                              if (newIsResizing || newResizeData) {
+                                console.log('🚫 リサイズ中のため選択を無効化');
+                                return;
+                              }
+                              
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setSelectedSchedule(schedule);
+                              newHandleScheduleMouseDown(schedule, e);
+                            }}
+                            onDoubleClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setSelectedSchedule(schedule);
+                              setShowScheduleForm(true);
+                            }}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setSelectedSchedule(schedule);
+                              setShowScheduleAction(true);
+                            }}
                             title={`${schedule.title}\n${formatTime(new Date(schedule.start_datetime))} - ${formatTime(new Date(schedule.end_datetime))}`}
                           >
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', textAlign: 'center', color: 'white' }}>
+                            <div style={{ 
+                              display: 'flex', 
+                              flexDirection: 'column', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              width: '100%', 
+                              height: '100%', 
+                              textAlign: 'center', 
+                              color: 'white' 
+                            }}>
                               <div className="schedule-title" style={{ fontWeight: 700, color: 'white' }}>
-                                {width > 40 ? (schedule.title || '無題') : '●'}
+                                {schedule.title || '無題'}
                               </div>
-                              {width > 80 && (
-                                <div className="schedule-time" style={{ fontSize: 10, opacity: 0.9, color: 'white' }}>
-                                  {`${formatTime(new Date(schedule.start_datetime))} - ${formatTime(new Date(schedule.end_datetime))}`}
-                                </div>
-                              )}
+                              <div className="schedule-time" style={{ fontSize: 10, opacity: 0.9, color: 'white' }}>
+                                {`${formatTime(new Date(schedule.start_datetime))} - ${formatTime(new Date(schedule.end_datetime))}`}
+                              </div>
                             </div>
+                            
+                            {/* 改良されたリサイズハンドル */}
                             <div
                               className="resize-handle resize-start"
-                              onMouseDown={(e) => handleResizeMouseDown(schedule, 'start', e)}
-                              style={{ position: 'absolute', left: -6, top: 2, width: 16, height: 'calc(100% - 4px)', cursor: 'ew-resize', zIndex: 15, backgroundColor: 'rgba(255, 255, 255, 0.4)', border: '1px solid rgba(255, 255, 255, 0.6)', borderRadius: '2px', transition: 'all 0.2s ease' }}
+                              onMouseDown={(e) => {
+                                console.log('🔧 左リサイズハンドル クリック:', schedule.id);
+                                e.preventDefault();
+                                e.stopPropagation();
+                                newHandleResizeMouseDown(schedule, 'start', e);
+                              }}
+                              style={{ 
+                                position: 'absolute', 
+                                left: -2, 
+                                top: 0, 
+                                width: 8, 
+                                height: '100%', 
+                                cursor: 'ew-resize', 
+                                zIndex: 10001, // イベントバーより前面
+                                pointerEvents: 'auto', // 明示的にマウスイベントを受け取る
+                                backgroundColor: 'rgba(255, 255, 255, 0.4)',
+                                border: '1px solid rgba(255, 255, 255, 0.8)',
+                                borderRadius: '2px 0 0 2px',
+                                transition: 'all 0.2s ease',
+                                opacity: selectedSchedule?.id === schedule.id ? 1 : 0
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
+                                e.currentTarget.style.opacity = '1';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
+                                e.currentTarget.style.opacity = selectedSchedule?.id === schedule.id ? '1' : '0';
+                              }}
                             />
                             <div
                               className="resize-handle resize-end"
-                              onMouseDown={(e) => handleResizeMouseDown(schedule, 'end', e)}
-                              style={{ position: 'absolute', right: -6, top: 2, width: 16, height: 'calc(100% - 4px)', cursor: 'ew-resize', zIndex: 15, backgroundColor: 'rgba(255, 255, 255, 0.4)', border: '1px solid rgba(255, 255, 255, 0.6)', borderRadius: '2px', transition: 'all 0.2s ease' }}
+                              onMouseDown={(e) => {
+                                console.log('🔧 右リサイズハンドル クリック:', schedule.id);
+                                e.preventDefault();
+                                e.stopPropagation();
+                                newHandleResizeMouseDown(schedule, 'end', e);
+                              }}
+                              style={{ 
+                                position: 'absolute', 
+                                right: -2, 
+                                top: 0, 
+                                width: 8, 
+                                height: '100%', 
+                                cursor: 'ew-resize', 
+                                zIndex: 10001, // イベントバーより前面
+                                pointerEvents: 'auto', // 明示的にマウスイベントを受け取る
+                                backgroundColor: 'rgba(255, 255, 255, 0.4)',
+                                border: '1px solid rgba(255, 255, 255, 0.8)',
+                                borderRadius: '0 2px 2px 0',
+                                transition: 'all 0.2s ease',
+                                opacity: selectedSchedule?.id === schedule.id ? 1 : 0
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
+                                e.currentTarget.style.opacity = '1';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
+                                e.currentTarget.style.opacity = selectedSchedule?.id === schedule.id ? '1' : '0';
+                              }}
                             />
                           </div>
                         );
@@ -1401,7 +1769,31 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                     })()}
                   </div>
                 </div>
-              ))}
+                ));
+              })() : (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  height: '300px',
+                  backgroundColor: '#f8f9fa',
+                  border: '2px dashed #dee2e6',
+                  margin: '20px',
+                  borderRadius: '8px'
+                }}>
+                  <div style={{
+                    textAlign: 'center',
+                    color: '#6c757d',
+                    fontSize: '18px'
+                  }}>
+                    <div style={{ marginBottom: '10px', fontSize: '24px' }}>📋</div>
+                    <div>部署を選択してください</div>
+                    <div style={{ fontSize: '14px', marginTop: '8px', opacity: 0.7 }}>
+                      上部の部署ボタンから表示したい部署を選択してください
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1508,19 +1900,43 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
         />
       )}
 
-      {showRegistrationTab && (
-        <ScheduleRegistrationModal
-          selectedCells={selectedCells}
-          employees={employees}
-          equipments={equipments}
-          selectedDate={selectedDate}
-          colors={SCHEDULE_COLORS}
-          initialData={getSelectedCellDateTime()}
-          existingSchedules={schedules}
-          onSave={handleRegistrationSave}
-          onCancel={handleRegistrationCancel}
+      {showRegistrationTab && isModalOpen && (() => {
+        console.log('🔍 DailySchedule ScheduleRegistrationModal props:', {
+          isModalOpen,
+          selection,
+          selectionSnapshot,
+          defaultStart: (selectionSnapshot?.startDateTime ?? selection?.startDateTime) ?? new Date(),
+          defaultEnd: (selectionSnapshot?.endDateTime ?? selection?.endDateTime) ?? new Date(),
+          selectedDepartmentId: selectedDepartment?.id ?? 0,
+          defaultEmployeeId: selectionSnapshot?.employeeId ?? selection?.employeeId ?? filteredEmployees[0]?.id
+        });
+        return (
+          <ScheduleRegistrationModal
+            isOpen={isModalOpen}
+            onClose={() => {
+              console.log('🔍 DailySchedule: モーダルを閉じる、選択をクリア');
+              setSelectedCells(new Set());
+              setSelectionSnapshot(null);
+              setIsModalOpen(false);
+            }}
+            defaultStart={(selectionSnapshot?.startDateTime ?? selection?.startDateTime) ?? new Date()}
+            defaultEnd={(selectionSnapshot?.endDateTime ?? selection?.endDateTime) ?? new Date()}
+            selectedDepartmentId={selectedDepartment?.id ?? 0}
+            defaultEmployeeId={
+              (selectionSnapshot?.employeeId)
+              ?? (selection?.employeeId)
+              ?? (filteredEmployees[0]?.id)
+              ?? (employees[0]?.id)
+            }
+            employees={employees}
+          onCreated={(created) => {
+            console.log('🔍 DailySchedule onCreated:', { created, selectionSnapshot, selection });
+            setSchedules((prev) => [...prev, created]);
+            setIsModalOpen(false);
+          }}
         />
-      )}
+        );
+      })()}
 
       {/* 管理タブ */}
       <ManagementTabs
@@ -1581,6 +1997,65 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
         position={contextMenuPosition}
         onClose={handleContextMenuClose}
       />
+
+      {/* ドラッグゴースト - マウスカーソルに追従 */}
+      {newDragData && newDragGhost && newMousePosition && (
+        <div
+          style={{
+            position: 'fixed',
+            left: `${newMousePosition.x - 50}px`, // マウスの少し左に表示
+            top: `${newMousePosition.y - 18}px`, // マウスの少し上に表示
+            width: `${(() => {
+              const originalStart = new Date(newDragData.schedule.start_datetime);
+              const originalEnd = new Date(newDragData.schedule.end_datetime);
+              const originalDuration = originalEnd.getTime() - originalStart.getTime();
+              const durationInSlots = Math.ceil(originalDuration / (15 * 60 * 1000)); // 15分単位
+              return durationInSlots * CELL_WIDTH_PX * scheduleScale;
+            })()}px`,
+            height: '36px',
+            background: `linear-gradient(180deg, ${lightenColor(safeHexColor(newDragData.schedule.color), 25)} 0%, ${safeHexColor(newDragData.schedule.color)} 100%)`,
+            border: `2px solid ${lightenColor(safeHexColor(newDragData.schedule.color), -10)}`,
+            borderRadius: '4px',
+            padding: '2px 4px',
+            fontSize: '11px',
+            color: 'white',
+            overflow: 'hidden',
+            pointerEvents: 'none',
+            zIndex: 100000,
+            opacity: 0.8,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+          }}
+        >
+          <div style={{ fontWeight: 700, color: 'white' }}>{newDragData.schedule.title || '無題'}</div>
+          <div style={{ fontSize: 10, opacity: 0.9, color: 'white' }}>
+            {(() => {
+              const { hour, minute } = getTimeFromSlot(newDragGhost.newSlot);
+              const originalStart = new Date(newDragData.schedule.start_datetime);
+              const originalEnd = new Date(newDragData.schedule.end_datetime);
+              const originalDuration = originalEnd.getTime() - originalStart.getTime();
+              const newStart = new Date(originalStart);
+              newStart.setHours(hour, minute, 0, 0);
+              const newEnd = new Date(newStart.getTime() + originalDuration);
+              return `${newStart.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} - ${newEnd.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+            })()}
+          </div>
+          {newDragGhost.newEmployeeDelta !== 0 && (
+            <div style={{ fontSize: 9, opacity: 0.8, color: 'white' }}>
+              👤 {(() => {
+                const newEmployeeId = getEmployeeIdFromDelta(newDragData.originalEmployeeId, newDragGhost.newEmployeeDelta || 0);
+                const newEmployee = filteredEmployees.find(emp => emp.id === newEmployeeId);
+                return newEmployee?.name || '不明';
+              })()}
+            </div>
+          )}
+        </div>
+      )}
+
     </>
   );
 };

@@ -8,19 +8,19 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 3000;
+  z-index: 20000;
 }
 
 .schedule-registration-modal {
   position: relative;
-  background: #ffe6e6;
-  border: 2px solid #ff4444;
-  border-radius: 8px;
+  background: linear-gradient(135deg, #e3f2fd 0%, #f8f9ff 100%);
+  border: 2px solid #2196f3;
+  border-radius: 12px;
   width: 700px;
   max-width: 90vw;
   max-height: 80vh;
   overflow-y: auto;
-  box-shadow: 0 4px 12px rgba(255, 68, 68, 0.4);
+  box-shadow: 0 8px 24px rgba(33, 150, 243, 0.3);
 }
 
 .modal-header {
@@ -28,13 +28,14 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  border-bottom: 2px solid #ff4444;
-  background-color: #ffcccc;
+  border-bottom: 2px solid #2196f3;
+  background: linear-gradient(135deg, #bbdefb 0%, #e3f2fd 100%);
+  border-radius: 10px 10px 0 0;
 }
 
 .header-title-left {
   margin: 0;
-  color: #cc0000;
+  color: #1565c0;
   font-size: 18px;
   font-weight: 700;
   text-align: left;
@@ -50,7 +51,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, rgba(0, 123, 255, 0.1) 0%, rgba(0, 86, 179, 0.1) 100%);
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
   border-radius: 6px;
   z-index: -1;
 }
@@ -66,7 +67,7 @@
   position: absolute;
   top: 15px;
   right: 15px;
-  background: #ff4444;
+  background: #2196f3;
   border: 2px solid #fff;
   font-size: 24px;
   cursor: pointer;
@@ -84,10 +85,10 @@
 }
 
 .close-btn:hover {
-  background: #ff0000;
+  background: #1976d2;
   transform: scale(1.15);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
-  border-color: #ffcccc;
+  box-shadow: 0 6px 12px rgba(33, 150, 243, 0.4);
+  border-color: #e3f2fd;
 }
 
 .close-btn:active {
@@ -948,10 +949,139 @@
   background-color: #f8d7da;
 }
 
+/* タブスタイル */
+.tab-container {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.tab-header {
+  display: flex;
+  background: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.tab-button {
+  flex: 1;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-right: 1px solid #e0e0e0;
+}
+
+.tab-button:last-child {
+  border-right: none;
+}
+
+.tab-button:hover {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.tab-button.active {
+  background: #2196f3;
+  color: white;
+  font-weight: 600;
+}
+
+.tab-content {
+  padding: 16px;
+  min-height: 120px;
+}
+
+.participant-section,
+.equipment-section {
+  width: 100%;
+}
+
+.no-equipment-message {
+  text-align: center;
+  color: #999;
+  font-style: italic;
+  padding: 20px;
+}
+
+/* ボタングループスタイル */
+.button-group {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 16px 20px;
+  background: #f8f9fa;
+  border-top: 1px solid #e0e0e0;
+  border-radius: 0 0 12px 12px;
+}
+
+.cancel-btn,
+.save-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 120px;
+  justify-content: center;
+}
+
+.cancel-btn {
+  background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+  color: white;
+  border: 2px solid transparent;
+}
+
+.cancel-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #5a6268 0%, #495057 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+}
+
+.cancel-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.save-btn {
+  background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+  color: white;
+  border: 2px solid transparent;
+}
+
+.save-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+}
+
+.save-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-icon {
+  font-size: 16px;
+  font-weight: bold;
+}
+
 /* 重複警告スタイル */
 .overlap-warning {
-  background-color: #fff3cd;
-  border: 1px solid #ffeaa7;
+  background-color: #e3f2fd;
+  border: 1px solid #90caf9;
   border-radius: 4px;
   padding: 12px;
   margin-bottom: 16px;

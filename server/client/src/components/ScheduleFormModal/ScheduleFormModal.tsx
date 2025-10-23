@@ -22,6 +22,9 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
   onSave,
   onCancel
 }) => {
+  console.log('🔍 ScheduleFormModal: Initializing with schedule:', schedule);
+  console.log('🔍 ScheduleFormModal: Employee:', employee);
+  
   // フォーム状態
   const [formData, setFormData] = useState({
     purpose: schedule.purpose || '',
@@ -91,18 +94,28 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
 
   // 保存処理
   const handleSave = () => {
-    if (!validateForm()) return;
+    console.log('🔍 ScheduleFormModal: handleSave called');
+    console.log('🔍 ScheduleFormModal: formData:', formData);
+    console.log('🔍 ScheduleFormModal: schedule:', schedule);
+    
+    if (!validateForm()) {
+      console.warn('⚠️ ScheduleFormModal: Form validation failed');
+      return;
+    }
 
     const startDateTime = new Date(`${formData.startDate}T${formData.startTime}`);
     const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
 
-    onSave({
+    const saveData = {
       ...schedule,
       purpose: formData.purpose.trim(),
       start_datetime: startDateTime.toISOString(),
       end_datetime: endDateTime.toISOString(),
       color: formData.color
-    });
+    };
+
+    console.log('🔍 ScheduleFormModal: Sending save data:', saveData);
+    onSave(saveData);
   };
 
   // Escキーでキャンセル
@@ -210,7 +223,7 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                     type="time"
                     value={formData.startTime}
                     onChange={e => handleTimeChange('startTime', e.target.value)}
-                    step="900"
+                    step="60"
                     className={`form-control ${errors.startTime ? 'error' : ''}`}
                   />
                   {errors.startTime && <div className="error-text">{errors.startTime}</div>}
@@ -235,7 +248,7 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                     type="time"
                     value={formData.endTime}
                     onChange={e => handleTimeChange('endTime', e.target.value)}
-                    step="900"
+                    step="60"
                     className={`form-control ${errors.endTime ? 'error' : ''}`}
                   />
                   {errors.endTime && <div className="error-text">{errors.endTime}</div>}

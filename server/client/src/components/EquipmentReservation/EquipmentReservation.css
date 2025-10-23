@@ -1,5 +1,22 @@
 /* 設備予約システム専用CSS */
 
+/* 設備選択スタイル */
+.equipment-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 20px;
+}
+
+.equipment-select {
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+  font-size: 14px;
+  min-width: 150px;
+}
+
 /* 右クリックスクロール用のカーソルスタイル */
 .equipment-reservation {
   cursor: grab;
@@ -875,6 +892,73 @@ div.schedule-table-container.equipment-reservation.schedule-grid-container {
   border-right-color: #495057;
   box-shadow: 4px 0 8px rgba(0,0,0,0.12);
   transform: translateX(1px);
+}
+
+/* 不要な上下矢印（疑似要素/背景アイコン）を強制的に無効化 */
+.equipment-reservation .date-cell-fixed::before,
+.equipment-reservation .date-cell-fixed::after,
+.equipment-reservation .equipment-name-text::before,
+.equipment-reservation .equipment-name-text::after {
+  content: none !important;
+  background: none !important;
+  -webkit-mask: none !important;
+  mask: none !important;
+  display: none !important;
+}
+
+/* 新しい極シンプルセルにも徹底適用 */
+.equipment-reservation .equipment-simple-cell,
+.equipment-reservation .equipment-simple-text {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  background-image: none !important;
+  list-style: none !important;
+}
+.equipment-reservation .equipment-simple-cell::before,
+.equipment-reservation .equipment-simple-cell::after,
+.equipment-reservation .equipment-simple-text::before,
+.equipment-reservation .equipment-simple-text::after,
+.equipment-reservation .equipment-simple-text::marker {
+  content: none !important;
+  display: none !important;
+}
+
+/* UAスタイル由来の装飾を完全リセットし、必要最低限のみ再指定 */
+.equipment-reservation .equipment-simple-text {
+  all: unset;
+  display: inline-block !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  color: #212529 !important;
+  line-height: 1.2 !important;
+}
+
+.equipment-reservation .equipment-simple-cell * {
+  background-image: none !important;
+  list-style: none !important;
+}
+
+/* 可能性のあるマーカー/ディテール矢印/スクロールボタンも除去 */
+.equipment-reservation .date-cell-fixed::marker,
+.equipment-reservation .equipment-name-text::marker {
+  content: '' !important;
+}
+.equipment-reservation summary::-webkit-details-marker {
+  display: none !important;
+}
+.equipment-reservation .date-cell-fixed::-webkit-scrollbar-button,
+.equipment-reservation .equipment-name-text::-webkit-scrollbar-button {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+.equipment-reservation .date-cell-fixed,
+.equipment-reservation .equipment-name-text {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  background-image: none !important;
 }
 
 /* 設備名テキスト（200px） - 強制センタリング */

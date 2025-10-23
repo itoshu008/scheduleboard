@@ -1,4 +1,56 @@
+// src/utils/dateUtils.ts
+// すべてローカルタイムで扱うユーティリティ（Zは付けない）
+
 import { Holiday } from '../types';
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+export function toLocalISODateTime(d: Date): string {
+  // YYYY-MM-DDTHH:mm:ss（Zなし）
+  const y = d.getFullYear();
+  const m = pad(d.getMonth() + 1);
+  const day = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const mm = pad(d.getMinutes());
+  const ss = pad(d.getSeconds());
+  return `${y}-${m}-${day}T${hh}:${mm}:${ss}`;
+}
+
+export function parseLocalDateTimeString(s: string): Date {
+  // "YYYY-MM-DD HH:mm:ss" or "YYYY-MM-DDTHH:mm:ss"
+  if (!s) return new Date(NaN);
+  const t = s.includes('T') ? s.replace('T', ' ') : s;
+  const [date, time = '00:00:00'] = t.split(' ');
+  const [y, m, d] = date.split('-').map(Number);
+  const [hh, mm, ss = 0] = time.split(':').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1, hh || 0, mm || 0, ss || 0);
+}
+
+export function formatLocal(d: Date, withSeconds = false): string {
+  if (isNaN(+d)) return '';
+  const y = d.getFullYear();
+  const m = pad(d.getMonth() + 1);
+  const day = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const mm = pad(d.getMinutes());
+  const ss = pad(d.getSeconds());
+  return withSeconds
+    ? `${y}/${m}/${day} ${hh}:${mm}:${ss}`
+    : `${y}/${m}/${day} ${hh}:${mm}`;
+}
+
+// セルからローカルDateを組み立てるヘルパ
+export function buildLocalDateTime(baseDate: Date, hour: number, minute = 0) {
+  return new Date(
+    baseDate.getFullYear(),
+    baseDate.getMonth(),
+    baseDate.getDate(),
+    hour,
+    minute,
+    0,
+    0
+  );
+}
 
 // 祝日データのキャッシュ
 let holidayCache: Map<string, string> = new Map();
@@ -7,20 +59,6 @@ const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24時間
 
 /**
  * 外部APIから祝日データを取得
- * 
- * 使用可能なAPI:
- * 1. holidays-jp.github.io (無料、推奨)
- *    - URL: https://holidays-jp.github.io/api/v1/{year}/date.json
- *    - 形式: { "2024-01-01": "元日", "2024-01-08": "成人の日", ... }
- * 
- * 2. その他の選択肢:
- *    - Google Calendar API (APIキー必要)
- *    - 内閣府の祝日データ (CSV形式)
- *    - 独自の祝日APIサーバー
- * 
- * フォールバック機能:
- * - APIが利用できない場合は、ハードコードされた祝日データを使用
- * - キャッシュ機能により24時間はAPIリクエストを抑制
  */
 export const fetchHolidaysFromAPI = async (year: number): Promise<Holiday[]> => {
   try {
@@ -50,124 +88,121 @@ export const fetchHolidaysFromAPI = async (year: number): Promise<Holiday[]> => 
 };
 
 /**
- * 複数年の祝日データを一括取得
+ * 複数年分の祝日データを一括取得
  */
-export const fetchHolidaysForYears = async (startYear: number, endYear: number): Promise<Map<string, string>> => {
-  const holidays = new Map<string, string>();
+export const fetchHolidaysForYears = async (years: number[]): Promise<Holiday[]> => {
+  const allHolidays: Holiday[] = [];
   
-  for (let year = startYear; year <= endYear; year++) {
-    try {
-      const yearHolidays = await fetchHolidaysFromAPI(year);
-      yearHolidays.forEach(holiday => {
-        holidays.set(holiday.date, holiday.name);
-      });
-    } catch (error) {
-      console.warn(`${year}年の祝日データ取得に失敗:`, error);
-    }
+  for (const year of years) {
+    const holidays = await fetchHolidaysFromAPI(year);
+    allHolidays.push(...holidays);
   }
   
-  return holidays;
+  return allHolidays;
 };
 
 /**
- * 祝日データを初期化（API + フォールバック）
+ * 祝日データを初期化（キャッシュ付き）
  */
 export const initializeHolidayData = async (): Promise<void> => {
-  const currentYear = new Date().getFullYear();
-  const startYear = currentYear - 1;
-  const endYear = currentYear + 10;
+  const now = Date.now();
+  
+  // キャッシュが有効な場合はスキップ
+  if (holidayCache.size > 0 && now < cacheExpiry) {
+    return;
+  }
   
   try {
-    // APIから祝日データを取得
-    const apiHolidays = await fetchHolidaysForYears(startYear, endYear);
+    const currentYear = new Date().getFullYear();
+    const years = [currentYear - 1, currentYear, currentYear + 1];
     
-    if (apiHolidays.size > 0) {
-      holidayCache = apiHolidays;
-      cacheExpiry = Date.now() + CACHE_DURATION;
-      // console.log(`APIから${apiHolidays.size}件の祝日データを取得しました`);
-      return;
-    }
+    const holidays = await fetchHolidaysForYears(years);
+    
+    // キャッシュを更新
+    holidayCache.clear();
+    holidays.forEach(holiday => {
+      holidayCache.set(holiday.date, holiday.name);
+    });
+    
+    cacheExpiry = now + CACHE_DURATION;
+    
+    console.log(`祝日データを更新しました (${holidays.length}件)`);
   } catch (error) {
-    console.warn('APIからの祝日データ取得に失敗、フォールバックデータを使用:', error);
+    console.error('祝日データの初期化に失敗しました:', error);
   }
-  
-  // フォールバック: ハードコードされた祝日データ
-  initializeFallbackHolidayData();
 };
 
 /**
- * フォールバック用の祝日データを初期化
- */
-const initializeFallbackHolidayData = (): void => {
-  // 日本の祝日データ（2024年）
-  const HOLIDAYS_2024: Holiday[] = [
-    { date: '2024-01-01', name: '元日' },
-    { date: '2024-01-08', name: '成人の日' },
-    { date: '2024-02-11', name: '建国記念の日' },
-    { date: '2024-02-12', name: '振替休日' },
-    { date: '2024-02-23', name: '天皇誕生日' },
-    { date: '2024-03-20', name: '春分の日' },
-    { date: '2024-04-29', name: '昭和の日' },
-    { date: '2024-05-03', name: '憲法記念日' },
-    { date: '2024-05-04', name: 'みどりの日' },
-    { date: '2024-05-05', name: 'こどもの日' },
-    { date: '2024-05-06', name: '振替休日' },
-    { date: '2024-07-15', name: '海の日' },
-    { date: '2024-08-11', name: '山の日' },
-    { date: '2024-08-12', name: '振替休日' },
-    { date: '2024-09-16', name: '敬老の日' },
-    { date: '2024-09-22', name: '秋分の日' },
-    { date: '2024-09-23', name: '振替休日' },
-    { date: '2024-10-14', name: 'スポーツの日' },
-    { date: '2024-11-03', name: '文化の日' },
-    { date: '2024-11-04', name: '振替休日' },
-    { date: '2024-11-23', name: '勤労感謝の日' },
-  ];
-
-  // 日本の祝日データ（2025年）
-  const HOLIDAYS_2025: Holiday[] = [
-    { date: '2025-01-01', name: '元日' },
-    { date: '2025-01-13', name: '成人の日' },
-    { date: '2025-02-11', name: '建国記念の日' },
-    { date: '2025-02-23', name: '天皇誕生日' },
-    { date: '2025-02-24', name: '振替休日' },
-    { date: '2025-03-21', name: '春分の日' },
-    { date: '2025-04-29', name: '昭和の日' },
-    { date: '2025-05-03', name: '憲法記念日' },
-    { date: '2025-05-04', name: 'みどりの日' },
-    { date: '2025-05-05', name: 'こどもの日' },
-    { date: '2025-05-06', name: '振替休日' },
-    { date: '2025-07-21', name: '海の日' },
-    { date: '2025-08-11', name: '山の日' },
-    { date: '2025-09-15', name: '敬老の日' },
-    { date: '2025-09-23', name: '秋分の日' },
-    { date: '2025-10-13', name: 'スポーツの日' },
-    { date: '2025-11-03', name: '文化の日' },
-    { date: '2025-11-23', name: '勤労感謝の日' },
-    { date: '2025-11-24', name: '振替休日' },
-  ];
-
-  // フォールバックデータをマップに追加
-  [...HOLIDAYS_2024, ...HOLIDAYS_2025].forEach(holiday => {
-    holidayCache.set(holiday.date, holiday.name);
-  });
-  
-  cacheExpiry = Date.now() + CACHE_DURATION;
-  // console.log('フォールバック祝日データを使用しました');
-};
-
-/**
- * 祝日データを更新
+ * 祝日データを強制更新
  */
 export const refreshHolidayData = async (): Promise<void> => {
-  // キャッシュが有効期限切れの場合のみ更新
-  if (Date.now() > cacheExpiry) {
-    await initializeHolidayData();
-  }
+  holidayCache.clear();
+  cacheExpiry = 0;
+  await initializeHolidayData();
 };
 
 /**
- * 指定した日付を YYYY-MM-DD 形式の文字列に変換
+ * 指定した日付が祝日かどうかを判定（非同期）
+ */
+export const isHoliday = async (date: Date): Promise<boolean> => {
+  await initializeHolidayData();
+  const dateStr = formatDate(date);
+  return holidayCache.has(dateStr);
+};
+
+/**
+ * 指定した日付が祝日かどうかを判定（同期・キャッシュのみ）
+ */
+export const isHolidaySync = (date: Date): boolean => {
+  const dateStr = formatDate(date);
+  return holidayCache.has(dateStr);
+};
+
+/**
+ * 指定した日付の祝日名を取得（非同期）
+ */
+export const getHolidayName = async (date: Date): Promise<string | null> => {
+  await initializeHolidayData();
+  const dateStr = formatDate(date);
+  return holidayCache.get(dateStr) || null;
+};
+
+/**
+ * 指定した日付の祝日名を取得（同期・キャッシュのみ）
+ */
+export const getHolidayNameSync = (date: Date): string | null => {
+  const dateStr = formatDate(date);
+  return holidayCache.get(dateStr) || null;
+};
+
+/**
+ * 祝日認識のデバッグ情報を出力
+ */
+export const debugHolidayRecognition = (): void => {
+  console.log('=== 祝日認識デバッグ情報 ===');
+  console.log(`キャッシュサイズ: ${holidayCache.size}`);
+  console.log(`キャッシュ有効期限: ${new Date(cacheExpiry).toLocaleString()}`);
+  console.log('キャッシュ内容:');
+  
+  const sortedHolidays = Array.from(holidayCache.entries()).sort();
+  sortedHolidays.forEach(([date, name]) => {
+    console.log(`  ${date}: ${name}`);
+  });
+  
+  // 今日の判定テスト
+  const today = new Date();
+  const todayStr = formatDate(today);
+  const isHolidayToday = isHolidaySync(today);
+  const holidayName = getHolidayNameSync(today);
+  
+  console.log(`今日 (${todayStr}) の判定:`);
+  console.log(`  祝日判定: ${isHolidayToday}`);
+  console.log(`  祝日名: ${holidayName || 'なし'}`);
+  console.log('========================');
+};
+
+/**
+ * 日付を YYYY-MM-DD 形式でフォーマット
  */
 export const formatDate = (date: Date): string => {
   const year = date.getFullYear();
@@ -177,7 +212,17 @@ export const formatDate = (date: Date): string => {
 };
 
 /**
- * 時刻を HH:MM 形式の文字列に変換
+ * 日付と時刻を YYYY-MM-DD HH:MM 形式でフォーマット
+ */
+export const formatDateTime = (date: Date): string => {
+  const dateStr = formatDate(date);
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${dateStr} ${hours}:${minutes}`;
+};
+
+/**
+ * 時刻を HH:MM 形式でフォーマット
  */
 export const formatTime = (date: Date): string => {
   const hours = String(date.getHours()).padStart(2, '0');
@@ -186,20 +231,161 @@ export const formatTime = (date: Date): string => {
 };
 
 /**
- * 日付と時刻を YYYY-MM-DD HH:MM 形式の文字列に変換
+ * 現在の時刻を取得（HH:MM形式）
  */
-export const formatDateTime = (date: Date): string => {
-  return `${formatDate(date)} ${formatTime(date)}`;
+export const getCurrentTime = (): string => {
+  const now = new Date();
+  return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+};
+
+/** YYYY-MM-DD（ローカル） */
+export function todayLocal(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Date を "YYYY-MM-DD"（ローカル）に */
+export function toLocalYMD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** "YYYY-MM-DD" → Date（ローカル 00:00）*/
+export function fromYMDLocal(s: string): Date {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, (m ?? 1) - 1, d ?? 1, 0, 0, 0, 0);
+}
+
+/**
+ * 日付の日本語文字列を取得
+ */
+export const getJapaneseDateString = (date: Date): string => {
+  return date.toLocaleDateString('ja-JP', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long'
+  });
 };
 
 /**
- * 15分刻みのタイムスロット番号を取得（0-95）
- * 0:00 = 0, 0:15 = 1, ..., 23:45 = 95
+ * 曜日の日本語名を取得
  */
-export const getTimeSlot = (date: Date): number => {
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  return hours * 4 + Math.floor(minutes / 15);
+export const getJapaneseDayName = (date: Date): string => {
+  const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+  return dayNames[date.getDay()];
+};
+
+/**
+ * 指定した日付の曜日を取得（0=日曜日）
+ */
+export const getDayOfWeek = (date: Date): number => {
+  return date.getDay();
+};
+
+/**
+ * 土曜日かどうかを判定
+ */
+export const isSaturday = (date: Date): boolean => {
+  return date.getDay() === 6;
+};
+
+/**
+ * 日曜日かどうかを判定
+ */
+export const isSunday = (date: Date): boolean => {
+  return date.getDay() === 0;
+};
+
+/**
+ * 週末（土日）かどうかを判定
+ */
+export const isWeekend = (date: Date): boolean => {
+  const day = date.getDay();
+  return day === 0 || day === 6;
+};
+
+/**
+ * 同じ日付かどうかを判定
+ */
+export const isSameDate = (date1: Date, date2: Date): boolean => {
+  return (
+    date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate()
+  );
+};
+
+/**
+ * 同じ月かどうかを判定
+ */
+export const isSameMonth = (date1: Date, date2: Date): boolean => {
+  return (
+    date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth()
+  );
+};
+
+/**
+ * 月の最初の日を取得
+ */
+export const getFirstDayOfMonth = (date: Date): Date => {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+};
+
+/**
+ * 月の最後の日を取得
+ */
+export const getLastDayOfMonth = (date: Date): Date => {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+};
+
+/**
+ * 月の日数を取得
+ */
+export const getDaysInMonth = (date: Date): number => {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+};
+
+/**
+ * 月の日付一覧を取得
+ */
+export const getMonthDates = (date: Date): Date[] => {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const daysInMonth = getDaysInMonth(date);
+  
+  const dates: Date[] = [];
+  for (let day = 1; day <= daysInMonth; day++) {
+    dates.push(new Date(year, month, day));
+  }
+  
+  return dates;
+};
+
+/**
+ * 時間の重複をチェック
+ */
+export const hasTimeOverlap = (
+  start1: Date,
+  end1: Date,
+  start2: Date,
+  end2: Date
+): boolean => {
+  return start1 < end2 && start2 < end1;
+};
+
+/**
+ * 現在の時刻が指定した日付の範囲内かどうか
+ */
+export const isCurrentTimeInDate = (date: Date): boolean => {
+  const now = new Date();
+  return isSameDate(now, date);
 };
 
 /**
@@ -212,6 +398,34 @@ export const getTimeFromSlot = (slot: number): { hour: number; minute: number } 
 };
 
 /**
+ * 終了時刻のタイムスロット番号を取得（1-96）
+ * 0:00 = 0, 0:15 = 1, ..., 24:00 = 96
+ */
+export const getEndTimeSlot = (date: Date): number => {
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  return hours * 4 + Math.ceil(minutes / 15);
+};
+
+/**
+ * 時刻からタイムスロット番号を取得（0-95）
+ */
+export const getTimeSlot = (time: string | Date): number => {
+  let hours: number, minutes: number;
+  
+  if (typeof time === 'string') {
+    const [h, m] = time.split(':').map(Number);
+    hours = h;
+    minutes = m;
+  } else {
+    hours = time.getHours();
+    minutes = time.getMinutes();
+  }
+  
+  return hours * 4 + Math.floor(minutes / 15);
+};
+
+/**
  * タイムスロット番号から時刻文字列を取得
  */
 export const getTimeStringFromSlot = (slot: number): string => {
@@ -220,218 +434,11 @@ export const getTimeStringFromSlot = (slot: number): string => {
 };
 
 /**
- * 指定した日付の曜日を取得（0=日曜日）
+ * 日付とタイムスロット番号から完全なDateオブジェクトを作成
  */
-export const getDayOfWeek = (date: Date): number => {
-  return date.getDay();
-};
-
-/**
- * 指定した日付が土曜日かどうか
- */
-export const isSaturday = (date: Date): boolean => {
-  return getDayOfWeek(date) === 6;
-};
-
-/**
- * 指定した日付が日曜日かどうか
- */
-export const isSunday = (date: Date): boolean => {
-  return getDayOfWeek(date) === 0;
-};
-
-/**
- * 指定した日付が週末かどうか
- */
-export const isWeekend = (date: Date): boolean => {
-  return isSaturday(date) || isSunday(date);
-};
-
-/**
- * 指定した日付が祝日かどうか
- */
-export const isHoliday = async (date: Date): Promise<boolean> => {
-  await refreshHolidayData();
-  const dateStr = formatDate(date);
-  return holidayCache.has(dateStr);
-};
-
-/**
- * 指定した日付の祝日名を取得
- */
-export const getHolidayName = async (date: Date): Promise<string | null> => {
-  await refreshHolidayData();
-  const dateStr = formatDate(date);
-  return holidayCache.get(dateStr) || null;
-};
-
-/**
- * 同期版の祝日判定（既存のコードとの互換性のため）
- */
-export const isHolidaySync = (date: Date): boolean => {
-  const dateStr = formatDate(date);
-  return holidayCache.has(dateStr);
-};
-
-/**
- * 同期版の祝日名取得（既存のコードとの互換性のため）
- */
-export const getHolidayNameSync = (date: Date): string | null => {
-  const dateStr = formatDate(date);
-  return holidayCache.get(dateStr) || null;
-};
-
-/**
- * 祝日認識のデバッグ用関数
- */
-export const debugHolidayRecognition = (date: Date): void => {
-  const dateStr = formatDate(date);
-  const isHolidayResult = isHolidaySync(date);
-  const holidayName = getHolidayNameSync(date);
-  
-  console.log(`日付: ${dateStr}`);
-  console.log(`祝日判定: ${isHolidayResult}`);
-  console.log(`祝日名: ${holidayName}`);
-  console.log(`holidayCache の内容:`, Array.from(holidayCache.entries()));
-};
-
-/**
- * 指定した日付の日本語曜日名を取得
- */
-export const getJapaneseDayName = (date: Date): string => {
-  const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
-  return dayNames[getDayOfWeek(date)];
-};
-
-/**
- * 指定した日付の月の日数を取得
- */
-export const getDaysInMonth = (date: Date): number => {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-};
-
-/**
- * 指定した日付の月の最初の日を取得
- */
-export const getFirstDayOfMonth = (date: Date): Date => {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-};
-
-/**
- * 指定した日付の月の最後の日を取得
- */
-export const getLastDayOfMonth = (date: Date): Date => {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
-};
-
-/**
- * 指定した年月の日付配列を取得
- */
-export const getMonthDates = (year: number, month: number): Date[] => {
-  const dates: Date[] = [];
-  // monthは0ベース（0-11）で渡される
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  
-  for (let day = 1; day <= daysInMonth; day++) {
-    dates.push(new Date(year, month, day));
-  }
-  
-  return dates;
-};
-
-/**
- * 2つの日付が同じ日かどうか
- */
-export const isSameDate = (date1: Date, date2: Date): boolean => {
-  return formatDate(date1) === formatDate(date2);
-};
-
-/**
- * 2つの日付が同じ月かどうか
- */
-export const isSameMonth = (date1: Date, date2: Date): boolean => {
-  return date1.getFullYear() === date2.getFullYear() && 
-         date1.getMonth() === date2.getMonth();
-};
-
-/**
- * 時間の重複をチェック
- */
-export const hasTimeOverlap = (
-  start1: Date, 
-  end1: Date, 
-  start2: Date, 
-  end2: Date
-): boolean => {
-  return start1 < end2 && end1 > start2;
-};
-
-/**
- * 日付を15分単位に丸める
- */
-export const roundToNearestQuarter = (date: Date): Date => {
-  const rounded = new Date(date);
-  const minutes = rounded.getMinutes();
-  const roundedMinutes = Math.round(minutes / 15) * 15;
-  
-  if (roundedMinutes === 60) {
-    rounded.setHours(rounded.getHours() + 1);
-    rounded.setMinutes(0);
-  } else {
-    rounded.setMinutes(roundedMinutes);
-  }
-  
-  rounded.setSeconds(0);
-  rounded.setMilliseconds(0);
-  
-  return rounded;
-};
-
-/**
- * 指定した日付の次の15分刻みの時刻を取得
- */
-export const getNextQuarterHour = (date: Date): Date => {
-  const next = new Date(date);
-  const minutes = next.getMinutes();
-  const nextQuarter = Math.ceil(minutes / 15) * 15;
-  
-  if (nextQuarter === 60) {
-    next.setHours(next.getHours() + 1);
-    next.setMinutes(0);
-  } else {
-    next.setMinutes(nextQuarter);
-  }
-  
-  next.setSeconds(0);
-  next.setMilliseconds(0);
-  
-  return next;
-};
-
-/**
- * 日付の文字列表現を日本語形式で取得
- */
-export const getJapaneseDateString = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const dayName = getJapaneseDayName(date);
-  
-  let result = `${year}年${month}月${day}日(${dayName})`;
-  
-  const holidayName = getHolidayNameSync(date);
-  if (holidayName) {
-    result += ` ${holidayName}`;
-  }
-  
-  return result;
-};
-
-/**
- * 現在の時刻を取得
- */
-export const getCurrentTime = (): Date => {
-  return new Date();
+export const createTimeFromSlot = (baseDate: Date, slot: number): Date => {
+  const { hour, minute } = getTimeFromSlot(slot);
+  return new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), hour, minute, 0, 0);
 };
 
 /**
@@ -442,9 +449,35 @@ export const getCurrentTimeSlot = (): number => {
 };
 
 /**
- * 現在の時刻が指定した日付の範囲内かどうか
+ * 15分単位に丸める（次の15分区切り）
  */
-export const isCurrentTimeInDate = (date: Date): boolean => {
-  const now = getCurrentTime();
-  return isSameDate(now, date);
+export const getNextQuarterHour = (date: Date): Date => {
+  const minutes = date.getMinutes();
+  const roundedMinutes = Math.ceil(minutes / 15) * 15;
+  
+  const result = new Date(date);
+  if (roundedMinutes >= 60) {
+    result.setHours(result.getHours() + 1, 0, 0, 0);
+  } else {
+    result.setMinutes(roundedMinutes, 0, 0);
+  }
+  
+  return result;
+};
+
+/**
+ * 15分単位に丸める（最も近い15分区切り）
+ */
+export const roundToNearestQuarter = (date: Date): Date => {
+  const minutes = date.getMinutes();
+  const roundedMinutes = Math.round(minutes / 15) * 15;
+  
+  const result = new Date(date);
+  if (roundedMinutes >= 60) {
+    result.setHours(result.getHours() + 1, 0, 0, 0);
+  } else {
+    result.setMinutes(roundedMinutes, 0, 0);
+  }
+  
+  return result;
 };

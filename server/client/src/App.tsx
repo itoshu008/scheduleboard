@@ -1,12 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { upsertEventIfChanged } from './utils/eventEquality';
+import { normalizeEvent, eventSig } from './utils/timeQuant';
+import dayjs from 'dayjs';
 import './App.css';
+import './styles/debug.css'; // デバッグ用CSS
 
 // コンポーネント
 import MonthlySchedule from './components/MonthlySchedule/MonthlySchedule';
 import DailySchedule from './components/DailySchedule/DailySchedule';
 import AllEmployeesSchedule from './components/AllEmployeesSchedule/AllEmployeesSchedule';
-import EquipmentReservation from './components/EquipmentReservation/EquipmentReservation';
+// import EquipmentReservation from './components/EquipmentReservation/EquipmentReservation';
+import SimpleEquipmentReservation from './components/SimpleEquipmentReservation/SimpleEquipmentReservation';
 import UserManagement from './components/UserManagement/UserManagement';
 import ScaleControl from './components/ScaleControl/ScaleControl';
 import Health from './pages/Health';
@@ -43,13 +48,32 @@ const AppContent: React.FC = () => {
         // APIヘルスチェック
         await logHealthCheck();
 
-        // 並行してデータを取得（スケジュールも含める）
+        // 並行してデータを取得（スケジュールは当月範囲で取得）
+        console.log('App: Starting data loading...');
+        const initYear = (new Date()).getFullYear();
+        const initMonth = (new Date()).getMonth() + 1; // 1-12
+        const initStartJst = new Date(`${initYear}-${String(initMonth).padStart(2, '0')}-01T00:00:00.000+09:00`);
+        const initNextMonthJst = new Date(initStartJst);
+        initNextMonthJst.setMonth(initNextMonthJst.getMonth() + 1);
+        const initRangeParams: any = {
+          start: initStartJst.toISOString(),
+          end: initNextMonthJst.toISOString(),
+          start_date: initStartJst.toISOString(),
+          end_date: initNextMonthJst.toISOString(),
+        };
+
         const [departmentsRes, employeesRes, equipmentRes, schedulesRes] = await Promise.all([
           departmentApi.getAll(),
           employeeApi.getAll(),
           equipmentApi.getAll(),
-          scheduleApi.getAll(),
+          scheduleApi.getAll(initRangeParams),
         ]);
+        console.log('App: Data loading completed:', {
+          departments: departmentsRes.data?.length || 0,
+          employees: employeesRes.data?.length || 0,
+          equipment: equipmentRes.data?.length || 0,
+          schedules: schedulesRes.data?.length || 0
+        });
 
         // データが配列でない場合は空配列を設定
         setDepartments(Array.isArray(departmentsRes.data) ? departmentsRes.data : []);
@@ -59,7 +83,7 @@ const AppContent: React.FC = () => {
         
         console.log('App: Initial data loaded - schedules:', schedulesRes.data?.length || 0);
 
-        // デフォルト選択
+        // デフォルト選択（データが無い場合でもアプリケーションを表示）
         if (departmentsRes.data.length > 0) {
           setSelectedDepartment(departmentsRes.data[0]);
           
@@ -70,13 +94,32 @@ const AppContent: React.FC = () => {
           if (firstDeptEmployees.length > 0) {
             setSelectedEmployee(firstDeptEmployees[0]);
           }
+        } else {
+          // データが無い場合はnullを設定
+          setSelectedDepartment(null);
+          setSelectedEmployee(null);
         }
 
         // 設備の初期選択は不要
 
-      } catch (err) {
+      } catch (err: any) {
         console.error('初期データ読み込みエラー:', err);
-        setError('データの読み込みに失敗しました。');
+        console.error('エラー詳細:', {
+          message: err?.message || 'Unknown error',
+          status: err?.response?.status,
+          data: err?.response?.data
+        });
+        
+        // エラーが発生してもアプリケーションを表示（データは空配列で初期化）
+        setDepartments([]);
+        setEmployees([]);
+        setEquipment([]);
+        setSchedules([]);
+        setSelectedDepartment(null);
+        setSelectedEmployee(null);
+        
+        // エラーは表示しない（データが無い場合でもアプリケーションを使用可能にする）
+        console.log('App: Continuing with empty data due to error');
       } finally {
         setLoading(false);
       }
@@ -85,20 +128,82 @@ const AppContent: React.FC = () => {
     loadInitialData();
   }, []);
 
-  // スケジュール再読み込み関数
-  const reloadSchedules = async () => {
-    try {
-      console.log('App: reloadSchedules called');
-      const schedulesRes = await scheduleApi.getAll();
-      console.log('App: scheduleApi.getAll response:', schedulesRes.status, schedulesRes.data?.length);
-      const newSchedules = Array.isArray(schedulesRes.data) ? schedulesRes.data : [];
-      console.log('App: Setting schedules count:', newSchedules.length);
-      setSchedules(newSchedules);
-      console.log('App: reloadSchedules completed');
-    } catch (err) {
-      console.error('スケジュール読み込みエラー:', err);
+  // 去重＆同値スキップ用のref
+  const lastReqKeyRef = useRef<string>('');
+  const inflightRef = useRef<AbortController | null>(null);
+  const prevApiSigRef = useRef<string>('');
+
+  // 月ビューの期間 & フィルタからリクエストキー作成（同一キーなら叩かない）
+  const reqKey = useMemo(() => {
+    const year = selectedDate.getFullYear();
+    const month = selectedDate.getMonth() + 1;
+    const rangeStart = dayjs(`${year}-${String(month).padStart(2,'0')}-01`).startOf('month').toISOString();
+    const rangeEnd = dayjs(rangeStart).endOf('month').toISOString();
+    return JSON.stringify({ 
+      employeeId: selectedEmployee?.id, 
+      departmentId: selectedDepartment?.id, 
+      rangeStart, 
+      rangeEnd 
+    });
+  }, [selectedEmployee?.id, selectedDepartment?.id, selectedDate]);
+
+  // スケジュール再読み込み関数（去重＆同値スキップ）
+  const reloadSchedules = useCallback(async () => {
+    if (reqKey === lastReqKeyRef.current) {
+      console.debug('🔄 App: skip reload (same reqKey)');
+      return;
     }
-  };
+    lastReqKeyRef.current = reqKey;
+
+    // 既存リクエストは中断
+    inflightRef.current?.abort();
+    const ac = new AbortController();
+    inflightRef.current = ac;
+
+    console.log('🔄 App: reloadSchedules START', { 
+      employeeId: selectedEmployee?.id, 
+      departmentId: selectedDepartment?.id, 
+      year: selectedDate.getFullYear(), 
+      month: selectedDate.getMonth() + 1
+    });
+
+    try {
+      const year = selectedDate.getFullYear();
+      const month = selectedDate.getMonth() + 1;
+      const startJst = new Date(`${year}-${String(month).padStart(2, '0')}-01T00:00:00.000+09:00`);
+      const nextMonthJst = new Date(startJst);
+      nextMonthJst.setMonth(nextMonthJst.getMonth() + 1);
+      
+      const params: any = {
+        start: startJst.toISOString(),
+        end: nextMonthJst.toISOString(),
+        start_date: startJst.toISOString(),
+        end_date: nextMonthJst.toISOString()
+      };
+      if (selectedEmployee?.id) {
+        params.employee_id = selectedEmployee.id;
+      } else if (selectedDepartment?.id) {
+        params.department_id = selectedDepartment.id;
+      }
+
+      const res = await scheduleApi.getAll(params);
+      const raw = Array.isArray(res.data) ? res.data : [];
+      const normalized = raw.map((e: any) => normalizeEvent(e) as Schedule);
+      const apiSig = normalized.map(eventSig).sort().join('@@');
+
+      // **内容が同じなら set しない**
+      if (apiSig === prevApiSigRef.current) {
+        console.debug('🔄 App: skip setSchedules (no content change)');
+        return;
+      }
+      prevApiSigRef.current = apiSig;
+
+      setSchedules(normalized);
+      console.log('🔄 App: reloadSchedules DONE, count:', normalized.length);
+    } catch (err) {
+      console.error('❌ スケジュール読み込みエラー:', err);
+    }
+  }, [reqKey, selectedEmployee?.id, selectedDepartment?.id, selectedDate]);
 
   // 部署変更時の処理
   const handleDepartmentChange = async (department: Department | null) => {
@@ -126,7 +231,6 @@ const AppContent: React.FC = () => {
   // 社員変更時の処理
   const handleEmployeeChange = (employee: Employee) => {
     setSelectedEmployee(employee);
-    
     // 社員の部署も更新
     const employeeDepartment = departments.find(dept => dept.id === employee.department_id);
     if (employeeDepartment && employeeDepartment.id !== selectedDepartment?.id) {
@@ -136,7 +240,7 @@ const AppContent: React.FC = () => {
 
   // スケジュール関連のハンドラー
   const handleScheduleUpdate = (schedule: Schedule) => {
-    setSchedules(prev => prev.map(s => s.id === schedule.id ? schedule : s));
+    setSchedules(prev => upsertEventIfChanged(prev, schedule));
   };
 
   const handleScheduleDelete = (scheduleId: number) => {
@@ -156,7 +260,7 @@ const AppContent: React.FC = () => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
-    setSchedules(prev => [...prev, newSchedule]);
+    setSchedules(prev => upsertEventIfChanged(prev, newSchedule));
   };
 
   // 部署データ更新の処理
@@ -178,10 +282,11 @@ const AppContent: React.FC = () => {
     }
   };
 
-
-
-
-
+  // 担当者/部署/日付が変わったら月別を再取得
+  useEffect(() => {
+    // Monthlyページ以外でも整合性を保つため常に更新
+    reloadSchedules().catch(() => void 0);
+  }, [selectedEmployee, selectedDepartment, selectedDate, reloadSchedules]);
   if (loading) {
     return (
       <div className="app-loading">
@@ -202,6 +307,14 @@ const AppContent: React.FC = () => {
       </div>
     );
   }
+
+  // データが無い場合でもアプリケーションを表示
+  console.log('App: Rendering with data:', {
+    departments: departments.length,
+    employees: employees.length,
+    equipment: equipment.length,
+    schedules: schedules.length
+  });
 
   return (
     <div className="app">
@@ -236,7 +349,7 @@ const AppContent: React.FC = () => {
                   reloadSchedules={reloadSchedules}
                   onScheduleCreate={(schedule) => {
                     // 即時反映（同月フィルタはMonthly側が実施）
-                    setSchedules(prev => [...prev, schedule]);
+                    setSchedules(prev => upsertEventIfChanged(prev, schedule));
                   }}
                 />
               } 
@@ -270,7 +383,7 @@ const AppContent: React.FC = () => {
             <Route 
               path="/equipment" 
               element={
-                <EquipmentReservation
+                <SimpleEquipmentReservation
                   selectedDate={selectedDate}
                   onDateChange={setSelectedDate}
                   equipments={equipment}

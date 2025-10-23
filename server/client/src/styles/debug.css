@@ -1,0 +1,46 @@
+/* src/styles/debug.css */
+.event-bar { 
+  position: relative; 
+  z-index: 5; 
+}
+
+.grid-layer { 
+  overflow: visible !important; 
+}
+
+/* UniversalEventBar用の表示スタイル（デバッグ線を削除） */
+.schedule-item,
+.universal-event-bar {
+  position: absolute !important;
+  z-index: 999 !important;
+  min-width: 50px !important;
+  min-height: 30px !important;
+}
+
+/* 設備予約専用の表示スタイル（太線を削除） */
+.equipment-reservation .schedule-item,
+.equipment-reservation .universal-event-bar,
+.equipment-event-bar {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: none !important;
+  position: absolute !important;
+  z-index: 999 !important;
+  color: white !important;
+  font-weight: bold !important;
+  min-width: 50px !important;
+  min-height: 30px !important;
+}
+
+/* 重複ハイライト用（太線を削除） */
+.ring-2 { /* outline: 2px solid #ef4444 !important; */ }
+.ring-red-500 { /* outline-color: #ef4444 !important; */ }
+.animate-pulse { 
+  animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

@@ -57,10 +57,18 @@ const EquipmentReservationModal: React.FC<EquipmentReservationModalProps> = ({
       setEndTime(`${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`);
       setSelectedEquipment(initialData.equipmentId);
     } else if (selectedCells.size > 0) {
-      // 選択されたセルから時間を計算
+      // 選択されたセルから時間を計算（新しいセルID形式: YYYY-MM-DD-equipmentId-slot）
       const cellIds = Array.from(selectedCells ?? []);
+      console.log('EquipmentModal: cellIds =', cellIds);
+      console.log('EquipmentModal: selectedDate =', selectedDate);
+      
       const slots = cellIds.map(id => {
         const parts = id.split('-');
+        // 新形式: YYYY-MM-DD-equipmentId-slot の場合、slot は parts[4]
+        if (parts.length === 5) {
+          return parseInt(parts[4]); // slot
+        }
+        // 旧形式: equipmentId-slot の場合（後方互換性）
         return parseInt(parts[1]);
       }).sort((a, b) => a - b);
 
@@ -72,17 +80,37 @@ const EquipmentReservationModal: React.FC<EquipmentReservationModalProps> = ({
       const endHour = Math.floor(endSlot / 4);
       const endMinuteCalc = (endSlot % 4) * 15;
 
+      console.log('EquipmentModal: Time calculation:', {
+        startSlot,
+        endSlot,
+        startHour,
+        startMinute,
+        endHour,
+        endMinuteCalc,
+        selectedDate: selectedDate.toDateString()
+      });
+
       setStartTime(`${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`);
       setEndTime(`${endHour.toString().padStart(2, '0')}:${endMinuteCalc.toString().padStart(2, '0')}`);
 
       // 最初の設備を選択
       if (equipments.length > 0) {
         const firstCellId = cellIds[0];
-        const equipmentId = parseInt(firstCellId.split('-')[0]);
+        const parts = firstCellId.split('-');
+        let equipmentId: number;
+        
+        if (parts.length === 5) {
+          // 新形式: YYYY-MM-DD-equipmentId-slot
+          equipmentId = parseInt(parts[3]);
+        } else {
+          // 旧形式: equipmentId-slot（後方互換性）
+          equipmentId = parseInt(parts[0]);
+        }
+        
         setSelectedEquipment(equipmentId);
       }
     }
-  }, [selectedCells, equipments, initialData]);
+  }, [selectedCells, equipments, initialData, selectedDate]);
 
   const handleSave = () => {
     if (!selectedEquipment || !selectedEmployee || !purpose.trim() || !startTime || !endTime) {

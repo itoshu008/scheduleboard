@@ -42,7 +42,6 @@ const ManagementTabs: React.FC<ManagementTabsProps> = ({
     <div className="management-tabs-overlay">
       <div className="management-tabs" ref={tabsRef}>
         <div className="tabs-header">
-          <h3>登録管理</h3>
           <button className="close-btn" onClick={onClose}>
             ×
           </button>

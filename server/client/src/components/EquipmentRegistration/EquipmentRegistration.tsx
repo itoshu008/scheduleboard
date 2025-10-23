@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './EquipmentRegistration.css';
 import { Equipment } from '../../types';
-import { equipmentApi } from '../../utils/api';
+import { api } from '../../api';
 
 interface EquipmentRegistrationProps {
   onClose: () => void;
@@ -23,7 +23,7 @@ const EquipmentRegistration: React.FC<EquipmentRegistrationProps> = ({ onClose }
   const loadEquipment = async () => {
     try {
       setLoading(true);
-      const response = await equipmentApi.getAll();
+      const response = await api.get('/equipment');
       setEquipment(response.data);
     } catch (error) {
       console.error('設備データの読み込みエラー:', error);
@@ -40,7 +40,7 @@ const EquipmentRegistration: React.FC<EquipmentRegistrationProps> = ({ onClose }
     }
 
     try {
-      await equipmentApi.create({
+      await api.post('/equipment', {
         name: newEquipment.name.trim(),
         description: newEquipment.description.trim() || ''
       });
@@ -60,7 +60,7 @@ const EquipmentRegistration: React.FC<EquipmentRegistrationProps> = ({ onClose }
     }
 
     try {
-      await equipmentApi.update(editingEquipment.id, {
+      await api.put(`/equipment/${editingEquipment.id}`, {
         name: editingEquipment.name.trim(),
         description: editingEquipment.description?.trim() || ''
       });
@@ -77,7 +77,7 @@ const EquipmentRegistration: React.FC<EquipmentRegistrationProps> = ({ onClose }
     if (!window.confirm('この設備を削除しますか？')) return;
 
     try {
-      await equipmentApi.delete(equipmentId);
+      await api.delete(`/equipment/${equipmentId}`);
       await loadEquipment();
       alert('設備を削除しました。');
     } catch (error) {

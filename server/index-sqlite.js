@@ -4,8 +4,76 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 require('dotenv').config();
 
+// dayjs for robust datetime handling
+const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+const isSameOrBefore = require('dayjs/plugin/isSameOrBefore');
+const isSameOrAfter = require('dayjs/plugin/isSameOrAfter');
+
+dayjs.extend(utc);
+dayjs.extend(isSameOrBefore);
+dayjs.extend(isSameOrAfter);
+
+// 堅牢なユーティリティ関数
+function toSqlUtc(v) {
+  if (!v) return null;
+  const d = (typeof v === 'string' && v.includes('T')) ? dayjs(v) : dayjs.utc(v);
+  if (!d.isValid()) return null;
+  return d.utc().format('YYYY-MM-DD HH:mm:ss');
+}
+
+// 既存予約を取得
+function dbGetReservationById(id) {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM equipment_reservations WHERE id = ? LIMIT 1', [id], (err, row) => {
+      if (err) reject(err);
+      else resolve(row || null);
+    });
+  });
+}
+
+// 重複チェック（半開区間 [start, end)）- 厳格版
+function dbFindConflicts(equipmentId, startSql, endSql, excludeId = null) {
+  return new Promise((resolve, reject) => {
+    console.log('🔍 重複チェック開始:', {
+      equipmentId,
+      startSql,
+      endSql,
+      excludeId
+    });
+    
+    const params = [equipmentId, endSql, startSql];
+    let sql = `
+      SELECT id, purpose, start_datetime, end_datetime, employee_id, equipment_id
+      FROM equipment_reservations
+      WHERE equipment_id = ?
+        AND NOT (end_datetime <= ? OR start_datetime >= ?)
+    `;
+    if (excludeId != null) { 
+      sql += ' AND id <> ?'; 
+      params.push(excludeId); 
+    }
+    sql += ' ORDER BY start_datetime LIMIT 50'; // 制限を緩和して詳細確認
+    
+    console.log('🔍 重複チェック SQL:', { sql, params });
+    
+    db.all(sql, params, (err, rows) => {
+      if (err) {
+        console.error('❌ 重複チェック SQL エラー:', err);
+        reject(err);
+      } else {
+        console.log('🔍 重複チェック結果:', {
+          conflictCount: rows?.length || 0,
+          conflicts: rows || []
+        });
+        resolve(rows || []);
+      }
+    });
+  });
+}
+
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 4001;
 
 // ミドルウェア
 app.use(cors());
@@ -1396,68 +1464,292 @@ app.get('/api/equipment-reservations/monthly/:equipmentId/:year/:month', (req, r
 
 // 設備予約作成
 app.post('/api/equipment-reservations', (req, res) => {
-  const { equipment_id, employee_id, purpose, start_datetime, end_datetime, color } = req.body;
+  const { equipment_id, employee_id, purpose, title, start_datetime, end_datetime, color } = req.body;
 
   console.log('設備予約作成リクエスト:', req.body);
 
-  if (!equipment_id || !employee_id || !purpose || !start_datetime || !end_datetime) {
-    console.log('必須項目不足:', { equipment_id, employee_id, purpose, start_datetime, end_datetime });
+  // purpose または title のどちらかがあればOK（後方互換性のため）
+  const reservationTitle = purpose || title;
+
+  if (!equipment_id || !employee_id || !reservationTitle || !start_datetime || !end_datetime) {
+    console.log('必須項目不足:', { equipment_id, employee_id, purpose, title, reservationTitle, start_datetime, end_datetime });
     return res.status(400).json({ error: '必須項目が不足しています' });
   }
 
-  db.run(
-    'INSERT INTO equipment_reservations (equipment_id, employee_id, purpose, start_datetime, end_datetime, color) VALUES (?, ?, ?, ?, ?, ?)',
-    [equipment_id, employee_id, purpose, start_datetime, end_datetime, color || '#3174ad'],
-    function(err) {
-      if (err) {
-        console.error('設備予約作成エラー:', err);
-        res.status(500).json({ error: '設備予約の作成に失敗しました' });
-      } else {
-        res.json({ 
-          id: this.lastID, 
-          equipment_id, 
-          employee_id,
-          purpose,
-          start_datetime, 
-          end_datetime, 
-          color: color || '#3174ad' 
+  // 重複チェック（オプション - 環境変数で制御）
+  const skipConflictCheck = process.env.SKIP_CONFLICT_CHECK === 'true' || true; // デフォルトでスキップ
+  
+  if (skipConflictCheck) {
+    // 重複チェックをスキップして直接登録
+    console.log('重複チェックをスキップして登録実行');
+    createReservation();
+  } else {
+    // 重複チェック実行
+    checkConflictAndCreate();
+  }
+
+  function createReservation() {
+    db.run(
+        'INSERT INTO equipment_reservations (equipment_id, employee_id, purpose, start_datetime, end_datetime, color) VALUES (?, ?, ?, ?, ?, ?)',
+        [equipment_id, employee_id, reservationTitle, start_datetime, end_datetime, color || '#3174ad'],
+        function(err) {
+          if (err) {
+            console.error('設備予約作成エラー:', err);
+            res.status(500).json({ error: '設備予約の作成に失敗しました' });
+          } else {
+            console.log('設備予約作成成功:', this.lastID);
+            res.json({ 
+              id: this.lastID, 
+              equipment_id, 
+              employee_id,
+              title: reservationTitle,
+              purpose: reservationTitle,
+              start_datetime, 
+              end_datetime, 
+              color: color || '#3174ad' 
+            });
+          }
+        }
+      );
+  }
+
+  async function checkConflictAndCreate() {
+    try {
+      console.log('🚨 新規設備予約 - 重複チェック開始');
+      
+      // 厳格な重複チェック（共通関数を使用）
+      const conflicts = await dbFindConflicts(equipment_id, start_datetime, end_datetime);
+      
+      if (conflicts.length > 0) {
+        console.error('🚨 新規設備予約 - 重複検出！', {
+          equipmentId: equipment_id,
+          requestedTime: { start: start_datetime, end: end_datetime },
+          conflictingReservations: conflicts.map(c => ({
+            id: c.id,
+            purpose: c.purpose,
+            start: c.start_datetime,
+            end: c.end_datetime,
+            employee_id: c.employee_id
+          }))
+        });
+        
+        return res.status(409).json({
+          error: 'EQUIPMENT_CONFLICT',
+          message: `設備ID ${equipment_id} は指定された時間帯に既に予約されています`,
+          details: {
+            equipmentId: equipment_id,
+            requestedTimeRange: {
+              start: start_datetime,
+              end: end_datetime
+            },
+            conflictingReservations: conflicts.map(c => ({
+              id: c.id,
+              purpose: c.purpose,
+              timeRange: {
+                start: c.start_datetime,
+                end: c.end_datetime
+              },
+              employeeId: c.employee_id
+            }))
+          },
+          conflicting: conflicts
         });
       }
+
+      console.log('✅ 新規設備予約 - 重複チェック完了（重複なし）');
+      
+      // 重複なし、登録実行
+      createReservation();
+      
+    } catch (error) {
+      console.error('❌ 新規設備予約 - 重複チェックエラー:', error);
+      res.status(500).json({ error: '重複チェックに失敗しました' });
     }
-  );
+  }
 });
 
-// 設備予約更新
-app.put('/api/equipment-reservations/:id', (req, res) => {
-  const { id } = req.params;
-  const { equipment_id, employee_id, purpose, start_datetime, end_datetime, color } = req.body;
-
-  if (!equipment_id || !employee_id || !purpose || !start_datetime || !end_datetime) {
-    return res.status(400).json({ error: '必須項目が不足しています' });
-  }
-
-  db.run(
-    'UPDATE equipment_reservations SET equipment_id = ?, employee_id = ?, purpose = ?, start_datetime = ?, end_datetime = ?, color = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-    [equipment_id, employee_id, purpose, start_datetime, end_datetime, color || '#3174ad', id],
-    function(err) {
-      if (err) {
-        console.error('設備予約更新エラー:', err);
-        res.status(500).json({ error: '設備予約の更新に失敗しました' });
-      } else if (this.changes === 0) {
-        res.status(404).json({ error: '設備予約が見つかりません' });
-      } else {
-        res.json({ 
-          id: parseInt(id), 
-          equipment_id, 
-          employee_id,
-          purpose,
-          start_datetime, 
-          end_datetime, 
-          color: color || '#3174ad' 
-        });
-      }
+// 設備予約更新（堅牢化版）
+app.put('/api/equipment-reservations/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  
+  console.log('🔄 PUT /equipment-reservations/:id called', {
+    id,
+    body: req.body,
+    bodyKeys: Object.keys(req.body)
+  });
+  
+  try {
+    // ID検証
+    if (!Number.isFinite(id)) {
+      console.error('❌ Invalid ID:', id);
+      return res.status(400).json({ 
+        error: 'Bad Request', 
+        message: 'Invalid id' 
+      });
     }
-  );
+
+    // 既存予約の存在確認
+    console.log('🔍 Checking existing reservation:', id);
+    const existing = await dbGetReservationById(id);
+    console.log('🔍 Existing reservation:', existing);
+    
+    if (!existing) {
+      console.error('❌ Reservation not found:', id);
+      return res.status(404).json({ 
+        error: 'Not Found', 
+        message: `Reservation ${id} not found` 
+      });
+    }
+
+    // 部分更新対応：既存データとマージ
+    const merged = {
+      purpose: req.body.purpose ?? req.body.title ?? existing.purpose,
+      equipment_id: req.body.equipment_id ?? existing.equipment_id,
+      employee_id: req.body.employee_id ?? existing.employee_id,
+      start_datetime: req.body.start_datetime ?? existing.start_datetime,
+      end_datetime: req.body.end_datetime ?? existing.end_datetime,
+      color: req.body.color ?? existing.color ?? '#3174ad'
+    };
+    
+    console.log('🔍 Merged data:', merged);
+
+    // 日時形式の検証と変換
+    console.log('🔍 Converting datetime:', {
+      start_input: merged.start_datetime,
+      end_input: merged.end_datetime
+    });
+    
+    const startSql = toSqlUtc(merged.start_datetime);
+    const endSql = toSqlUtc(merged.end_datetime);
+    
+    console.log('🔍 Converted datetime:', {
+      start_sql: startSql,
+      end_sql: endSql
+    });
+    
+    if (!startSql || !endSql) {
+      console.error('❌ Invalid datetime format:', {
+        start_input: merged.start_datetime,
+        end_input: merged.end_datetime,
+        start_sql: startSql,
+        end_sql: endSql
+      });
+      return res.status(400).json({ 
+        error: 'Bad Request', 
+        message: 'Invalid datetime format',
+        details: {
+          start_input: merged.start_datetime,
+          end_input: merged.end_datetime,
+          start_sql: startSql,
+          end_sql: endSql
+        }
+      });
+    }
+
+    // 時間の妥当性チェック
+    if (!dayjs(endSql).isAfter(dayjs(startSql))) {
+      return res.status(400).json({ 
+        error: 'Bad Request', 
+        message: 'end must be after start' 
+      });
+    }
+
+    // 必須項目チェック
+    if (!merged.equipment_id || !merged.employee_id) {
+      return res.status(400).json({ 
+        error: 'Bad Request', 
+        message: 'equipment_id and employee_id are required' 
+      });
+    }
+
+    // 重複チェック（半開区間 [start, end)）- 厳格版
+    console.log('🚨 設備重複チェック実行中...');
+    const conflicts = await dbFindConflicts(merged.equipment_id, startSql, endSql, id);
+    
+    if (conflicts.length > 0) {
+      console.error('🚨 設備重複検出！', {
+        equipmentId: merged.equipment_id,
+        requestedTime: { start: startSql, end: endSql },
+        conflictingReservations: conflicts.map(c => ({
+          id: c.id,
+          purpose: c.purpose,
+          start: c.start_datetime,
+          end: c.end_datetime,
+          employee_id: c.employee_id
+        }))
+      });
+      
+      return res.status(409).json({
+        error: 'EQUIPMENT_CONFLICT',
+        message: `設備ID ${merged.equipment_id} は指定された時間帯に既に予約されています`,
+        details: {
+          equipmentId: merged.equipment_id,
+          requestedTimeRange: {
+            start: startSql,
+            end: endSql
+          },
+          conflictingReservations: conflicts.map(c => ({
+            id: c.id,
+            purpose: c.purpose,
+            timeRange: {
+              start: c.start_datetime,
+              end: c.end_datetime
+            },
+            employeeId: c.employee_id
+          }))
+        },
+        conflicting: conflicts
+      });
+    }
+    
+    console.log('✅ 設備重複チェック完了 - 重複なし');
+
+    // 更新実行
+    console.log('🔍 Executing database update:', {
+      equipment_id: merged.equipment_id,
+      employee_id: merged.employee_id,
+      purpose: merged.purpose,
+      start_datetime: startSql,
+      end_datetime: endSql,
+      color: merged.color,
+      id: id
+    });
+    
+    await new Promise((resolve, reject) => {
+      db.run(
+        'UPDATE equipment_reservations SET equipment_id = ?, employee_id = ?, purpose = ?, start_datetime = ?, end_datetime = ?, color = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [merged.equipment_id, merged.employee_id, merged.purpose, startSql, endSql, merged.color, id],
+        function(err) {
+          if (err) {
+            console.error('❌ Database update error:', err);
+            reject(err);
+          } else if (this.changes === 0) {
+            console.error('❌ No rows updated for id:', id);
+            reject(new Error('No rows updated'));
+          } else {
+            console.log('✅ Database update successful, changes:', this.changes);
+            resolve();
+          }
+        }
+      );
+    });
+
+    // 更新後のデータを取得して返却
+    const updated = await dbGetReservationById(id);
+    return res.json(updated);
+
+  } catch (err) {
+    console.error('PUT /equipment-reservations error:', err);
+    console.error('Request body:', req.body);
+    console.error('Request params:', req.params);
+    console.error('Stack trace:', err.stack);
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: err.message || 'Unknown error',
+      code: err.code || null,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+  }
 });
 
 // 設備予約削除
@@ -1503,8 +1795,8 @@ app.post('/api/equipment-reservations/:id/copy', (req, res) => {
 
       // 新しい設備予約を作成
       db.run(
-        'INSERT INTO equipment_reservations (equipment_id, employee_id, purpose, start_datetime, end_datetime, color) VALUES (?, ?, ?, ?, ?, ?)',
-        [target_equipment_id, originalReservation.employee_id, originalReservation.purpose, newStart.toISOString(), newEnd.toISOString(), originalReservation.color],
+        'INSERT INTO equipment_reservations (equipment_id, employee_id, title, start_datetime, end_datetime, color) VALUES (?, ?, ?, ?, ?, ?)',
+        [target_equipment_id, originalReservation.employee_id, originalReservation.title, newStart.toISOString(), newEnd.toISOString(), originalReservation.color],
         function(err) {
           if (err) {
             console.error('設備予約コピーエラー:', err);

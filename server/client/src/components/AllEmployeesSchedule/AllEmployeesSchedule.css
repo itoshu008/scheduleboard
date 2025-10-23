@@ -1333,6 +1333,21 @@
   margin-left: auto;
 }
 
+/* 登録ボタンを赤色に */
+.nav-btn.registration-btn {
+  background: #dc3545 !important;
+  color: white !important;
+  border-color: #dc3545 !important;
+  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3) !important;
+}
+
+.nav-btn.registration-btn:hover {
+  background: #c82333 !important;
+  border-color: #c82333 !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 12px rgba(220, 53, 69, 0.4) !important;
+}
+
 /* 日付ナビゲーションボタン */
 .date-controls {
   display: flex;

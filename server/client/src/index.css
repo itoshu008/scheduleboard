@@ -309,6 +309,7 @@ body {
 }
 
 /* セレクトボックス */
+/* 設備ページではセレクト装飾を出さない */
 select.form-control {
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%232196f3' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
   background-position: right 12px center;
@@ -316,6 +317,13 @@ select.form-control {
   background-size: 16px;
   padding-right: 40px;
   appearance: none;
+}
+
+.equipment-reservation select,
+.equipment-reservation .form-control[type="text"],
+.equipment-reservation .equipment-simple-cell,
+.equipment-reservation .equipment-simple-text {
+  background-image: none !important;
 }
 
 /* カードスタイル */
