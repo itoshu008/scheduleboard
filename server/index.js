@@ -4,14 +4,12 @@ const path = require('path');
 require('dotenv').config();
 
 const app = express();
-const PORT = 4001; // ← 変更禁止（Nginx設定に合わせる）
-
+const PORT = 4001; // ↁE変更禁止�E�Eginx設定に合わせる�E�E
 // ミドルウェア
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
-// リクエストの処理時間を計測してログ出力
-app.use((req, res, next) => {
+// リクエスト�E処琁E��間を計測してログ出劁Eapp.use((req, res, next) => {
   const start = process.hrtime();
   res.on('finish', () => {
     const diff = process.hrtime(start);
@@ -21,36 +19,32 @@ app.use((req, res, next) => {
   next();
 });
 
-// 静的ファイル（フロント）を提供
-app.use(express.static(path.join(__dirname, 'suke')));
+// 静的ファイル�E�フロント）を提侁Eapp.use(express.static(path.join(__dirname, 'suke')));
 
-// ヘルスチェック
+// ヘルスチェチE��
 app.get('/api/health', (req, res) => {
   res.json({ message: 'OK' });
 });
 
-// templates ルートは下記のルーター経由で処理
-
-// API ルート（ビルド済みの dist から読み込み）。dist が無い場合は警告のみ
+// templates ルート�E下記�Eルーター経由で処琁E
+// API ルート（ビルド済みの dist から読み込み�E�。dist が無ぁE��合�E警告�Eみ
 try {
-  app.use('/api/departments', require('./dist/routes/departments'));
-  app.use('/api/employees', require('./dist/routes/employees'));
-  app.use('/api/schedules', require('./dist/routes/schedules'));
-  app.use('/api/equipment', require('./dist/routes/equipment'));
-  app.use('/api/equipment-reservations', require('./dist/routes/equipmentReservations'));
+  app.use('/api/departments', require('./routes/departments'));
+  app.use('/api/employees', require('./routes/employees'));
+  app.use('/api/schedules', require('./routes/schedules'));
+  app.use('/api/equipment', require('./routes/equipment'));
+  app.use('/api/equipment-reservations', require('./routes/equipmentReservations'));
 } catch (e) {
-  console.warn('dist ルートの読み込みに失敗しました。API は無効です。', e && e.message ? e.message : e);
+  console.warn('dist ルート�E読み込みに失敗しました、EPI は無効です、E, e && e.message ? e.message : e);
 }
 
-// templates ルートを追加（既存のスタブを統合）
-try {
+// templates ルートを追加�E�既存�Eスタブを統合！Etry {
   app.use('/api/templates', require('./routes/templates'));
 } catch (e) {
-  console.warn('templates ルートの読み込みに失敗しました。', e && e.message ? e.message : e);
+  console.warn('templates ルート�E読み込みに失敗しました、E, e && e.message ? e.message : e);
 }
 
-// 404ハンドラー（存在しない /api/* に対して）
-app.all('/api/*', (req, res) => {
+// 404ハンドラー�E�存在しなぁE/api/* に対して�E�Eapp.all('/api/*', (req, res) => {
   res.status(404).json({
     error: 'Not Found',
     path: req.originalUrl,
@@ -67,13 +61,11 @@ app.all('/api/*', (req, res) => {
   });
 });
 
-// SPA ルーティング（最後に配置）
-app.get('*', (req, res) => {
+// SPA ルーチE��ング�E�最後に配置�E�Eapp.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'suke', 'index.html'));
 });
 
-// サーバー起動（DB への破壊的操作は一切行わない）
-app.listen(PORT, () => {
+// サーバ�E起動！EB への破壊的操作�E一刁E��わなぁE��Eapp.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
 
