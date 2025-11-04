@@ -1,0 +1,403 @@
+/* モーダルオーバーレイ */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 3000;
+}
+
+/* アクションモーダル固有のスタイル */
+.action-modal-content {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  max-width: 480px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* スケジュール情報 */
+.schedule-info {
+  padding: 24px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.schedule-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.schedule-color-indicator {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.schedule-title {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.schedule-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.detail-label {
+  font-weight: 600;
+  color: #495057;
+  min-width: 60px;
+  font-size: 14px;
+}
+
+.detail-value {
+  color: #333;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* アクションボタン */
+.action-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.action-btn {
+  background: none;
+  border: none;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-size: 14px;
+  font-weight: 500;
+  border-right: 1px solid #e9ecef;
+}
+
+.action-btn:last-child {
+  border-right: none;
+}
+
+.action-btn:hover {
+  background-color: #f8f9fa;
+}
+
+.btn-icon {
+  font-size: 24px;
+  display: block;
+}
+
+.edit-btn {
+  color: #007bff;
+}
+
+.edit-btn:hover {
+  background-color: #e3f2fd;
+}
+
+.copy-btn {
+  color: #28a745;
+}
+
+.copy-btn:hover {
+  background-color: #e8f5e8;
+}
+
+.delete-btn {
+  color: #dc3545;
+}
+
+.delete-btn:hover {
+  background-color: #fde8e8;
+}
+
+/* 削除確認 */
+.delete-confirm {
+  padding: 24px;
+  text-align: center;
+}
+
+.confirm-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.delete-confirm h3 {
+  margin: 0 0 16px 0;
+  font-size: 20px;
+  color: #333;
+  font-weight: 600;
+}
+
+.delete-confirm p {
+  margin: 0 0 16px 0;
+  color: #666;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.confirm-schedule-info {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  text-align: left;
+}
+
+.confirm-title {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+.confirm-datetime {
+  color: #666;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.warning-text {
+  color: #dc3545;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+/* 確認ボタン */
+.confirm-buttons {
+  display: flex;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid #e9ecef;
+  background-color: #f8f9fa;
+}
+
+.confirm-buttons .btn {
+  flex: 1;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background-color: #545b62;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover {
+  background-color: #c82333;
+}
+
+/* モーダルフッター */
+.modal-footer {
+  padding: 16px 24px;
+  display: flex;
+  justify-content: center;
+  background-color: #f8f9fa;
+}
+
+.modal-footer .btn {
+  padding: 8px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+/* レスポンシブデザイン */
+@media (max-width: 768px) {
+  .action-modal-content {
+    max-width: 95vw;
+    margin: 10px;
+  }
+  
+  .schedule-info {
+    padding: 20px;
+  }
+  
+  .schedule-title {
+    font-size: 16px;
+  }
+  
+  .action-buttons {
+    grid-template-columns: 1fr;
+  }
+  
+  .action-btn {
+    padding: 16px;
+    flex-direction: row;
+    justify-content: center;
+    border-right: none;
+    border-bottom: 1px solid #e9ecef;
+  }
+  
+  .action-btn:last-child {
+    border-bottom: none;
+  }
+  
+  .btn-icon {
+    font-size: 20px;
+  }
+  
+  .delete-confirm {
+    padding: 20px;
+  }
+  
+  .confirm-icon {
+    font-size: 40px;
+  }
+  
+  .delete-confirm h3 {
+    font-size: 18px;
+  }
+  
+  .confirm-buttons {
+    flex-direction: column-reverse;
+    padding: 16px 20px;
+  }
+  
+  .modal-footer {
+    padding: 12px 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .action-modal-content {
+    max-width: 98vw;
+    margin: 5px;
+    border-radius: 8px;
+  }
+  
+  .schedule-info {
+    padding: 16px;
+  }
+  
+  .schedule-header {
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  
+  .schedule-color-indicator {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .schedule-title {
+    font-size: 15px;
+  }
+  
+  .detail-item {
+    gap: 8px;
+  }
+  
+  .detail-label {
+    min-width: 50px;
+    font-size: 13px;
+  }
+  
+  .detail-value {
+    font-size: 13px;
+  }
+  
+  .action-btn {
+    padding: 14px;
+    font-size: 13px;
+  }
+  
+  .btn-icon {
+    font-size: 18px;
+  }
+  
+  .delete-confirm {
+    padding: 16px;
+  }
+  
+  .confirm-icon {
+    font-size: 36px;
+    margin-bottom: 12px;
+  }
+  
+  .delete-confirm h3 {
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+  
+  .delete-confirm p {
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+  
+  .confirm-schedule-info {
+    padding: 12px;
+    margin: 12px 0;
+  }
+  
+  .confirm-title {
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+  
+  .confirm-datetime {
+    font-size: 13px;
+  }
+  
+  .warning-text {
+    font-size: 12px;
+  }
+  
+  .confirm-buttons {
+    padding: 12px 16px;
+  }
+  
+  .modal-footer {
+    padding: 10px 16px;
+  }
+  
+  .btn {
+    font-size: 13px;
+    padding: 8px 16px;
+  }
+}

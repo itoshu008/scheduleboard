@@ -1,0 +1,494 @@
+/* 日別スケジュール専用CSS */
+
+/* === 基本レイアウト === */
+.daily-schedule .schedule-table-container,
+.daily-schedule-container,
+.schedule-table-container.schedule-container-base.schedule-container-daily,
+div.schedule-table-container.schedule-container-base.schedule-container-daily {
+  /* サイズ設定 */
+  width: calc(100vw - 100px) !important;
+  max-width: calc(100vw - 100px) !important;
+  min-width: 600px !important;
+  height: auto !important;
+  min-height: 100px !important;
+  max-height: none !important;
+  
+  /* 配置設定 */
+  margin: 0 !important;
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  display: block !important;
+  
+  /* スタイル設定 */
+  border: 2px solid var(--border-blue);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 6px 20px var(--shadow);
+  
+  /* スクロール設定 */
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  scroll-behavior: smooth !important;
+  scrollbar-width: auto !important;
+  scrollbar-color: #4285f4 #f8f9fa !important;
+  -webkit-overflow-scrolling: touch !important;
+  
+  /* その他 */
+  box-sizing: border-box !important;
+  cursor: grab !important;
+  transition: all 0.3s ease !important;
+}
+
+.daily-schedule .schedule-table-container:active {
+  cursor: grabbing !important;
+}
+
+/* === テーブル設定 === */
+.daily-schedule .schedule-table {
+  width: 1800px !important;
+  min-width: 1800px !important;
+  table-layout: fixed !important;
+  border-collapse: collapse !important;
+}
+
+/* === スクロールバースタイル === */
+.daily-schedule .schedule-table-container::-webkit-scrollbar {
+  width: 16px !important;
+  height: 16px !important;
+  background: rgba(0, 0, 0, 0.05) !important;
+}
+
+.daily-schedule .schedule-table-container::-webkit-scrollbar-track {
+  background: #f1f3f4 !important;
+  border-radius: 10px !important;
+  border: 1px solid #dadce0 !important;
+  margin: 4px !important;
+}
+
+.daily-schedule .schedule-table-container::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #4285f4 0%, #1a73e8 100%) !important;
+  border-radius: 8px !important;
+  border: 2px solid #f8f9fa !important;
+  transition: all 0.3s ease !important;
+  min-height: 30px !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+.daily-schedule .schedule-table-container::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #1a73e8 0%, #1557b0 100%) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+  transform: scale(1.1) !important;
+}
+
+.daily-schedule .schedule-table-container::-webkit-scrollbar-corner {
+  background: #f8f9fa !important;
+  border: 1px solid #e9ecef !important;
+}
+
+/* === ヘッダー設定 === */
+.schedule-header {
+  background: var(--surface);
+  border-bottom: 2px solid var(--primary-blue);
+  box-shadow: 0 2px 8px var(--shadow);
+  padding: 16px 20px;
+  position: relative;
+  z-index: 1000;
+  width: 100%;
+}
+
+.schedule-header h2 {
+  margin: 0 0 8px 0;
+  color: #333;
+  font-size: 24px;
+}
+
+/* === コントロール設定 === */
+.grid-top-controls {
+  position: relative;
+  z-index: 1000;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-blue);
+  width: 100%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.grid-controls-row {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.nav-btn {
+  padding: 12px 20px;
+  border: 2px solid var(--border-blue);
+  background: var(--surface);
+  color: var(--text-primary);
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  min-width: 120px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.nav-btn:hover {
+  background: var(--light-blue);
+  border-color: var(--accent-blue);
+  transform: translateY(-1px);
+}
+
+.nav-btn.active {
+  background: var(--accent-blue);
+  color: white;
+  border-color: var(--dark-blue);
+}
+
+/* === テーブル要素 === */
+.employee-column {
+  width: 150px;
+  min-width: 150px;
+  background: var(--primary-blue);
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: center;
+  padding: 8px;
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  border-right: 2px solid var(--border-blue);
+}
+
+.time-column {
+  width: 80px;
+  min-width: 80px;
+  background: var(--primary-blue);
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: center;
+  font-size: 0.85rem;
+  padding: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  border-bottom: 1px solid var(--border-blue);
+}
+
+.employee-cell {
+  width: 150px;
+  min-width: 150px;
+  background: #f8f9fa;
+  padding: 3px;
+  text-align: center;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  height: 40px;
+}
+
+.schedule-cell-15min {
+  width: 20px;
+  min-width: 20px;
+  height: 40px;
+  position: relative;
+  padding: 0;
+  margin: 0;
+  border-left: 1px solid var(--border-blue);
+  border-bottom: 1px solid var(--border-blue);
+  box-sizing: border-box;
+  background: var(--surface);
+  transition: background-color 0.2s ease;
+  cursor: grab;
+}
+
+.schedule-cell-15min:active {
+  cursor: grabbing;
+}
+
+.schedule-cell-15min.hour-border {
+  border-left: 2px solid var(--accent-blue);
+}
+
+.schedule-cell-15min.selected {
+  background: var(--secondary-blue);
+  border-color: var(--accent-blue);
+}
+
+.schedule-cell-15min:hover {
+  background: var(--light-blue);
+  cursor: pointer;
+}
+
+/* === スケジュールアイテム === */
+.schedule-item,
+.schedule-item-base {
+  position: absolute;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  transition: all 0.2s;
+  width: var(--schedule-width, 100px);
+  height: 100%;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 11px;
+  color: white;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.schedule-item:hover,
+.schedule-item-base:hover {
+  z-index: 2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.schedule-item.selected,
+.schedule-item-base.selected {
+  z-index: 30 !important;
+  border: 3px solid #fff !important;
+  box-shadow: 0 0 0 3px #007bff !important;
+  transform: scale(1.02) !important;
+}
+
+.schedule-item-gradient {
+  background: linear-gradient(180deg, var(--schedule-color, #007bff)25 0%, var(--schedule-color, #007bff) 100%);
+  border: 1px solid var(--schedule-color, #007bff);
+}
+
+.schedule-item-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+}
+
+.schedule-item-title {
+  font-weight: 700;
+  color: white;
+}
+
+.schedule-item-time {
+  font-size: 10px;
+  opacity: 0.9;
+  color: white;
+}
+
+.schedule-item:hover,
+.schedule-item-base:hover {
+  z-index: 2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.schedule-item.selected,
+.schedule-item-base.selected {
+  z-index: 30 !important;
+  border: 3px solid #fff !important;
+  box-shadow: 0 0 0 3px #007bff !important;
+  transform: scale(1.02) !important;
+}
+
+/* === リサイズハンドル === */
+.resize-handle,
+.resize-handle-base {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 15;
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 2px;
+  transition: all 0.2s ease;
+}
+
+.resize-handle-start {
+  left: -4px;
+}
+
+.resize-handle-end {
+  right: -4px;
+}
+
+.resize-handle:hover,
+.resize-handle-base:hover {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+.resize-handle.resize-start,
+.resize-handle-start {
+  left: -4px;
+  background: #2e7d32;
+  opacity: 0.9;
+}
+
+.resize-handle.resize-end,
+.resize-handle-end {
+  right: -4px;
+  background: #c62828;
+  opacity: 0.9;
+}
+
+.resize-handle:hover,
+.resize-handle-base:hover {
+  opacity: 1;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+/* === ドラッグゴースト === */
+.drag-ghost {
+  position: absolute;
+  width: var(--ghost-width, 100px);
+  height: var(--ghost-height, 40px);
+  background: linear-gradient(135deg, var(--ghost-color, #007bff)AA 0%, var(--ghost-color, #007bff)66 100%);
+  border: 2px dashed rgba(255, 255, 255, 0.9);
+  border-radius: 4px;
+  opacity: 0.95;
+  z-index: 1300;
+  pointer-events: none;
+}
+
+/* === エラー・ローディング === */
+.error-message {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 12px 20px;
+  border: 1px solid #f5c6cb;
+  margin: 0 20px 20px 20px;
+  border-radius: 4px;
+}
+
+.loading-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #666;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e3e3e3;
+  border-top: 4px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* === レスポンシブデザイン === */
+@media (max-width: 1850px) {
+  .daily-schedule .schedule-table-container,
+  .daily-schedule-container,
+  .schedule-table-container.schedule-container-base.schedule-container-daily {
+    width: 95% !important;
+    max-width: 95% !important;
+    min-width: 800px !important;
+    max-height: none !important;
+    margin: 0 !important;
+  }
+}
+
+@media (max-width: 1400px) {
+  .daily-schedule .schedule-table-container,
+  .daily-schedule-container,
+  .schedule-table-container.schedule-container-base.schedule-container-daily {
+    width: 90% !important;
+    max-width: 90% !important;
+    min-width: 700px !important;
+    max-height: none !important;
+    margin: 0 !important;
+  }
+}
+
+@media (max-width: 1200px) {
+  .daily-schedule .schedule-table-container,
+  .daily-schedule-container,
+  .schedule-table-container.schedule-container-base.schedule-container-daily {
+    width: 99% !important;
+    max-width: 1400px !important;
+    min-width: 600px !important;
+    max-height: none !important;
+  }
+}
+
+@media (max-width: 992px) {
+  .daily-schedule .schedule-table-container,
+  .daily-schedule-container,
+  .schedule-table-container.schedule-container-base.schedule-container-daily {
+    width: 100% !important;
+    max-width: 1200px !important;
+    min-width: 500px !important;
+    max-height: none !important;
+    margin-top: 80px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .schedule-header {
+    padding: 16px;
+  }
+  
+  .schedule-header h2 {
+    font-size: 20px;
+  }
+  
+  .daily-schedule .schedule-table-container,
+  .daily-schedule-container,
+  .schedule-table-container.schedule-container-base.schedule-container-daily {
+    width: 100% !important;
+    max-width: 1000px !important;
+    min-width: 400px !important;
+    max-height: none !important;
+    margin-top: 60px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .schedule-header {
+    padding: 12px;
+  }
+  
+  .schedule-header h2 {
+    font-size: 18px;
+  }
+  
+  .daily-schedule .schedule-table-container,
+  .daily-schedule-container,
+  .schedule-table-container.schedule-container-base.schedule-container-daily {
+    width: 100% !important;
+    max-width: 800px !important;
+    min-width: 300px !important;
+    max-height: none !important;
+    margin-top: 50px !important;
+  }
+}
+
+/* 2px scrollbar - DailyScheduleContainer */
+.daily-schedule .schedule-table-container { scrollbar-width: thin; }
+.daily-schedule .schedule-table-container::-webkit-scrollbar { width: 2px !important; height: 2px !important; }
+.daily-schedule .schedule-table-container::-webkit-scrollbar-track { background: transparent !important; }
+.daily-schedule .schedule-table-container::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.25) !important; border-radius: 1px !important; }

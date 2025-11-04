@@ -1,0 +1,155 @@
+.overlap-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(2px);
+}
+
+.overlap-dialog {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  animation: fadeInScale 0.2s ease-out;
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.overlap-dialog-header {
+  padding: 20px 20px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.overlap-dialog-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #d32f2f;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.overlap-dialog-content {
+  padding: 20px;
+}
+
+.overlap-message {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: #333;
+  line-height: 1.5;
+}
+
+.overlap-list {
+  border: 1px solid #eee;
+  border-radius: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.overlap-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f5f5f5;
+  background: #fafafa;
+}
+
+.overlap-item:last-child {
+  border-bottom: none;
+}
+
+.overlap-item-title {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.overlap-item-time {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 2px;
+}
+
+.overlap-item-person,
+.overlap-item-equipment {
+  font-size: 11px;
+  color: #888;
+}
+
+.overlap-warning {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #856404;
+}
+
+.overlap-dialog-actions {
+  padding: 16px 20px 20px;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  border-top: 1px solid #eee;
+}
+
+.overlap-btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 100px;
+}
+
+.overlap-btn-cancel {
+  background: #f5f5f5;
+  color: #666;
+  border: 1px solid #ddd;
+}
+
+.overlap-btn-cancel:hover {
+  background: #e8e8e8;
+  color: #333;
+}
+
+.overlap-btn-confirm {
+  background: #ff9800;
+  color: white;
+}
+
+.overlap-btn-confirm:hover {
+  background: #f57c00;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+}
+
+
+
+
+
+
+
+

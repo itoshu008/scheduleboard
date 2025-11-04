@@ -1,0 +1,37 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🚀 クイックデプロイコマンド
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+【shuke-b アプリケーション】
+
+コマンド:
+  cd /home/itoshu2/apps/shuke-b/scheduleboard
+  ./deploy-local.sh
+
+または:
+  sudo mkdir -p /var/www/html/shuke-b && \
+  sudo rsync -av --delete suke/build/ /var/www/html/shuke-b/ && \
+  sudo chown -R www-data:www-data /var/www/html/shuke-b && \
+  sudo chmod -R 755 /var/www/html/shuke-b
+
+📍 アクセスURL:
+  • http://162.43.86.239/shuke-b/
+  • http://zatint1991.com/shuke-b/ (DNS設定済みの場合)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+【nginx設定】(初回のみ)
+
+設定確認:
+  sudo grep "location /shuke-b" /etc/nginx/sites-available/default
+
+設定追加（必要な場合）:
+  sudo nano /etc/nginx/sites-available/default
+
+追加内容は nginx-shuke-b.conf を参照
+
+設定反映:
+  sudo nginx -t
+  sudo systemctl reload nginx
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

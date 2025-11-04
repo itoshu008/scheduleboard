@@ -1,0 +1,12 @@
+# SSH設定ファイル（~/.ssh/config に追加）
+# kintai-backend デプロイ用サーバー設定
+
+Host prod-239
+    HostName 162.43.86.239
+    Port 22
+    User itoshu
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+

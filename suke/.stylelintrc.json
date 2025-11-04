@@ -1,0 +1,21 @@
+{
+  "extends": [
+    "stylelint-config-standard", // 基本ルールセット
+    "stylelint-config-prettier"  // Prettierと競合しないよう調整
+  ],
+  "plugins": ["stylelint-order"],
+  "rules": {
+    "declaration-no-important": true,        // !important禁止
+    "property-disallowed-list": ["height"],  // height禁止（→min-heightを使う）
+    "unit-disallowed-list": ["px"],          // px禁止（→remを推奨）
+    "color-named": "never",                  // 名前付き色（redとか）禁止
+    "selector-max-id": 0,                    // #idセレクタ禁止
+    "order/properties-order": [              // CSSプロパティ順序ルール
+      ["display", "position", "top", "right", "bottom", "left", "z-index"],
+      ["flex", "grid", "gap", "align-*", "justify-*"],
+      ["width", "min-width", "max-width", "height", "min-height", "max-height"],
+      ["margin", "padding", "border", "border-radius", "box-shadow"],
+      ["background", "color", "font", "text-*", "white-space", "overflow"]
+    ]
+  }
+}

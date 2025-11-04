@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>スケジュール登録テスト</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .result { margin: 10px 0; padding: 10px; background: #f5f5f5; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        button { padding: 8px 16px; margin: 5px; cursor: pointer; }
+        input, textarea { margin: 5px; padding: 5px; }
+        .form-group { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>スケジュール登録テスト</h1>
+    
+    <div class="test-section">
+        <h2>1. API接続確認</h2>
+        <button onclick="testConnections()">全API接続テスト</button>
+        <div id="connection-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. スケジュール作成テスト</h2>
+        <div class="form-group">
+            <label>社員ID: <input type="number" id="employee-id" value="6"></label>
+        </div>
+        <div class="form-group">
+            <label>タイトル: <input type="text" id="title" value="テストスケジュール"></label>
+        </div>
+        <div class="form-group">
+            <label>開始時刻: <input type="datetime-local" id="start-time"></label>
+        </div>
+        <div class="form-group">
+            <label>終了時刻: <input type="datetime-local" id="end-time"></label>
+        </div>
+        <div class="form-group">
+            <label>色: <input type="color" id="color" value="#FF6B6B"></label>
+        </div>
+        <button onclick="createSchedule()">スケジュール作成</button>
+        <div id="create-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. スケジュール一覧確認</h2>
+        <button onclick="listSchedules()">スケジュール一覧取得</button>
+        <div id="list-result" class="result"></div>
+    </div>
+
+    <script>
+        // 現在時刻を設定
+        window.onload = function() {
+            const now = new Date();
+            const startTime = new Date(now.getTime() + 60000); // 1分後
+            const endTime = new Date(now.getTime() + 1800000); // 30分後
+            
+            document.getElementById('start-time').value = formatDateTime(startTime);
+            document.getElementById('end-time').value = formatDateTime(endTime);
+        };
+        
+        function formatDateTime(date) {
+            return date.toISOString().slice(0, 16);
+        }
+        
+        async function testConnections() {
+            const resultDiv = document.getElementById('connection-result');
+            const tests = [
+                { name: 'ヘルスチェック', url: '/api/health' },
+                { name: '社員一覧', url: '/api/employees' },
+                { name: 'スケジュール一覧', url: '/api/schedules' },
+                { name: 'テンプレート（404想定）', url: '/api/templates' }
+            ];
+            
+            let results = [];
+            for (const test of tests) {
+                try {
+                    const response = await fetch(test.url);
+                    const status = response.ok ? '✅' : '❌';
+                    results.push(`${status} ${test.name}: ${response.status}`);
+                } catch (error) {
+                    results.push(`❌ ${test.name}: ${error.message}`);
+                }
+            }
+            
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = `<pre>${results.join('\n')}</pre>`;
+        }
+        
+        async function createSchedule() {
+            const resultDiv = document.getElementById('create-result');
+            
+            const data = {
+                employee_id: parseInt(document.getElementById('employee-id').value),
+                title: document.getElementById('title').value,
+                start_datetime: new Date(document.getElementById('start-time').value).toISOString(),
+                end_datetime: new Date(document.getElementById('end-time').value).toISOString(),
+                color: document.getElementById('color').value
+            };
+            
+            try {
+                console.log('Creating schedule:', data);
+                const response = await fetch('/api/schedules', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.text();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <strong>✅ スケジュール作成成功 (${response.status})</strong><br>
+                        <pre>${result}</pre>
+                    `;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `
+                        <strong>❌ スケジュール作成失敗 (${response.status})</strong><br>
+                        <pre>${result}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <strong>❌ 接続エラー</strong><br>
+                    <pre>${error.message}</pre>
+                `;
+            }
+        }
+        
+        async function listSchedules() {
+            const resultDiv = document.getElementById('list-result');
+            
+            try {
+                const response = await fetch('/api/schedules');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    const count = Array.isArray(data) ? data.length : 0;
+                    resultDiv.innerHTML = `
+                        <strong>✅ スケジュール一覧取得成功 (${count}件)</strong><br>
+                        <pre>${JSON.stringify(data.slice(0, 3), null, 2)}</pre>
+                        ${count > 3 ? `<p>... 他${count - 3}件</p>` : ''}
+                    `;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `
+                        <strong>❌ スケジュール一覧取得失敗 (${response.status})</strong><br>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <strong>❌ 接続エラー</strong><br>
+                    <pre>${error.message}</pre>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+.current-time-line {
+  position: fixed;
+  top: 0;
+  width: 1px;
+  /* height: 100%; 削除 - インラインスタイルで制御 */
+  background: #ff0000;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+

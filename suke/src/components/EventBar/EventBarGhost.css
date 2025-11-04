@@ -1,0 +1,259 @@
+/* EventBar ゴースト効果のアニメーション */
+@keyframes ghost-pulse {
+  0%, 100% {
+    transform: scale(1.15) translateZ(0);
+    box-shadow: 
+      0 12px 32px rgba(255,0,0,0.6), 
+      0 6px 16px rgba(255,255,0,0.4), 
+      inset 0 2px 0 rgba(255,255,255,0.8),
+      0 0 20px rgba(0,255,255,0.5);
+    border-color: rgba(255,255,255,1);
+  }
+  50% {
+    transform: scale(1.2) translateZ(10px);
+    box-shadow: 
+      0 16px 40px rgba(255,0,0,0.8), 
+      0 8px 20px rgba(255,255,0,0.6), 
+      inset 0 2px 0 rgba(255,255,255,1),
+      0 0 30px rgba(0,255,255,0.7);
+    border-color: rgba(255,255,0,1);
+  }
+}
+
+@keyframes ghost-shimmer {
+  0% {
+    background-position: -100% 0;
+  }
+  100% {
+    background-position: 100% 0;
+  }
+}
+
+@keyframes ghost-gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes ghost-bounce {
+  0%, 100% {
+    transform: translateX(-50%) translateY(0px);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-5px);
+  }
+}
+
+@keyframes ghost-text-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(0.95);
+  }
+}
+
+/* ゴースト状態のEventBar */
+.event-bar-ghost {
+  position: relative;
+  overflow: visible !important;
+  border: 4px dashed rgba(255,255,255,1) !important;
+  background: linear-gradient(45deg, 
+    rgba(255,0,0,0.8), 
+    rgba(255,255,0,0.6), 
+    rgba(0,255,255,0.8),
+    rgba(255,0,255,0.6)
+  ) !important;
+  background-size: 400% 400% !important;
+  animation: ghost-pulse 1s ease-in-out infinite, ghost-gradient 3s ease infinite !important;
+}
+
+.event-bar-ghost::before {
+  content: '📍 ここに移動します';
+  position: absolute;
+  top: -35px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(45deg, rgba(255,0,0,0.95), rgba(255,255,0,0.95));
+  color: white;
+  padding: 6px 16px;
+  border-radius: 25px;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+  z-index: 1000000;
+  box-shadow: 
+    0 6px 20px rgba(0,0,0,0.7),
+    inset 0 2px 0 rgba(255,255,255,0.3);
+  border: 2px solid rgba(255,255,255,1);
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+  animation: ghost-bounce 1s ease-in-out infinite;
+  letter-spacing: 0.5px;
+}
+
+.event-bar-ghost::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 200%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.6),
+    transparent
+  );
+  animation: ghost-shimmer 1.5s infinite;
+}
+
+/* ゴーストハンドル */
+.ghost-handle {
+  opacity: 1 !important;
+  background: linear-gradient(45deg, 
+    rgba(255,0,0,0.9), 
+    rgba(255,255,0,0.9), 
+    rgba(0,255,255,0.9)
+  ) !important;
+  border: 3px solid rgba(255, 255, 255, 1) !important;
+  border-radius: 6px !important;
+  box-shadow: 
+    0 0 15px rgba(255,255,0,0.8),
+    inset 0 2px 0 rgba(255,255,255,0.5) !important;
+  animation: ghost-handle-pulse 1s ease-in-out infinite !important;
+  cursor: ew-resize !important;
+}
+
+@keyframes ghost-handle-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 
+      0 0 15px rgba(255,255,0,0.8),
+      inset 0 2px 0 rgba(255,255,255,0.5);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 
+      0 0 25px rgba(255,0,0,0.9),
+      inset 0 2px 0 rgba(255,255,255,0.8);
+  }
+}
+
+/* ゴーストテキスト */
+.ghost-text {
+  text-shadow: 0 2px 4px rgba(0,0,0,0.7);
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+}
+
+.ghost-sub-text {
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  filter: drop-shadow(0 0.5px 1px rgba(0,0,0,0.3));
+}
+
+/* ゴーストボーダーアニメーション */
+@keyframes dash-animation {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: 20;
+  }
+}
+
+.event-bar-ghost {
+  border-style: dashed !important;
+  border-image: linear-gradient(45deg, 
+    rgba(255,255,255,0.9), 
+    rgba(255,255,255,0.6), 
+    rgba(255,255,255,0.9)
+  ) 1;
+  animation: dash-animation 1s linear infinite;
+}
+
+/* 3D効果の強化 */
+.event-bar-ghost {
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  @keyframes ghost-pulse {
+    0%, 100% {
+      transform: scale(1.05) rotateX(2deg) translateZ(0);
+    }
+    50% {
+      transform: scale(1.08) rotateX(4deg) translateZ(2px);
+    }
+  }
+}
+
+/* ドラッグガイド線 */
+.drag-guide-line {
+  position: absolute;
+  width: 3px;
+  background: linear-gradient(
+    180deg,
+    rgba(255,0,0,0.8),
+    rgba(255,255,0,0.8),
+    rgba(0,255,255,0.8)
+  );
+  border-radius: 2px;
+  z-index: 999999;
+  animation: guide-pulse 1s ease-in-out infinite;
+  box-shadow: 0 0 10px rgba(255,255,0,0.6);
+}
+
+/* .drag-guide-arrow - 無効化（不要な矢印を削除）
+.drag-guide-arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 12px solid rgba(255,255,0,0.9);
+  z-index: 999999;
+  animation: arrow-pulse 1s ease-in-out infinite;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+*/
+
+@keyframes guide-pulse {
+  0%, 100% {
+    opacity: 0.7;
+    transform: scaleX(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleX(1.2);
+  }
+}
+
+/* @keyframes arrow-pulse - 無効化（不要なアニメーション）
+@keyframes arrow-pulse {
+  0%, 100% {
+    transform: translateY(0px);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+*/
+
+/* 高性能デバイス用の追加効果 */
+@media (min-resolution: 2dppx) {
+  .event-bar-ghost {
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+  }
+}
