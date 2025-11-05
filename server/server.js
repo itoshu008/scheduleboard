@@ -2,11 +2,18 @@
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
+const morgan = require('morgan');
 require('dotenv').config();
 
 const { bootstrap, getPool } = require('./db');
 
 const app = express();
+app.set('trust proxy', true);
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(compression());
+app.use(morgan('combined'));
 app.use(cors());
 app.use(express.json());
 
@@ -16,6 +23,7 @@ bootstrap().then(() => { ready = true; }).catch(err => {
   console.error('[DB bootstrap error]', err);
 });
 
+// ===== API routes =====
 app.get('/api/health', async (_req, res) => {
   try {
     if (!ready) return res.json({ ok: true, service: 'scheduleboard', db: 'initializing' });
@@ -107,17 +115,27 @@ app.post('/api/events', asyncH(async (req, res) => {
   res.json({ ok: true, id: r.insertId });
 }));
 
-// === Static client (production) mounted under /scheduleboard ===
+// API 404 guard
+app.use('/api', (_req, res) => {
+  res.status(404).json({ ok: false, error: 'Not Found' });
+});
+
+// ===== Static client (production) under /shuke-b =====
 const clientDir = path.join(__dirname, '..', 'suke', 'dist');
-
-// Serve assets under /scheduleboard (note: no trailing slash in mount)
-app.use('/scheduleboard', express.static(clientDir));
-
-// SPA fallback only for /scheduleboard/* paths
-app.get('/scheduleboard/*', (_req, res) => {
+// Cache assets aggressively
+app.use('/shuke-b/assets', express.static(path.join(clientDir, 'assets'), { maxAge: '30d', immutable: true }));
+// index.html must not be cached
+app.get('/shuke-b', (_req, res) => res.redirect(301, '/shuke-b/'));
+app.get('/shuke-b/*', (_req, res) => {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(clientDir, 'index.html'));
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running: http://localhost:${PORT}`));
+// Global error handler (last)
+app.use((err, _req, res, _next) => {
+  console.error('[Unhandled]', err);
+  res.status(500).json({ ok: false, error: 'Internal Server Error' });
+});
 
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server http://localhost:${PORT}`));

@@ -15,13 +15,13 @@ say "[0/4] Preflight checks..."
 [ -d "$TARGET" ] || die "Target $TARGET not found. Ask admin to create & chown to itoshu2."
 [ -w "$TARGET" ] || die "Target $TARGET not writable by current user."
 # 0-3) vite base sanity (warn only)
-if [ -f "$APP_ROOT/suke/vite.config.ts" ] && ! grep -q "base: '/shuke-b/'" "$APP_ROOT/suke/vite.config.ts"; then
-  say "WARN: vite base may not be '/shuke-b/'. Update vite.config.ts if assets 404."
+if [ -f "$APP_ROOT/suke/vite.config.ts" ] && ! grep -q "base: '/scheduleboard/'" "$APP_ROOT/suke/vite.config.ts"; then
+  say "WARN: vite base may not be '/scheduleboard/'. Update vite.config.ts if assets 404."
 fi
 
 say "[1/4] Build client (suke)..."
 if [ -f "$APP_ROOT/suke/package-lock.json" ]; then
-  npm --prefix "$APP_ROOT/suke" ci
+  npm --prefix "$APP_ROOT/suke" ci || npm --prefix "$APP_ROOT/suke" install
 else
   npm --prefix "$APP_ROOT/suke" install
 fi
@@ -36,4 +36,4 @@ sudo "$NGINX" -t
 say "[4/4] Reload nginx (zero-downtime)..."
 sudo "$NGINX" -s reload
 
-say "Done. Visit: https://zatint1991.com/shuke-b/"
+say "Done. Visit: https://zatint1991.com/scheduleboard/"

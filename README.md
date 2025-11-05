@@ -243,11 +243,11 @@ http://localhost:3000
 ## Deploy (nginx limited-sudo mode)
 
 ### Prerequisites (admin task)
-- Nginx location for `/shuke-b/`:
+- Nginx location for `/scheduleboard/`:
   ```
-  location ^~ /shuke-b/ {
+  location ^~ /scheduleboard/ {
     alias /var/www/html/scheduleboard/;
-    try_files $uri $uri/ /shuke-b/index.html;
+    try_files $uri $uri/ /scheduleboard/index.html;
   }
   ```
 - sudoers (limited to nginx only):
@@ -285,6 +285,44 @@ This performs: build → rsync (no sudo) → `sudo nginx -t` → `sudo nginx -s 
 - 403/permission error: check ownership (itoshu2) and directory mode `2775`.
 - `sudo: a password is required`: confirm sudoers entry is exactly:
   `itoshu2 ALL=(root) NOPASSWD: /usr/sbin/nginx`
+
+## Stability Hotfix Notes
+
+### Subpath Deploy Configuration
+- **Vite base path**: `base: '/shuke-b/'` in `vite.config.ts` ensures assets resolve correctly under subpath
+- **SPA fallback**: `/shuke-b/*` routes are handled by Express fallback to `index.html` for deep links
+
+### Error Handling & Visibility
+- **ErrorBoundary**: React component catches rendering errors and displays them in a yellow panel instead of blank screen
+- **Status banner**: Visible health/API status at top of page with clear error messages
+- **API client**: `suke/src/lib/api.ts` provides:
+  - 10-second timeout for all requests
+  - Clear error messages with status codes
+  - Proper JSON/error parsing
+
+### Backend Improvements
+- **Logging**: `morgan('combined')` logs all HTTP requests for debugging
+- **Security**: `helmet()` adds security headers (CSP disabled for compatibility)
+- **Compression**: `compression()` middleware enables gzip for responses
+- **Cache headers**: 
+  - Static assets (`/shuke-b/assets/*`): 30 days cache, immutable
+  - `index.html`: no-cache to ensure updates are visible
+- **API error handling**: 
+  - `/api/*` 404 returns JSON error response
+  - Global error handler catches unhandled exceptions
+  - All errors logged to console
+
+### Troubleshooting Checklist
+- **404 on assets**: Check `vite.config.ts` has `base: '/shuke-b/'` and files exist under `/var/www/html/scheduleboard/`
+- **500 API errors**: Check server logs (morgan) and `/api` 404 guard responses
+- **Blank page**: Check browser console for ErrorBoundary messages and API errors
+- **Deep link reload fails**: Verify `/shuke-b/*` fallback is working (check Express routes)
+
+### Verification Steps
+1. Open `/shuke-b/` - Status banner should show JSON with health info
+2. Simulate error: Temporarily stop backend to see graceful error display
+3. Check network tab: API calls should have proper error messages
+4. Reload `/shuke-b/any-deep-path` - Should display correctly (SPA routing)
 
 ## ライセンス
 
