@@ -1,10 +1,12 @@
 {
   "name": "scheduleboard-server",
   "version": "0.1.0",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
+    "realtime": "node realtime.js",
     "db:ping": "node db-ping.js",
     "migrate": "node migrate.js",
     "migrate:status": "node migrate.js status"
@@ -16,6 +18,8 @@
     "mysql2": "^3.11.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "eventsource": "^2.0.2",
+    "socket.io": "^4.7.5"
   }
 }

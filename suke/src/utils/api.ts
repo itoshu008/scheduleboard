@@ -25,53 +25,53 @@ const toLocalISOString = (date: Date) => {
 // 部署API
 export const departmentApi = {
   getAll: async (): Promise<import('axios').AxiosResponse<Department[]>> => {
-    return await api.get<Department[]>('/departments');
+    return await api.get<Department[]>('/admin/departments');
   },
   getById: async (id: number): Promise<import('axios').AxiosResponse<Department>> => {
-    return await api.get<Department>(`/departments/${id}`);
+    return await api.get<Department>(`/admin/departments/${id}`);
   },
   create: async (data: CreateDepartmentForm): Promise<import('axios').AxiosResponse<Department>> => {
-    return await api.post<Department>('/departments', data);
+    return await api.post<Department>('/admin/departments', data);
   },
   update: async (id: number, data: Partial<CreateDepartmentForm>): Promise<import('axios').AxiosResponse<Department>> => {
-    return await api.put<Department>(`/departments/${id}`, data);
+    return await api.put<Department>(`/admin/departments/${id}`, data);
   },
   delete: async (id: number): Promise<import('axios').AxiosResponse<any>> => {
-    return await api.delete(`/departments/${id}`);
+    return await api.delete(`/admin/departments/${id}`);
   },
   move: async (id: number, direction: 'up' | 'down'): Promise<import('axios').AxiosResponse<Department>> => {
-    return await api.put<Department>(`/departments/${id}/move`, { direction });
+    return await api.put<Department>(`/admin/departments/${id}/move`, { direction });
   },
   updateOrder: async (orders: { id: number; display_order: number }[]): Promise<import('axios').AxiosResponse<any>> => {
-    return await api.put('/departments/order/update', { orders });
+    return await api.put('/admin/departments/order/update', { orders });
   },
 };
 
 // 社員API
 export const employeeApi = {
   getAll: async (params?: { department_id?: number; order_by?: string }): Promise<import('axios').AxiosResponse<Employee[]>> => {
-    return await api.get<Employee[]>('/employees', { params });
+    return await api.get<Employee[]>('/admin/employees', { params });
   },
   getById: async (id: number): Promise<import('axios').AxiosResponse<Employee>> => {
-    return await api.get<Employee>(`/employees/${id}`);
+    return await api.get<Employee>(`/admin/employees/${id}`);
   },
   getByEmployeeNumber: async (employeeNumber: string): Promise<import('axios').AxiosResponse<Employee>> => {
-    return await api.get<Employee>(`/employees/number/${employeeNumber}`);
+    return await api.get<Employee>(`/admin/employees/number/${employeeNumber}`);
   },
   create: async (data: CreateEmployeeForm): Promise<import('axios').AxiosResponse<Employee>> => {
-    return await api.post<Employee>('/employees', data);
+    return await api.post<Employee>('/admin/employees', data);
   },
   update: async (id: number, data: Partial<CreateEmployeeForm>): Promise<import('axios').AxiosResponse<Employee>> => {
-    return await api.put<Employee>(`/employees/${id}`, data);
+    return await api.put<Employee>(`/admin/employees/${id}`, data);
   },
   delete: async (id: number): Promise<import('axios').AxiosResponse<any>> => {
-    return await api.delete(`/employees/${id}`);
+    return await api.delete(`/admin/employees/${id}`);
   },
   move: async (id: number, direction: 'up' | 'down'): Promise<import('axios').AxiosResponse<Employee>> => {
-    return await api.put<Employee>(`/employees/${id}/move`, { direction });
+    return await api.put<Employee>(`/admin/employees/${id}/move`, { direction });
   },
   updateOrder: async (orders: { id: number; display_order: number }[]): Promise<import('axios').AxiosResponse<any>> => {
-    return await api.put('/employees/order/update', { orders });
+    return await api.put('/admin/employees/order/update', { orders });
   },
 };
 
@@ -83,23 +83,23 @@ export const scheduleApi = {
     start_date?: string;
     end_date?: string;
   }): Promise<import('axios').AxiosResponse<Schedule[]>> => {
-    return await api.get<Schedule[]>('/schedules', { params });
+    return await api.get<Schedule[]>('/admin/schedules', { params });
   },
   getById: async (id: number): Promise<import('axios').AxiosResponse<Schedule>> => {
-    return await api.get<Schedule>(`/schedules/${id}`);
+    return await api.get<Schedule>(`/admin/schedules/${id}`);
   },
   getMonthly: async (employeeId: number, year: number, month: number): Promise<import('axios').AxiosResponse<Schedule[]>> => {
-    return await api.get<Schedule[]>(`/schedules/monthly/${employeeId}/${year}/${month}`);
+    return await api.get<Schedule[]>(`/admin/schedules/monthly/${employeeId}/${year}/${month}`);
   },
   getMonthlyByDepartment: async (departmentId: number, year: number, month: number): Promise<import('axios').AxiosResponse<Schedule[]>> => {
-    return await api.get<Schedule[]>(`/schedules/monthly/department/${departmentId}/${year}/${month}`);
+    return await api.get<Schedule[]>(`/admin/schedules/monthly/department/${departmentId}/${year}/${month}`);
   },
   getMonthlyAll: async (year: number, month: number): Promise<import('axios').AxiosResponse<Schedule[]>> => {
-    return await api.get<Schedule[]>(`/schedules/monthly/all/${year}/${month}`);
+    return await api.get<Schedule[]>(`/admin/schedules/monthly/all/${year}/${month}`);
   },
   getDailyByDepartment: async (departmentId: number, date: string): Promise<import('axios').AxiosResponse<Schedule[]>> => {
     const timestamp = Date.now();
-    return await api.get<Schedule[]>(`/schedules/daily/department/${departmentId}/${date}?_t=${timestamp}`);
+    return await api.get<Schedule[]>(`/admin/schedules/daily/department/${departmentId}/${date}?_t=${timestamp}`);
   },
   getDailyAll: async (date: string): Promise<import('axios').AxiosResponse<Schedule[]>> => {
     // 互換キーを両方送付
@@ -110,7 +110,7 @@ export const scheduleApi = {
       start: toServerISO(start),
       end: toServerISO(end),
     };
-    return await api.get<Schedule[]>('/schedules', { params });
+    return await api.get<Schedule[]>('/admin/schedules', { params });
   },
   create: async (data: CreateScheduleForm): Promise<import('axios').AxiosResponse<Schedule>> => {
     const payload = {
@@ -118,7 +118,7 @@ export const scheduleApi = {
       start_datetime: toLocalISOString(data.start_datetime),
       end_datetime: toLocalISOString(data.end_datetime),
     };
-    return await api.post<Schedule>('/schedules', payload);
+    return await api.post<Schedule>('/admin/schedules', payload);
   },
   update: async (id: number, data: Partial<CreateScheduleForm>): Promise<import('axios').AxiosResponse<Schedule>> => {
     const payload = {
@@ -126,13 +126,13 @@ export const scheduleApi = {
       start_datetime: data.start_datetime ? toLocalISOString(data.start_datetime) : undefined,
       end_datetime: data.end_datetime ? toLocalISOString(data.end_datetime) : undefined,
     };
-    return await api.put<Schedule>(`/schedules/${id}`, payload);
+    return await api.put<Schedule>(`/admin/schedules/${id}`, payload);
   },
   delete: async (id: number): Promise<import('axios').AxiosResponse<any>> => {
-    return await api.delete(`/schedules/${id}`);
+    return await api.delete(`/admin/schedules/${id}`);
   },
   copy: async (sourceId: number, targetEmployeeId: number, targetStartTime: Date): Promise<import('axios').AxiosResponse<Schedule>> => {
-    return await api.post<Schedule>(`/schedules/${sourceId}/copy`, {
+    return await api.post<Schedule>(`/admin/schedules/${sourceId}/copy`, {
       target_employee_id: targetEmployeeId,
       target_start_datetime: toLocalISOString(targetStartTime),
     });
@@ -149,7 +149,7 @@ export const scheduleApi = {
       end_datetime: toLocalISOString(data.end_datetime),
     };
     return await api.post<{ hasConflict: boolean; conflicts: Schedule[] }>(
-      '/schedules/check-conflict',
+      '/admin/schedules/check-conflict',
       payload
     );
   },
@@ -158,25 +158,25 @@ export const scheduleApi = {
 // 設備API
 export const equipmentApi = {
   getAll: async (): Promise<import('axios').AxiosResponse<Equipment[]>> => {
-    return await api.get<Equipment[]>('/equipment');
+    return await api.get<Equipment[]>('/admin/equipment');
   },
   getById: async (id: number): Promise<import('axios').AxiosResponse<Equipment>> => {
-    return await api.get<Equipment>(`/equipment/${id}`);
+    return await api.get<Equipment>(`/admin/equipment/${id}`);
   },
   create: async (data: CreateEquipmentForm): Promise<import('axios').AxiosResponse<Equipment>> => {
-    return await api.post<Equipment>('/equipment', data);
+    return await api.post<Equipment>('/admin/equipment', data);
   },
   update: async (id: number, data: Partial<CreateEquipmentForm>): Promise<import('axios').AxiosResponse<Equipment>> => {
-    return await api.put<Equipment>(`/equipment/${id}`, data);
+    return await api.put<Equipment>(`/admin/equipment/${id}`, data);
   },
   delete: async (id: number): Promise<import('axios').AxiosResponse<any>> => {
-    return await api.delete(`/equipment/${id}`);
+    return await api.delete(`/admin/equipment/${id}`);
   },
   move: async (id: number, direction: 'up' | 'down'): Promise<import('axios').AxiosResponse<Equipment>> => {
-    return await api.put<Equipment>(`/equipment/${id}/move`, { direction });
+    return await api.put<Equipment>(`/admin/equipment/${id}/move`, { direction });
   },
   updateOrder: async (orders: { id: number; display_order: number }[]): Promise<import('axios').AxiosResponse<any>> => {
-    return await api.put('/equipment/order/update', { orders });
+    return await api.put('/admin/equipment/order/update', { orders });
   },
 };
 
