@@ -1,66 +1,39 @@
-#!/bin/bash
-# shuke-b アプリケーション デプロイスクリプト
+#!/usr/bin/env bash
+set -euo pipefail
 
-set -e  # エラーが発生したら即座に終了
+APP_ROOT="$(cd "$(dirname "$0")" && pwd)"
+TARGET="/var/www/html/scheduleboard"
+NGINX="/usr/sbin/nginx"
 
-echo "🚀 shuke-b デプロイ開始..."
+say() { printf '%s\n' "$*"; }
+die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
-# カレントディレクトリを確認
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR"
+say "[0/4] Preflight checks..."
+# 0-1) nginx path
+[ -x "$NGINX" ] || die "nginx not found at $NGINX. Ask admin to confirm path and sudoers rule."
+# 0-2) target dir
+[ -d "$TARGET" ] || die "Target $TARGET not found. Ask admin to create & chown to itoshu2."
+[ -w "$TARGET" ] || die "Target $TARGET not writable by current user."
+# 0-3) vite base sanity (warn only)
+if [ -f "$APP_ROOT/suke/vite.config.ts" ] && ! grep -q "base: '/shuke-b/'" "$APP_ROOT/suke/vite.config.ts"; then
+  say "WARN: vite base may not be '/shuke-b/'. Update vite.config.ts if assets 404."
+fi
 
-# デプロイ先の設定（環境に応じて変更してください）
-DEPLOY_USER="${DEPLOY_USER:-root}"
-DEPLOY_HOST="${DEPLOY_HOST:-zatint1991.com}"
-DEPLOY_PATH="${DEPLOY_PATH:-/var/www/html/shuke-b}"
-
-echo "📦 ビルドを確認中..."
-# dist または build ディレクトリを探す
-if [ -d "suke/dist" ]; then
-    BUILD_DIR="suke/dist"
-elif [ -d "suke/build" ]; then
-    BUILD_DIR="suke/build"
+say "[1/4] Build client (suke)..."
+if [ -f "$APP_ROOT/suke/package-lock.json" ]; then
+  npm --prefix "$APP_ROOT/suke" ci
 else
-    echo "❌ ビルドが見つかりません。先にビルドを実行してください:"
-    echo "   ./build.sh"
-    exit 1
+  npm --prefix "$APP_ROOT/suke" install
 fi
-echo "📍 使用するビルド: ${BUILD_DIR}"
+npm --prefix "$APP_ROOT/suke" run build
 
-echo "🔍 デプロイ先情報:"
-echo "  ホスト: $DEPLOY_HOST"
-echo "  ユーザー: $DEPLOY_USER"
-echo "  パス: $DEPLOY_PATH"
-echo ""
+say "[2/4] Sync artifacts -> $TARGET"
+rsync -av --delete "$APP_ROOT/suke/dist/" "$TARGET/"
 
-# 確認
-read -p "デプロイを実行しますか？ (y/N): " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "❌ デプロイをキャンセルしました"
-    exit 1
-fi
+say "[3/4] Validate nginx config..."
+sudo "$NGINX" -t
 
-echo "📤 ファイルを転送中..."
+say "[4/4] Reload nginx (zero-downtime)..."
+sudo "$NGINX" -s reload
 
-# デプロイ先ディレクトリを作成（存在しない場合）
-ssh "${DEPLOY_USER}@${DEPLOY_HOST}" "mkdir -p ${DEPLOY_PATH}"
-
-# ファイルを転送
-rsync -avz --delete \
-    --exclude='*.map' \
-    ${BUILD_DIR}/ \
-    "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"
-
-echo "🔧 権限を設定中..."
-ssh "${DEPLOY_USER}@${DEPLOY_HOST}" "chown -R www-data:www-data ${DEPLOY_PATH}"
-ssh "${DEPLOY_USER}@${DEPLOY_HOST}" "chmod -R 755 ${DEPLOY_PATH}"
-
-echo "✅ デプロイ完了！"
-echo "🌐 アクセスURL: http://${DEPLOY_HOST}/shuke-b/"
-echo ""
-echo "📝 nginx設定を確認してください:"
-echo "   1. shuke.txt の内容を /etc/nginx/sites-available/default にマージ"
-echo "   2. nginx -t で設定をテスト"
-echo "   3. systemctl reload nginx で反映"
-
+say "Done. Visit: https://zatint1991.com/shuke-b/"

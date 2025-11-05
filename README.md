@@ -240,6 +240,52 @@ http://localhost:3000
 - `equipment`: 設備情報
 - `equipment_reservations`: 設備予約情報
 
+## Deploy (nginx limited-sudo mode)
+
+### Prerequisites (admin task)
+- Nginx location for `/shuke-b/`:
+  ```
+  location ^~ /shuke-b/ {
+    alias /var/www/html/scheduleboard/;
+    try_files $uri $uri/ /shuke-b/index.html;
+  }
+  ```
+- sudoers (limited to nginx only):
+  ```
+  itoshu2 ALL=(root) NOPASSWD: /usr/sbin/nginx
+  ```
+  > No other commands (systemctl, rm, bash, etc.) are allowed. Principle of least privilege.
+
+- Target directory owned by `itoshu2` and group `www-data`, with setgid for group inheritance:
+  ```
+  sudo mkdir -p /var/www/html/scheduleboard
+  sudo chown -R itoshu2:www-data /var/www/html/scheduleboard
+  sudo chmod -R 2775 /var/www/html/scheduleboard
+  ```
+
+### Usage (developer task)
+
+```bash
+./deploy.sh
+```
+
+This performs: build → rsync (no sudo) → `sudo nginx -t` → `sudo nginx -s reload` (zero-downtime).
+
+### Safety Rules (MUST READ)
+- **Least privilege**: `sudo` is allowed **only** for `/usr/sbin/nginx`. No `systemctl`, no `restart`, no `stop`.
+- **Always validate before reload**: deploy.sh runs `nginx -t` first. Never reload with syntax errors.
+- **Never touch DB from deploy**: this script does not run migrations or alter MySQL.
+- **No PM2/system restarts from deploy**: process management is separate and handled by admins.
+- **No destructive rsync outside target**: rsync uses `--delete` but only within `/var/www/html/scheduleboard/`.
+- **Config changes require admin review**: Nginx/conf edits must be reviewed; deploy just reloads.
+- **Auditable**: All sudo operations are logged; any deviation is detectable.
+
+### Troubleshooting
+- 404 on assets: ensure Vite `base: '/shuke-b/'` and files exist under `/var/www/html/scheduleboard/`.
+- 403/permission error: check ownership (itoshu2) and directory mode `2775`.
+- `sudo: a password is required`: confirm sudoers entry is exactly:
+  `itoshu2 ALL=(root) NOPASSWD: /usr/sbin/nginx`
+
 ## ライセンス
 
 このプロジェクトはMITライセンスの下で公開されています。

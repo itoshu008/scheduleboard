@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "db:ping": "node db-ping.js"
+    "db:ping": "node db-ping.js",
+    "migrate": "node migrate.js",
+    "migrate:status": "node migrate.js status"
   },
   "dependencies": {
     "mysql2": "^3.11.0",

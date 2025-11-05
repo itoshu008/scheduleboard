@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS breaks (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  date DATE NOT NULL,
+  start_at DATETIME NOT NULL,
+  end_at DATETIME NOT NULL,
+  note VARCHAR(255) NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_breaks_user_date (user_id, date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
