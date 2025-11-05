@@ -1,26 +1,16 @@
 {
-  "name": "schedule-server",
-  "version": "1.0.0",
-  "description": "バックエンドサーバー",
-  "main": "index.js",
+  "name": "scheduleboard-server",
+  "version": "0.1.0",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
-    "safe": "node index.safe.js",
-    "dev:safe": "nodemon index.safe.js",
-    "db:init": "node scripts/init-db.js"
+    "dev": "node server.js",
+    "start": "node server.js",
+    "db:ping": "node db-ping.js"
   },
   "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
-    "dayjs": "^1.11.18",
-    "dotenv": "^16.3.0",
-    "express": "^4.18.2",
-    "jsonwebtoken": "^9.0.0",
-    "mysql2": "^3.6.0",
-    "sqlite3": "^5.1.7"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
+    "mysql2": "^3.11.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "cors": "^2.8.5"
   }
 }

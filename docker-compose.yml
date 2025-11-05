@@ -1,0 +1,25 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: scheduleboard-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${DB_NAME:-scheduleboard}
+      MYSQL_USER: ${DB_USER:-sb_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-sb_pass}
+    ports:
+      - "3306:3306"
+    command: [
+      "--character-set-server=utf8mb4",
+      "--collation-server=utf8mb4_0900_ai_ci",
+      "--default-authentication-plugin=mysql_native_password",
+      "--sql-mode=",
+      "--skip-log-bin"
+    ]
+    volumes:
+      - sb_mysql_data:/var/lib/mysql
+volumes:
+  sb_mysql_data:
+    name: sb_mysql_data
+
