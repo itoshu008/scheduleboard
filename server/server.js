@@ -1,4 +1,6 @@
 /* eslint-disable */
+'use strict';
+
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
@@ -10,20 +12,26 @@ require('dotenv').config();
 const { bootstrap, getPool } = require('./db');
 
 const app = express();
+
+/* ===== 基本ミドルウェア ===== */
 app.set('trust proxy', true);
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({ contentSecurityPolicy: false })); // 必要に応じてCSPは後日チューニング
 app.use(compression());
 app.use(morgan('combined'));
 app.use(cors());
 app.use(express.json());
 
-// Boot DB then start server
+/* ===== DB 起動（非同期） ===== */
 let ready = false;
-bootstrap().then(() => { ready = true; }).catch(err => {
-  console.error('[DB bootstrap error]', err);
-});
+bootstrap()
+  .then(() => { ready = true; })
+  .catch(err => {
+    console.error('[DB bootstrap error]', err);
+  });
 
-// ===== API routes =====
+/* ===== API ===== */
+
+// Health
 app.get('/api/health', async (_req, res) => {
   try {
     if (!ready) return res.json({ ok: true, service: 'scheduleboard', db: 'initializing' });
@@ -34,13 +42,14 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
-// Helpers
-const asyncH = (fn) => (req, res) => fn(req, res).catch(e => {
-  console.error(e);
-  res.status(500).json({ ok: false, error: String(e) });
-});
+// ユーティリティ（asyncハンドラ）
+const asyncH = (fn) => (req, res) =>
+  Promise.resolve(fn(req, res)).catch(e => {
+    console.error(e);
+    res.status(500).json({ ok: false, error: String(e) });
+  });
 
-// Routes (minimal)
+// groups
 app.get('/api/groups', asyncH(async (_req, res) => {
   const [rows] = await getPool().query('SELECT * FROM groups ORDER BY id;');
   res.json({ ok: true, groups: rows });
@@ -49,10 +58,14 @@ app.get('/api/groups', asyncH(async (_req, res) => {
 app.post('/api/groups', asyncH(async (req, res) => {
   const { name, color } = req.body || {};
   if (!name) return res.status(400).json({ ok: false, error: 'name required' });
-  const [r] = await getPool().query('INSERT INTO groups(name, color) VALUES (?, ?);', [name, color || null]);
+  const [r] = await getPool().query(
+    'INSERT INTO groups(name, color) VALUES (?, ?);',
+    [name, color || null]
+  );
   res.json({ ok: true, id: r.insertId });
 }));
 
+// users
 app.get('/api/users', asyncH(async (_req, res) => {
   const [rows] = await getPool().query(
     'SELECT u.*, g.name AS group_name FROM users u LEFT JOIN groups g ON g.id=u.group_id ORDER BY u.id;'
@@ -70,6 +83,7 @@ app.post('/api/users', asyncH(async (req, res) => {
   res.json({ ok: true, id: r.insertId });
 }));
 
+// templates
 app.get('/api/templates', asyncH(async (_req, res) => {
   const [rows] = await getPool().query('SELECT * FROM templates ORDER BY id;');
   res.json({ ok: true, templates: rows });
@@ -85,6 +99,7 @@ app.post('/api/templates', asyncH(async (req, res) => {
   res.json({ ok: true, id: r.insertId });
 }));
 
+// events
 app.get('/api/events', asyncH(async (req, res) => {
   // Optional filters: user_id, from, to
   const { user_id, from, to } = req.query;
@@ -107,7 +122,9 @@ app.get('/api/events', asyncH(async (req, res) => {
 
 app.post('/api/events', asyncH(async (req, res) => {
   const { user_id, template_id, start_at, end_at, note } = req.body || {};
-  if (!user_id || !start_at || !end_at) return res.status(400).json({ ok: false, error: 'user_id, start_at, end_at required' });
+  if (!user_id || !start_at || !end_at) {
+    return res.status(400).json({ ok: false, error: 'user_id, start_at, end_at required' });
+  }
   const [r] = await getPool().query(
     'INSERT INTO events(user_id, template_id, start_at, end_at, note) VALUES (?, ?, ?, ?, ?);',
     [user_id, template_id || null, start_at, end_at, note || null]
@@ -120,22 +137,38 @@ app.use('/api', (_req, res) => {
   res.status(404).json({ ok: false, error: 'Not Found' });
 });
 
-// ===== Static client (production) under /shuke-b =====
+/* ===== フロント配信（/scheduleboard 配下） ===== */
 const clientDir = path.join(__dirname, '..', 'suke', 'dist');
-// Cache assets aggressively
-app.use('/shuke-b/assets', express.static(path.join(clientDir, 'assets'), { maxAge: '30d', immutable: true }));
-// index.html must not be cached
-app.get('/shuke-b', (_req, res) => res.redirect(301, '/shuke-b/'));
-app.get('/shuke-b/*', (_req, res) => {
+
+// 旧パス /shuke-b は /scheduleboard に恒久リダイレクト（任意）
+app.get(['/shuke-b', '/shuke-b/*'], (_req, res) => {
+  const to = _req.originalUrl.replace(/^\/shuke-b/, '/scheduleboard');
+  res.redirect(301, to);
+});
+
+// アセットは長期キャッシュ
+app.use(
+  '/scheduleboard/assets',
+  express.static(path.join(clientDir, 'assets'), { maxAge: '30d', immutable: true })
+);
+
+// ルートの末尾スラを強制（/scheduleboard → /scheduleboard/）
+app.get('/scheduleboard', (_req, res) => res.redirect(301, '/scheduleboard/'));
+
+// index.html は no-cache（常に最新）
+app.get('/scheduleboard/*', (_req, res) => {
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(clientDir, 'index.html'));
 });
 
-// Global error handler (last)
+/* ===== 未処理エラーの最終ハンドラ ===== */
 app.use((err, _req, res, _next) => {
   console.error('[Unhandled]', err);
   res.status(500).json({ ok: false, error: 'Internal Server Error' });
 });
 
+/* ===== 起動 ===== */
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server http://localhost:${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server http://localhost:${PORT}`);
+});
