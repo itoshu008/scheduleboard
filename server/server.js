@@ -30,9 +30,11 @@ bootstrap()
   });
 
 /* ===== API ===== */
+/* ★ ScheduleBoard専用API: /api/scheduleboard/* で提供 */
+/* ★ 勤怠アプリ（kintai-backend）の /api/* とは完全に分離 */
 
 // Health
-app.get('/api/health', async (_req, res) => {
+app.get('/api/scheduleboard/health', async (_req, res) => {
   try {
     if (!ready) return res.json({ ok: true, service: 'scheduleboard', db: 'initializing' });
     const [rows] = await getPool().query('SELECT DATABASE() db, NOW() as now;');
@@ -50,12 +52,12 @@ const asyncH = (fn) => (req, res) =>
   });
 
 // groups
-app.get('/api/groups', asyncH(async (_req, res) => {
+app.get('/api/scheduleboard/groups', asyncH(async (_req, res) => {
   const [rows] = await getPool().query('SELECT * FROM groups ORDER BY id;');
   res.json({ ok: true, groups: rows });
 }));
 
-app.post('/api/groups', asyncH(async (req, res) => {
+app.post('/api/scheduleboard/groups', asyncH(async (req, res) => {
   const { name, color } = req.body || {};
   if (!name) return res.status(400).json({ ok: false, error: 'name required' });
   const [r] = await getPool().query(
@@ -66,14 +68,14 @@ app.post('/api/groups', asyncH(async (req, res) => {
 }));
 
 // users
-app.get('/api/users', asyncH(async (_req, res) => {
+app.get('/api/scheduleboard/users', asyncH(async (_req, res) => {
   const [rows] = await getPool().query(
     'SELECT u.*, g.name AS group_name FROM users u LEFT JOIN groups g ON g.id=u.group_id ORDER BY u.id;'
   );
   res.json({ ok: true, users: rows });
 }));
 
-app.post('/api/users', asyncH(async (req, res) => {
+app.post('/api/scheduleboard/users', asyncH(async (req, res) => {
   const { code, name, email, group_id } = req.body || {};
   if (!name) return res.status(400).json({ ok: false, error: 'name required' });
   const [r] = await getPool().query(
@@ -84,12 +86,12 @@ app.post('/api/users', asyncH(async (req, res) => {
 }));
 
 // templates
-app.get('/api/templates', asyncH(async (_req, res) => {
+app.get('/api/scheduleboard/templates', asyncH(async (_req, res) => {
   const [rows] = await getPool().query('SELECT * FROM templates ORDER BY id;');
   res.json({ ok: true, templates: rows });
 }));
 
-app.post('/api/templates', asyncH(async (req, res) => {
+app.post('/api/scheduleboard/templates', asyncH(async (req, res) => {
   const { title, description, color } = req.body || {};
   if (!title) return res.status(400).json({ ok: false, error: 'title required' });
   const [r] = await getPool().query(
@@ -100,7 +102,7 @@ app.post('/api/templates', asyncH(async (req, res) => {
 }));
 
 // events
-app.get('/api/events', asyncH(async (req, res) => {
+app.get('/api/scheduleboard/events', asyncH(async (req, res) => {
   // Optional filters: user_id, from, to
   const { user_id, from, to } = req.query;
   const where = [];
@@ -120,7 +122,7 @@ app.get('/api/events', asyncH(async (req, res) => {
   res.json({ ok: true, events: rows });
 }));
 
-app.post('/api/events', asyncH(async (req, res) => {
+app.post('/api/scheduleboard/events', asyncH(async (req, res) => {
   const { user_id, template_id, start_at, end_at, note } = req.body || {};
   if (!user_id || !start_at || !end_at) {
     return res.status(400).json({ ok: false, error: 'user_id, start_at, end_at required' });
@@ -132,8 +134,8 @@ app.post('/api/events', asyncH(async (req, res) => {
   res.json({ ok: true, id: r.insertId });
 }));
 
-// API 404 guard
-app.use('/api', (_req, res) => {
+// ScheduleBoard API 404 guard
+app.use('/api/scheduleboard', (_req, res) => {
   res.status(404).json({ ok: false, error: 'Not Found' });
 });
 

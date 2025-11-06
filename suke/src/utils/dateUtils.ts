@@ -63,7 +63,7 @@ const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24時間
 export const fetchHolidaysFromAPI = async (year: number): Promise<Holiday[]> => {
   try {
     // サーバー側の祝日APIを使用（相対パスで統一）
-    const response = await fetch(`/api/holidays/${year}`);
+    const response = await fetch(`/api/scheduleboard/holidays/${year}`);
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);

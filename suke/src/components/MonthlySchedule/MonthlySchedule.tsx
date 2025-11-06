@@ -2108,7 +2108,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
             console.log('🔍 DEBUG: Current propsSig:', propsSig);
             console.log('🔍 DEBUG: Current visibleSchedules:', visibleSchedules);
             try {
-              const response = await fetch('/api/debug/schedules');
+              const response = await fetch('/api/scheduleboard/debug/schedules');
               const data = await response.json();
               console.log('🔍 DEBUG: Server schedules:', data);
             } catch (error) {

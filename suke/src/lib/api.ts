@@ -1,5 +1,5 @@
 export const API_BASE =
-  (import.meta as any).env?.VITE_API_BASE || '/api';
+  (import.meta as any).env?.VITE_API_BASE || '/api/scheduleboard';
 
 type FetchOptions = { method?: 'GET'|'POST'|'PUT'|'DELETE'; body?: any; signal?: AbortSignal; headers?: Record<string,string> };
 
