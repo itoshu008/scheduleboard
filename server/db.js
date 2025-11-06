@@ -36,7 +36,7 @@ async function bootstrap() {
   });
 
   const ddl = `
-CREATE TABLE IF NOT EXISTS groups (
+CREATE TABLE IF NOT EXISTS \`groups\` (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   color VARCHAR(32) DEFAULT NULL,
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS users (
   group_id INT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_users_group
-    FOREIGN KEY (group_id) REFERENCES groups(id)
+    FOREIGN KEY (group_id) REFERENCES \`groups\`(id)
     ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -87,9 +87,9 @@ CREATE TABLE IF NOT EXISTS events (
   }
 
   // Seed minimal data if empty
-  const [rows] = await pool.query('SELECT COUNT(*) AS c FROM groups;');
+  const [rows] = await pool.query('SELECT COUNT(*) AS c FROM `groups`;');
   if (rows[0].c === 0) {
-    await pool.query('INSERT INTO groups(name, color) VALUES (?, ?), (?, ?);',
+    await pool.query('INSERT INTO `groups`(name, color) VALUES (?, ?), (?, ?);',
       ['Default', '#4f46e5', 'Support', '#16a34a']);
   }
   return pool;

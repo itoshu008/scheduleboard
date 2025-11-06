@@ -53,7 +53,7 @@ const asyncH = (fn) => (req, res) =>
 
 // groups
 app.get('/api/scheduleboard/groups', asyncH(async (_req, res) => {
-  const [rows] = await getPool().query('SELECT * FROM groups ORDER BY id;');
+  const [rows] = await getPool().query('SELECT * FROM `groups` ORDER BY id;');
   res.json({ ok: true, groups: rows });
 }));
 
@@ -61,7 +61,7 @@ app.post('/api/scheduleboard/groups', asyncH(async (req, res) => {
   const { name, color } = req.body || {};
   if (!name) return res.status(400).json({ ok: false, error: 'name required' });
   const [r] = await getPool().query(
-    'INSERT INTO groups(name, color) VALUES (?, ?);',
+    'INSERT INTO `groups`(name, color) VALUES (?, ?);',
     [name, color || null]
   );
   res.json({ ok: true, id: r.insertId });
@@ -70,7 +70,7 @@ app.post('/api/scheduleboard/groups', asyncH(async (req, res) => {
 // users
 app.get('/api/scheduleboard/users', asyncH(async (_req, res) => {
   const [rows] = await getPool().query(
-    'SELECT u.*, g.name AS group_name FROM users u LEFT JOIN groups g ON g.id=u.group_id ORDER BY u.id;'
+    'SELECT u.*, g.name AS group_name FROM users u LEFT JOIN `groups` g ON g.id=u.group_id ORDER BY u.id;'
   );
   res.json({ ok: true, users: rows });
 }));
@@ -138,7 +138,7 @@ app.post('/api/scheduleboard/events', asyncH(async (req, res) => {
 
 // Admin Departments
 app.get('/api/scheduleboard/admin/departments', asyncH(async (_req, res) => {
-  const [rows] = await getPool().query('SELECT * FROM groups ORDER BY id;');
+  const [rows] = await getPool().query('SELECT * FROM `groups` ORDER BY id;');
   res.json(rows);
 }));
 
@@ -146,33 +146,33 @@ app.post('/api/scheduleboard/admin/departments', asyncH(async (req, res) => {
   const { name, color } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name required' });
   const [r] = await getPool().query(
-    'INSERT INTO groups(name, color) VALUES (?, ?);',
+    'INSERT INTO `groups`(name, color) VALUES (?, ?);',
     [name, color || null]
   );
   res.json({ id: r.insertId, name, color });
 }));
 
 app.get('/api/scheduleboard/admin/departments/:id', asyncH(async (req, res) => {
-  const [rows] = await getPool().query('SELECT * FROM groups WHERE id = ?;', [req.params.id]);
+  const [rows] = await getPool().query('SELECT * FROM `groups` WHERE id = ?;', [req.params.id]);
   if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
   res.json(rows[0]);
 }));
 
 app.put('/api/scheduleboard/admin/departments/:id', asyncH(async (req, res) => {
   const { name, color } = req.body || {};
-  await getPool().query('UPDATE groups SET name = ?, color = ? WHERE id = ?;', [name, color, req.params.id]);
+  await getPool().query('UPDATE `groups` SET name = ?, color = ? WHERE id = ?;', [name, color, req.params.id]);
   res.json({ id: req.params.id, name, color });
 }));
 
 app.delete('/api/scheduleboard/admin/departments/:id', asyncH(async (req, res) => {
-  await getPool().query('DELETE FROM groups WHERE id = ?;', [req.params.id]);
+  await getPool().query('DELETE FROM `groups` WHERE id = ?;', [req.params.id]);
   res.json({ ok: true });
 }));
 
 // Admin Employees
 app.get('/api/scheduleboard/admin/employees', asyncH(async (_req, res) => {
   const [rows] = await getPool().query(
-    'SELECT u.*, g.name AS department_name FROM users u LEFT JOIN groups g ON g.id=u.group_id ORDER BY u.id;'
+    'SELECT u.*, g.name AS department_name FROM users u LEFT JOIN `groups` g ON g.id=u.group_id ORDER BY u.id;'
   );
   res.json(rows);
 }));
