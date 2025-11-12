@@ -269,8 +269,16 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
   const resizeGhost = interactionState.resizeGhost;
 
   // セル選択（直接実装）- useMonthlyEventBarHandlersの後に定義（interactionStateにアクセスするため）
-  const handleCellMouseDown = useCallback((employeeId: number, slot: number) => {
-    if (interactionState.dragData) return; // ドラッグ中は選択無効（月別ビューのロジックと統一）
+  const handleCellMouseDown = useCallback((employeeId: number, slot: number, e?: React.MouseEvent) => {
+    // 右クリック時はセル選択を無効化（右クリックドラッグスクロール用）
+    if (e && e.button === 2) return;
+    if (interactionState.dragData || interactionState.resizeData) return; // ドラッグ中は選択無効（月別ビューのロジックと統一）
+    
+    // イベントバー操作中または編集モーダル閉じた後はセル選択を無効化
+    if (interactionState.isEventBarInteracting || interactionState.isModalClosing) {
+      console.log('🚫 DailySchedule: Cell selection disabled - event bar is being interacted with or modal is closing');
+      return;
+    }
 
     const cellId = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}-${employeeId}-${slot}`;
     console.log('🔍 DailySchedule: handleCellMouseDown', { 
@@ -285,14 +293,27 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
       day: selectedDate.getDate()
     });
 
-    // スケジュール選択をクリア
-    setSelectedSchedule(null);
+    // スケジュール選択をクリア（月別ビューと同じ仕様）
+    // ただし、編集モーダルが開いている場合はクリアしない
+    // また、スケジュールアイテム上でのクリックの場合はクリアしない（ダブルクリックで編集モードに入るため）
+    if (!showRegistrationTab) {
+      // クリックされた要素がスケジュールアイテムかどうかをチェック
+      const target = e?.target as HTMLElement;
+      const isOnScheduleItem = target?.closest('.schedule-item') || target?.closest('.excel-schedule-item');
+      
+      if (!isOnScheduleItem) {
+        console.log('DailySchedule: handleCellMouseDown - Clearing selectedSchedule (not on schedule item)');
+        setSelectedSchedule(null);
+      } else {
+        console.log('DailySchedule: handleCellMouseDown - Keeping selectedSchedule (on schedule item)');
+      }
+    }
 
     // セル選択開始
     setSelectedCells(new Set([cellId]));
     setIsSelecting(true);
     setSelectionAnchor({ employeeId, slot });
-  }, [interactionState.dragData, selectedDate, setSelectedSchedule, setSelectedCells, setIsSelecting, setSelectionAnchor]);
+  }, [interactionState.dragData, interactionState.resizeData, interactionState.isEventBarInteracting, interactionState.isModalClosing, selectedDate, showRegistrationTab, setSelectedSchedule, setSelectedCells, setIsSelecting, setSelectionAnchor]);
   const loadEquipments = useCallback(async () => {
     try {
       const response = await equipmentApi.getAll();
@@ -1156,14 +1177,14 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                             
                             // ReusableEventBar（schedule-item）がクリックされた場合はセル選択をスキップ
                             const target = e.target as HTMLElement;
-                            const scheduleItem = target.closest('.schedule-item');
+                            const scheduleItem = target.closest('.schedule-item') || target.closest('.excel-schedule-item');
                             if (scheduleItem) {
                               console.log('🚫 セルのonMouseDown: ReusableEventBarがクリックされたためスキップ');
                               return;
                             }
                             
                             e.stopPropagation();
-                            handleCellMouseDown(employee.id, slot);
+                            handleCellMouseDown(employee.id, slot, e);
                           }}
                           onMouseEnter={(e) => {
                             // ReusableEventBar（schedule-item）がホバーされた場合はセル選択をスキップ
