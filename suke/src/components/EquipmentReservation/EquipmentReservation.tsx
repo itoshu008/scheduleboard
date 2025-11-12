@@ -1114,7 +1114,12 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
                         }}
                         onMouseDown={(e) => {
                           // 日別ビューと同じ仕様：handleScheduleMouseDown内で選択状態を設定
+                          e.stopPropagation(); // セル選択を妨げないように
                           handleScheduleMouseDown(reservation as any, e);
+                        }}
+                        onMouseMove={(e) => {
+                          // イベントバー上でのマウス移動時にセル選択を妨げないように
+                          e.stopPropagation();
                         }}
                         onClick={(e) => {
                           // 日別ビューと同じ仕様：クリック時に選択状態を維持
