@@ -10,6 +10,7 @@ import { Department, Schedule, Employee, Equipment, SCHEDULE_COLORS } from '../.
 // API
 import { scheduleApi, employeeApi, equipmentReservationApi } from '../../utils/api';
 
+
 // ユーティリティ
 import { 
   getMonthDates, 
@@ -98,10 +99,18 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
   const [showManagementTabs, setShowManagementTabs] = useState(false);
   const [currentRegistrationView, setCurrentRegistrationView] = useState<string | null>(null);
 
-  // 1) props.schedules を正規化（参照安定のため useMemo）
+  // propsから受け取ったschedulesを使用（App.tsxでWebSocket管理）
+  const effectiveSchedules = schedules;
+  
+  console.log('📊 MonthlySchedule: Received schedules prop:', {
+    count: schedules?.length || 0,
+    firstSchedule: schedules?.[0]
+  });
+
+  // 1) effectiveSchedules を正規化（参照安定のため useMemo）
   const normalizedFromProps = useMemo<Schedule[]>(
-    () => (schedules ?? []).map((e: Schedule) => normalizeEvent(e) as Schedule),
-    [schedules]
+    () => (effectiveSchedules ?? []).map((e: Schedule) => normalizeEvent(e) as Schedule),
+    [effectiveSchedules]
   );
 
   // 2) "内容シグネチャ"：正規化後のイベントを署名化→ソート→連結
@@ -119,7 +128,12 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
     const currentMonth = selectedDate.getMonth();
     const currentYear = selectedDate.getFullYear();
     
-    return schedules.filter(schedule => {
+    return effectiveSchedules.filter(schedule => {
+      // 社員フィルタリング（selectedEmployeeが選択されている場合のみ）
+      if (selectedEmployee && schedule.employee_id !== selectedEmployee.id) {
+        return false;
+      }
+      
       const startTime = new Date(schedule.start_datetime);
       const endTime = new Date(schedule.end_datetime);
       
@@ -129,7 +143,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       
       return scheduleMonth === currentMonth && scheduleYear === currentYear;
     });
-  }, [schedules, selectedDate]);
+  }, [effectiveSchedules, selectedDate, selectedEmployee]);
   
   // 多重レンダリング検知のデバッグ
   const renderCountRef = useRef(0);
@@ -154,21 +168,15 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
   }, [propsSig, normalizedFromProps]);
 
   // 最新のschedulesを参照するためのref
-  const schedulesRef = useRef(schedules);
+  const schedulesRef = useRef(effectiveSchedules);
   useEffect(() => {
-    schedulesRef.current = schedules;
-  }, [schedules]);
+    schedulesRef.current = effectiveSchedules;
+  }, [effectiveSchedules]);
 
   // クリック・ダブルクリックの多重発火ガード
   const dblBlockUntilRef = useRef(0);
 
-  // 過剰レンダ警告のスパム抑止
-  const warnRef = useRef(0);
-  const warnExcessRender = useCallback((info: any) => {
-    if (++warnRef.current % 10 === 0) { // 10回に1回
-      console.warn('⚠️ Excessive re-rendering detected!', { count: warnRef.current, ...info });
-    }
-  }, []);
+  // 過剰レンダ警告は削除（パフォーマンス向上のため）
 
   // 基本状態
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
@@ -322,8 +330,10 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
   // スケール計算
   const scaledCellWidth = CELL_WIDTH_PX * (scheduleScale / 100);
   const scaledRowHeight = MONTH_CELL_HEIGHT_PX * (scheduleScale / 100);
-  const scaledDateColumnWidth = 120 * (scheduleScale / 100);
-  const scaledTimeHeaderWidth = 80 * (scheduleScale / 100); // 1時間 = 4マス × 20px = 80px
+  // 日付列の幅を時間セルの幅の倍数に調整（きれいに揃えるため）
+  // 1時間 = 4マスなので、日付列の幅を4マス分（1時間分）の倍数にする
+  const scaledTimeHeaderWidth = 4 * scaledCellWidth; // 1時間 = 4マス
+  const scaledDateColumnWidth = Math.max(100, Math.round(4 * scaledCellWidth)); // 最小100px、時間セルの倍数に調整
   const scaledFontSize = Math.max(8, 12 * (scheduleScale / 100)); // フォントサイズもスケール適用（最小8px）
   const scaledSmallFontSize = Math.max(6, 10 * (scheduleScale / 100)); // 小さなフォントサイズ（最小6px）
 
@@ -395,6 +405,10 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       });
 
       await scheduleApi.update(schedule.id, updateData);
+
+      // WebSocketの更新を待つ（サーバーがブロードキャストするまで少し待つ）
+      console.log('📡 MonthlySchedule: Waiting for WebSocket update after move...');
+      await new Promise(resolve => setTimeout(resolve, 300)); // 300ms待つ
 
       // スケジュール一覧を再読み込み
       await reloadSchedules();
@@ -803,127 +817,167 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
     setMousePosition({ x: e.clientX, y: e.clientY });
   };
 
-  // グローバルマウス移動とマウスアップ処理
+  // interactionStateの最新値を保持するref
+  const interactionStateRef = useRef(interactionState);
   useEffect(() => {
+    interactionStateRef.current = interactionState;
+  }, [interactionState]);
+
+  // グローバルマウス移動処理（最適化版）
+  useEffect(() => {
+    let rafId: number | null = null;
+    let lastUpdateTime = 0;
+    const UPDATE_THROTTLE = 16; // 約60fps（16ms間隔）
+    
     const handleMouseMove = (e: MouseEvent) => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
+      const state = interactionStateRef.current;
+      const now = Date.now();
+      if (now - lastUpdateTime < UPDATE_THROTTLE) {
+        return; // スロットリング
       }
       
-      animationFrameRef.current = requestAnimationFrame(() => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+      
+      rafId = requestAnimationFrame(() => {
+        lastUpdateTime = now;
+        const currentState = interactionStateRef.current;
+        
         // ドラッグ処理
-        if (interactionState.dragData && interactionState.dragGhost) {
-          const deltaX = e.clientX - interactionState.dragData.startX;
-          const deltaY = e.clientY - interactionState.dragData.startY;
+        if (currentState.dragData && currentState.dragGhost) {
+          const deltaX = e.clientX - currentState.dragData.startX;
+          const deltaY = e.clientY - currentState.dragData.startY;
           
           // 時間軸の移動（横方向）
           const slotDelta = Math.round(deltaX / scaledCellWidth);
-          const newStartSlot = Math.max(0, Math.min(95, interactionState.dragData.startSlot + slotDelta));
+          const newStartSlot = Math.max(0, Math.min(95, currentState.dragData.startSlot + slotDelta));
           
           // 日付軸の移動（縦方向）
           const dateDelta = Math.round(deltaY / scaledRowHeight);
-          const newDate = new Date(interactionState.dragData.startDate);
+          const newDate = new Date(currentState.dragData.startDate);
           newDate.setDate(newDate.getDate() + dateDelta);
           
           // 新しい開始・終了時刻を計算
-          const originalStart = new Date(interactionState.dragData.schedule.start_datetime);
-          const originalEnd = new Date(interactionState.dragData.schedule.end_datetime);
+          const originalStart = new Date(currentState.dragData.schedule.start_datetime);
+          const originalEnd = new Date(currentState.dragData.schedule.end_datetime);
           const originalDuration = originalEnd.getTime() - originalStart.getTime();
           const newStart = createTimeFromSlot(newDate, newStartSlot);
           const newEnd = new Date(newStart.getTime() + originalDuration);
           
-          setInteractionState((prev: any) => ({
-            ...prev,
-            dragGhost: {
-              schedule: interactionState.dragData!.schedule,
-              newSlot: newStartSlot,
-              newDate: newDate,
-              deltaX: e.clientX - interactionState.dragData!.startX,
-              deltaY: e.clientY - interactionState.dragData!.startY
-            }
-          }));
-
-          // マウス位置を更新（ドラッグゴースト表示用）
-          setMousePosition({ x: e.clientX, y: e.clientY });
+          // 変更があった場合のみ更新
+          const currentGhost = currentState.dragGhost;
+          if (currentGhost.newSlot !== newStartSlot || 
+              currentGhost.newDate.getTime() !== newDate.getTime()) {
+            setInteractionState((prev: any) => ({
+              ...prev,
+              dragGhost: {
+                schedule: currentState.dragData!.schedule,
+                newSlot: newStartSlot,
+                newDate: newDate,
+                deltaX: e.clientX - currentState.dragData!.startX,
+                deltaY: e.clientY - currentState.dragData!.startY
+              }
+            }));
+          }
         }
 
         // リサイズ処理
-        if (interactionState.resizeData && interactionState.resizeGhost) {
-          const deltaX = e.clientX - interactionState.resizeData.startX;
+        if (currentState.resizeData && currentState.resizeGhost) {
+          const deltaX = e.clientX - currentState.resizeData.startX;
           const slotDelta = Math.round(deltaX / scaledCellWidth);
 
-          let newStart = new Date(interactionState.resizeData.originalStart);
-          let newEnd = new Date(interactionState.resizeData.originalEnd);
+          let newStart = new Date(currentState.resizeData.originalStart);
+          let newEnd = new Date(currentState.resizeData.originalEnd);
           
-          if (interactionState.resizeData.edge === 'start') {
+          if (currentState.resizeData.edge === 'start') {
             // 左ハンドル：開始時刻を変更、終了時刻は固定
-            newEnd = interactionState.resizeData.originalEnd; // 終了時刻は固定
+            newEnd = currentState.resizeData.originalEnd; // 終了時刻は固定
             
             // 新しい開始時刻を計算（左に伸ばすことができるように）
-            const originalStartSlot = getTimeSlot(interactionState.resizeData.originalStart);
+            const originalStartSlot = getTimeSlot(currentState.resizeData.originalStart);
             let newStartSlot = originalStartSlot + slotDelta;
             
             // 境界チェック：0以上、終了時刻より前
-            const endSlot = getTimeSlot(interactionState.resizeData.originalEnd);
+            const endSlot = getTimeSlot(currentState.resizeData.originalEnd);
             newStartSlot = Math.max(0, Math.min(newStartSlot, endSlot - 1)); // 最低1スロット分の幅を確保
             
-            const startDate = new Date(interactionState.resizeData.originalStart);
+            const startDate = new Date(currentState.resizeData.originalStart);
             startDate.setHours(0, 0, 0, 0);
             newStart = createTimeFromSlot(startDate, newStartSlot);
             
           } else {
             // 右ハンドル：終了時刻を変更、開始時刻は固定
-            newStart = interactionState.resizeData.originalStart; // 開始時刻は固定
+            newStart = currentState.resizeData.originalStart; // 開始時刻は固定
             
-            const originalEndSlot = getTimeSlot(interactionState.resizeData.originalEnd);
+            const originalEndSlot = getTimeSlot(currentState.resizeData.originalEnd);
             let newEndSlot = originalEndSlot + slotDelta;
             
             // 境界チェック：開始時刻より後、95以下
-            const startSlot = getTimeSlot(interactionState.resizeData.originalStart);
+            const startSlot = getTimeSlot(currentState.resizeData.originalStart);
             newEndSlot = Math.max(startSlot + 1, Math.min(newEndSlot, 95)); // 最低1スロット分の幅を確保
             
-            const endDate = new Date(interactionState.resizeData.originalEnd);
+            const endDate = new Date(currentState.resizeData.originalEnd);
             endDate.setHours(0, 0, 0, 0);
             newEnd = createTimeFromSlot(endDate, newEndSlot);
             
           }
-            
-          setInteractionState((prev: any) => ({
-            ...prev,
-            resizeGhost: {
-              schedule: interactionState.resizeData!.schedule,
-              newStart,
-              newEnd,
-              edge: interactionState.resizeData!.edge
-            }
-          }));
-
-          // マウス位置を更新（リサイズゴースト表示用）
-          setMousePosition({ x: e.clientX, y: e.clientY });
+          
+          // 変更があった場合のみ更新
+          const currentGhost = currentState.resizeGhost;
+          if (currentGhost.newStart.getTime() !== newStart.getTime() || 
+              currentGhost.newEnd.getTime() !== newEnd.getTime()) {
+            setInteractionState((prev: any) => ({
+              ...prev,
+              resizeGhost: {
+                schedule: currentState.resizeData!.schedule,
+                newStart,
+                newEnd,
+                edge: currentState.resizeData!.edge
+              }
+            }));
+          }
         }
       });
     };
 
+    // イベントリスナー登録（ドラッグまたはリサイズ中のみ、かつ編集モーダルが閉じている時のみ）
+    const hasActiveOperation = interactionState.dragData || interactionState.resizeData;
+    if (hasActiveOperation && !interactionState.showEditModal) {
+      document.addEventListener('mousemove', handleMouseMove, { passive: true });
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
+  }, [!!interactionState.dragData, !!interactionState.resizeData, interactionState.showEditModal, scaledCellWidth, scaledRowHeight]);
+
+  // グローバルマウスアップ処理
+  useEffect(() => {
     const handleMouseUp = async () => {
-      console.log('🎯 グローバルマウスアップ:', { dragData: !!interactionState.dragData, resizeData: !!interactionState.resizeData });
+      const state = interactionStateRef.current;
+      console.log('🎯 グローバルマウスアップ:', { dragData: !!state.dragData, resizeData: !!state.resizeData });
       
       // イベントバー操作状態をリセット
-      if (interactionState.isEventBarInteracting) {
+      if (state.isEventBarInteracting) {
         console.log('🔄 MonthlySchedule: Resetting event bar interaction state');
         setInteractionState((prev: any) => ({ ...prev, isEventBarInteracting: false }));
       }
       
       // ドラッグ終了処理
-      if (interactionState.dragData && interactionState.dragGhost) {
+      if (state.dragData && state.dragGhost) {
         try {
           console.log('🚚 ドラッグ確定:', {
-            scheduleId: interactionState.dragData.schedule.id,
-            newDate: interactionState.dragGhost.newDate,
-            newSlot: interactionState.dragGhost.newSlot
+            scheduleId: state.dragData.schedule.id,
+            newDate: state.dragGhost.newDate,
+            newSlot: state.dragGhost.newSlot
           });
           
           // ドラッグ終了 - スケジュール更新
-          await updateSchedulePosition(interactionState.dragData.schedule, interactionState.dragGhost.newDate, interactionState.dragGhost.newSlot);
+          await updateSchedulePosition(state.dragData.schedule, state.dragGhost.newDate, state.dragGhost.newSlot);
           
           console.log('MonthlySchedule: Drag update completed successfully');
         } catch (error) {
@@ -933,24 +987,29 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       }
       
       // リサイズ終了処理
-      if (interactionState.resizeData && interactionState.resizeGhost) {
+      if (state.resizeData && state.resizeGhost) {
         try {
           console.log('🔧 リサイズ確定:', {
-            scheduleId: interactionState.resizeData.schedule.id,
-            edge: interactionState.resizeData.edge,
-            newStart: interactionState.resizeGhost.newStart.toISOString(),
-            newEnd: interactionState.resizeGhost.newEnd.toISOString()
+            scheduleId: state.resizeData.schedule.id,
+            edge: state.resizeData.edge,
+            newStart: state.resizeGhost.newStart.toISOString(),
+            newEnd: state.resizeGhost.newEnd.toISOString()
           });
           
           const updateData = {
-            title: interactionState.resizeData.schedule.title || '無題',
-            color: toApiColor(interactionState.resizeData.schedule.color),
-            employee_id: interactionState.resizeData.schedule.employee_id,
-            start_datetime: interactionState.resizeGhost.newStart,
-            end_datetime: interactionState.resizeGhost.newEnd
+            title: state.resizeData.schedule.title || '無題',
+            color: toApiColor(state.resizeData.schedule.color),
+            employee_id: state.resizeData.schedule.employee_id,
+            start_datetime: state.resizeGhost.newStart,
+            end_datetime: state.resizeGhost.newEnd
           };
           
-          await scheduleApi.update(interactionState.resizeData.schedule.id, updateData);
+          await scheduleApi.update(state.resizeData.schedule.id, updateData);
+          
+          // WebSocketの更新を待つ（サーバーがブロードキャストするまで少し待つ）
+          console.log('📡 MonthlySchedule: Waiting for WebSocket update after resize...');
+          await new Promise(resolve => setTimeout(resolve, 300)); // 300ms待つ
+          
           await reloadSchedules();
           
           console.log('MonthlySchedule: Resize update completed successfully');
@@ -973,19 +1032,15 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
     };
 
     // イベントリスナー登録（ドラッグまたはリサイズ中のみ、かつ編集モーダルが閉じている時のみ）
-    if ((interactionState.dragData || interactionState.resizeData) && !interactionState.showEditModal) {
-      document.addEventListener('mousemove', handleMouseMove);
+    const hasActiveOperation = interactionState.dragData || interactionState.resizeData;
+    if (hasActiveOperation && !interactionState.showEditModal) {
       document.addEventListener('mouseup', handleMouseUp);
     }
     
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
     };
-  }, [interactionState, schedules, scaledCellWidth, scaledRowHeight]);
+  }, [!!interactionState.dragData, !!interactionState.resizeData, interactionState.showEditModal, updateSchedulePosition, reloadSchedules]);
 
   // スケジュール操作関数（編集タブは削除済み）
   const handleScheduleSave = async (scheduleData: any) => {
@@ -996,6 +1051,11 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
   const handleScheduleDelete = async (scheduleId: number) => {
     try {
       await scheduleApi.delete(scheduleId);
+      
+      // WebSocketの更新を待つ（サーバーがブロードキャストするまで少し待つ）
+      console.log('📡 MonthlySchedule: Waiting for WebSocket update after delete...');
+      await new Promise(resolve => setTimeout(resolve, 300)); // 300ms待つ
+      
       await reloadSchedules();
       setSelectedSchedule(null);
     } catch (error: any) {
@@ -1110,6 +1170,11 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
         // 同じ月でも再読み込みしてUIを更新
         console.log('MonthlySchedule: Reloading schedules for same month');
         console.log('MonthlySchedule: Schedules before reload:', schedules.length);
+        
+        // WebSocketの更新を待つ（サーバーがブロードキャストするまで少し待つ）
+        console.log('📡 MonthlySchedule: Waiting for WebSocket update...');
+        await new Promise(resolve => setTimeout(resolve, 500)); // 500ms待つ
+        
         await reloadSchedules();
         console.log('MonthlySchedule: Reload completed');
         
@@ -1171,19 +1236,18 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
   return (
     <div className="monthly-schedule-page monthly-schedule" onClick={handleBackgroundClick}>
       <div className="schedule-header">
-                  <h2 style={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px', margin: 0 }}>
-            月別スケジュール
-          <span style={{ fontSize: '18px', fontWeight: 'normal', color: '#666' }}>
-            {new Date().toLocaleDateString('ja-JP', { 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric',
-              weekday: 'long'
-            })} {new Date().toLocaleTimeString('ja-JP', { 
-              hour: '2-digit', 
-              minute: '2-digit' 
-            })}
-          </span>
+        <h2 style={{ 
+          textAlign: 'center', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          gap: '20px', 
+          margin: 0,
+          fontSize: '24px',
+          fontWeight: 'bold',
+          color: '#333'
+        }}>
+          月別スケジュール
           {/* 月別専用スケールコントロール */}
           <div className="monthly-scale-control" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontSize: '14px', color: '#666' }}>表示倍率:</span>
@@ -1216,23 +1280,16 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
       )}
 
       {/* ナビゲーションバー */}
-      <div className="navigation-bar" style={{ 
-        position: 'sticky', 
-        top: '0', 
-        zIndex: 10000, 
-        background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)', 
-        borderBottom: '2px solid #dee2e6', 
-        padding: '10px 20px' 
-      }}>
+      <div className="navigation-bar">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
             
             {/* ナビゲーションボタン */}
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button className="nav-btn active" onClick={() => (window.location.href = '/monthly')}>月別</button>
-              <button className="nav-btn" onClick={() => (window.location.href = '/daily')}>日別</button>
-              <button className="nav-btn" onClick={() => (window.location.href = '/all-employees')}>全社員</button>
-              <button className="nav-btn" onClick={() => (window.location.href = '/equipment')}>設備</button>
+              <button className="nav-btn active" onClick={() => (window.location.href = '/scheduleboard/monthly')}>月別</button>
+              <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/daily')}>日別</button>
+              <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/all-employees')}>全社員</button>
+              <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/equipment')}>設備</button>
             </div>
           </div>
           
@@ -1261,29 +1318,19 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
               >
                 &laquo;
               </button>
-              <button 
-                className="date-nav-btn day-btn" 
-                onClick={() => moveDate('prev', 'day')}
-                title="前日"
-              >
-                &lsaquo;
-              </button>
-              <input
-                type="date"
-                value={formatDate(selectedDate)}
-                onChange={(e) => {
-                  const [year, month, day] = e.target.value.split('-').map(Number);
-                  onDateChange(new Date(year, month - 1, day));
-                }}
-                className="date-input"
-              />
-              <button 
-                className="date-nav-btn day-btn" 
-                onClick={() => moveDate('next', 'day')}
-                title="翌日"
-              >
-                &rsaquo;
-              </button>
+              <span style={{
+                padding: '6px 12px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                background: 'white',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: '#333',
+                minWidth: '120px',
+                textAlign: 'center'
+              }}>
+                {selectedDate.getFullYear()}年{selectedDate.getMonth() + 1}月
+              </span>
               <button 
                 className="date-nav-btn month-btn" 
                 onClick={() => moveDate('next', 'month')}
@@ -1293,10 +1340,13 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
               </button>
               <button 
                 className="date-nav-btn today-btn" 
-                onClick={() => onDateChange(new Date())}
-                title="本日"
+                onClick={() => {
+                  const now = new Date();
+                  onDateChange(new Date(now.getFullYear(), now.getMonth(), 1));
+                }}
+                title="当月"
               >
-                本日
+                当月
               </button>
             </div>
           </div>
@@ -1309,39 +1359,31 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
             <div className="employee-selector">
               {(() => {
                 if (!selectedDepartment) {
-                  return <span className="no-employees-text">部署と社員を選択してください</span>;
+                  return <span className="no-employees-text">部署を選択してください</span>;
                 }
                 
-                const deptEmployees = employees.filter(emp => emp.department_id === selectedDepartment.id);
+                const deptEmployees = employees.filter(emp => emp.department_id === selectedDepartment.id || emp.group_id === selectedDepartment.id);
                 
-                if (deptEmployees.length > 0) {
-                  return (
-                      <select
-                        value={selectedEmployee?.id || ''}
-                        onChange={(e) => {
-                          const employeeId = parseInt(e.target.value);
-                          const employee = employees.find(emp => emp.id === employeeId);
-                          if (employee) {
-                            onEmployeeChange(employee);
-                          }
-                        }}
-                        className="employee-select"
-                      >
-                        <option value="">社員を選択してください</option>
-                        {(deptEmployees ?? []).map(emp => (
-                          <option key={emp.id} value={emp.id}>
-                            {emp.name}
-                          </option>
-                        ))}
-                      </select>
-                  );
-                } else {
-                  return (
-                    <span className="no-employees-text">
-                      該当の部署に所属する社員はいません
-                    </span>
-                  );
-                }
+                return (
+                    <select
+                      value={selectedEmployee?.id || ''}
+                      onChange={(e) => {
+                        const employeeId = parseInt(e.target.value);
+                        const employee = employees.find(emp => emp.id === employeeId);
+                        if (employee) {
+                          onEmployeeChange(employee);
+                        }
+                      }}
+                      className="employee-select"
+                    >
+                      <option value="">社員を選択してください</option>
+                      {(deptEmployees ?? []).map(emp => (
+                        <option key={emp.id} value={emp.id}>
+                          {emp.name}
+                        </option>
+                      ))}
+                    </select>
+                );
               })()}
             </div>
             <button 
@@ -1399,20 +1441,25 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
         </div>
       </div>
 
-      
       {/* Excel風スケジュールテーブル */}
         <div 
           className="excel-schedule-container" 
           ref={tableContainerRef}
           style={{
             width: '100%',
+            maxWidth: '100vw',
             height: 'calc(100vh - 200px)',
             overflow: 'auto',
-            border: '1px solid #ccc',
             backgroundColor: '#fff',
             position: 'relative',
+            boxSizing: 'border-box',
+            margin: 0,
             scrollbarWidth: 'thin',
-            scrollbarColor: '#c0c0c0 #f5f5f5'
+            scrollbarColor: '#c0c0c0 #f5f5f5',
+            visibility: 'visible',
+            display: 'block',
+            minHeight: '400px',
+            marginTop: '20px'
           }}
         onContextMenu={(e) => {
           // 右クリックをスクロール操作に割り当てる
@@ -1458,8 +1505,12 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
             backgroundColor: '#f0f0f0',
             borderBottom: '2px solid #ccc',
             display: 'flex',
-          width: `${scaledDateColumnWidth + 96 * scaledCellWidth}px`,
-          minWidth: `${scaledDateColumnWidth + 96 * scaledCellWidth}px`
+            visibility: 'visible',
+            opacity: 1,
+            width: `${scaledDateColumnWidth + 96 * scaledCellWidth}px`,
+            minWidth: `${scaledDateColumnWidth + 96 * scaledCellWidth}px`,
+            padding: 0,
+            margin: 0
           }}>
             {/* 左上の空白セル（スクロール追従） */}
             <div style={{
@@ -1467,32 +1518,41 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
             height: `${scaledRowHeight}px`,
               backgroundColor: '#e0e0e0',
               border: '1px solid #ccc',
+              borderRight: '2px solid #999', // 日付列と時間列の境界を強調
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontWeight: 'bold',
             fontSize: `${scaledFontSize}px`,
-              flexShrink: 0
+              flexShrink: 0,
+              boxSizing: 'border-box'
             }}>
               日付/時間
             </div>
             
           {/* 時間ヘッダー */}
-          <div style={{ display: 'flex', flexShrink: 0, width: `${96 * scaledCellWidth}px` }}>
+          <div style={{ 
+            display: 'flex', 
+            flexShrink: 0, 
+            width: `${96 * scaledCellWidth}px`,
+            marginLeft: 0 // 左端を確実に0に
+          }}>
               {Array.from({ length: 24 }, (_, hour) => (
                 <div key={hour} style={{
                 width: `${scaledTimeHeaderWidth}px`,
                 height: `${scaledRowHeight}px`,
                   backgroundColor: '#f0f0f0',
                   border: '1px solid #ccc',
+                  borderLeft: hour === 0 ? '2px solid #999' : '1px solid #ccc', // 最初の時間セル（00:00）の左側を強調
                 boxSizing: 'border-box',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  justifyContent: 'center', // センタリング
                   fontWeight: 'bold',
-                  fontSize: `${scaledSmallFontSize}px`,
+                  fontSize: `${Math.max(12, scaledFontSize * 1.1)}px`, // 大きくする
                   color: '#333',
-                  flexShrink: 0
+                  flexShrink: 0,
+                  position: 'relative'
                 }}>
                   {hour.toString().padStart(2, '0')}:00
                 </div>
@@ -1521,6 +1581,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
                   backgroundColor: isSaturday(date) ? '#e6f3ff' : 
                                   isSunday(date) || isHolidaySync(date) ? '#ffe6e6' : '#f8f9fa',
                   border: '1px solid #ccc',
+                  borderRight: '2px solid #999', // 日付列と時間列の境界を強調
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
@@ -1528,37 +1589,48 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
                   padding: '2px',
                 fontSize: `${scaledSmallFontSize}px`,
                   fontWeight: '500',
-                  lineHeight: '1.1'
+                  lineHeight: '1.1',
+                  boxSizing: 'border-box'
                 }}>
-                  <div style={{ margin: 0 }}>{date.getDate()}日({getJapaneseDayName(date)})</div>
+                  <div style={{ 
+                    margin: 0,
+                    color: isSaturday(date) ? '#1976d2' : // 土曜日は青
+                           isSunday(date) || isHolidaySync(date) ? '#d32f2f' : // 日曜日・祝日は赤
+                           '#000000' // 平日は黒
+                  }}>
+                    {date.getDate()}日({getJapaneseDayName(date)})
+                  </div>
                   {isHolidaySync(date) && (
-                    <div style={{ fontSize: `${Math.max(6, scaledSmallFontSize - 2)}px`, color: '#d32f2f', fontWeight: 'bold', margin: 0 }}>
+                    <div style={{ 
+                      fontSize: `${Math.max(7, scaledSmallFontSize - 1)}px`, 
+                      color: '#d32f2f', 
+                      fontWeight: 'bold', 
+                      margin: '2px 0 0 0',
+                      textAlign: 'center'
+                    }}>
                       {getHolidayNameSync(date)}
                     </div>
                   )}
                 </div>
 
                 {/* 時間セル（96マス：15分間隔） */}
-              <div style={{ display: 'flex', width: `${96 * scaledCellWidth}px`, flexShrink: 0, position: 'relative', zIndex: 1, overflow: 'visible' }}>
+              <div style={{ 
+                display: 'flex', 
+                width: `${96 * scaledCellWidth}px`, 
+                flexShrink: 0, 
+                position: 'relative', 
+                zIndex: 1, 
+                overflow: 'visible',
+                marginLeft: 0 // 左端を確実に0に
+              }}>
                 {Array.from({ length: 96 }, (_, slot) => {
                   const hour = Math.floor(slot / 4);
                   const minute = (slot % 4) * 15;
 
-                  // このセルのスケジュールを検索
+                  // このセルのスケジュールを検索（visibleSchedulesは既に社員フィルタリング済み）
                   const cellSchedules = visibleSchedules.filter(schedule => {
                     const startTime = new Date(schedule.start_datetime);
                     const endTime = new Date(schedule.end_datetime);
-                    
-                    // 月の範囲でフィルタリング（古いデータを除外）
-                    const currentMonth = selectedDate.getMonth();
-                    const currentYear = selectedDate.getFullYear();
-                    const scheduleMonth = startTime.getMonth();
-                    const scheduleYear = startTime.getFullYear();
-                    
-                    // 現在表示している月と異なる月のスケジュールは除外
-                    if (scheduleMonth !== currentMonth || scheduleYear !== currentYear) {
-                      return false;
-                    }
                     
                     // 日付範囲でフィルタリング
                     const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0);
@@ -1695,20 +1767,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
                           }
                         }
                         
-                        // レンダリング回数をカウント（デバッグ用）
-                        if ((window as any).scheduleRenderCount) {
-                          (window as any).scheduleRenderCount++;
-                        } else {
-                          (window as any).scheduleRenderCount = 1;
-                        }
-                        
-                        // 過剰なレンダリングを検出
-                        if ((window as any).scheduleRenderCount > 50) {
-                          warnExcessRender({
-                            scheduleId: schedule.id,
-                            title: schedule.title,
-                          });
-                        }
+                        // 過剰なレンダリング警告は削除（パフォーマンス向上のため）
                         
                         return (
                           <ScheduleItem
@@ -1857,6 +1916,61 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
           ))}
         </div>
         
+        {/* リサイズゴースト */}
+        {interactionState.resizeGhost && interactionState.resizeData && (
+          (() => {
+            const schedule = interactionState.resizeGhost.schedule;
+            const newStart = interactionState.resizeGhost.newStart;
+            const newEnd = interactionState.resizeGhost.newEnd;
+            
+            // スケジュールが表示されている日付を探す
+            const scheduleDate = new Date(newStart);
+            let dateIndex = monthDates.findIndex(date => 
+              date.getFullYear() === scheduleDate.getFullYear() && 
+              date.getMonth() === scheduleDate.getMonth() && 
+              date.getDate() === scheduleDate.getDate()
+            );
+            
+            // 月の範囲外の場合は表示しない
+            if (dateIndex === -1) {
+              return null;
+            }
+            
+            const startSlot = getTimeSlot(newStart);
+            const endSlot = getEndTimeSlot(newEnd);
+            const width = (endSlot - startSlot) * scaledCellWidth;
+            
+            return (
+              <div
+                className="resize-ghost"
+                style={{
+                  position: 'absolute',
+                  width: `${width}px`,
+                  height: `${scaledRowHeight}px`,
+                  backgroundColor: safeHexColor(schedule.color || '#3498db'),
+                  border: '2px dashed rgba(255, 255, 255, 0.8)',
+                  borderRadius: '4px',
+                  pointerEvents: 'none',
+                  zIndex: 1001,
+                  opacity: 0.7,
+                  left: `${scaledDateColumnWidth + startSlot * scaledCellWidth}px`,
+                  top: `${49 + dateIndex * scaledRowHeight}px`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: `${scaledSmallFontSize}px`,
+                  fontWeight: 'bold',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
+                }}
+                title={`${schedule.title || '無題'}\n${formatTime(newStart)} - ${formatTime(newEnd)}`}
+              >
+                {interactionState.resizeGhost.edge === 'start' ? '◀' : '▶'} {schedule.title || '無題'}
+              </div>
+            );
+          })()
+        )}
+        
         {/* ドラッグゴースト */}
         {interactionState.dragGhost && interactionState.dragData && (
           (() => {
@@ -1892,7 +2006,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
                   position: 'absolute',
                   width: `${width}px`,
                   height: `${scaledRowHeight}px`,
-                  backgroundColor: safeHexColor(interactionState.dragGhost.schedule.color),
+                  backgroundColor: safeHexColor(interactionState.dragGhost.schedule.color || '#3498db'),
                   border: '2px dashed rgba(255, 255, 255, 0.8)',
                   borderRadius: '4px',
                   pointerEvents: 'none',
@@ -2009,6 +2123,10 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
             console.log('MonthlySchedule: Created data _wasUpdated flag:', created?._wasUpdated);
             console.log('MonthlySchedule: selectedSchedule at callback:', selectedSchedule);
             
+            // WebSocketの更新を待つ（サーバーがブロードキャストするまで少し待つ）
+            console.log('📡 MonthlySchedule: Waiting for WebSocket update...');
+            await new Promise(resolve => setTimeout(resolve, 500)); // 500ms待つ
+            
             // 編集モードの場合はより確実に更新を反映
             if (isEditMode || wasUpdating) {
               console.log('📝 MonthlySchedule: EDIT MODE - Starting change process');
@@ -2095,39 +2213,6 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
           setInteractionState((prev: any) => ({ ...prev, showEditModal: false }));
         }}
       />
-
-      {/* デバッグ用ボタン */}
-      <div style={{ position: 'fixed', top: '10px', right: '10px', zIndex: 9999 }}>
-        <button 
-          onClick={async () => {
-            console.log('🔍 DEBUG: Current schedules:', schedules);
-            console.log('🔍 DEBUG: Current selectedSchedule:', selectedSchedule);
-            console.log('🔍 DEBUG: Current showRegistrationTab:', showRegistrationTab);
-            console.log('🔍 DEBUG: Current showEditModal:', interactionState.showEditModal);
-            console.log('🔍 DEBUG: Current isEventBarInteracting:', interactionState.isEventBarInteracting);
-            console.log('🔍 DEBUG: Current propsSig:', propsSig);
-            console.log('🔍 DEBUG: Current visibleSchedules:', visibleSchedules);
-            try {
-              const response = await fetch('/api/scheduleboard/debug/schedules');
-              const data = await response.json();
-              console.log('🔍 DEBUG: Server schedules:', data);
-            } catch (error) {
-              console.error('🔍 DEBUG: Error fetching server schedules:', error);
-            }
-          }}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px'
-          }}
-        >
-          🔍 DEBUG
-        </button>
-      </div>
 
       {/* コンテキストメニュー */}
       {contextMenuPosition && (
