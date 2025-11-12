@@ -131,14 +131,14 @@ const ScheduleItem = memo<ScheduleItemProps>(({
         }}
         onMouseEnter={(e) => {
           if (!showEditModal && !isModalClosing) {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
+            e.currentTarget.style.backgroundColor = '#d32f2f'; // ホバー時は少し明るい赤
             e.currentTarget.style.opacity = '1';
           }
         }}
         onMouseLeave={(e) => {
           if (!showEditModal && !isModalClosing) {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
-            e.currentTarget.style.opacity = selectedSchedule?.id === schedule.id ? '1' : '0';
+            e.currentTarget.style.backgroundColor = '#c62828';
+            e.currentTarget.style.opacity = selectedSchedule?.id === schedule.id ? '0.9' : '0';
           }
         }}
         onDoubleClick={(e) => {
@@ -155,11 +155,11 @@ const ScheduleItem = memo<ScheduleItemProps>(({
           height: '100%', 
           cursor: (showEditModal || isModalClosing) ? 'not-allowed' : 'ew-resize', 
           zIndex: 999,
-          backgroundColor: (showEditModal || isModalClosing) ? 'rgba(255, 0, 0, 0.3)' : 'rgba(255, 255, 255, 0.4)',
+          backgroundColor: (showEditModal || isModalClosing) ? 'rgba(255, 0, 0, 0.3)' : '#c62828', // 開始時刻ハンドル=赤
           border: (showEditModal || isModalClosing) ? '1px solid rgba(255, 0, 0, 0.6)' : '1px solid rgba(255, 255, 255, 0.8)',
           borderRadius: '2px 0 0 2px',
           transition: 'all 0.2s ease',
-          opacity: (showEditModal || isModalClosing) ? 0.5 : (selectedSchedule?.id === schedule.id ? 1 : 0)
+          opacity: (showEditModal || isModalClosing) ? 0.5 : (selectedSchedule?.id === schedule.id ? 0.9 : 0)
         }}
       />
       <div
@@ -186,14 +186,14 @@ const ScheduleItem = memo<ScheduleItemProps>(({
         }}
         onMouseEnter={(e) => {
           if (!showEditModal && !isModalClosing) {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
+            e.currentTarget.style.backgroundColor = '#388e3c'; // ホバー時は少し明るい緑
             e.currentTarget.style.opacity = '1';
           }
         }}
         onMouseLeave={(e) => {
           if (!showEditModal && !isModalClosing) {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
-            e.currentTarget.style.opacity = selectedSchedule?.id === schedule.id ? '1' : '0';
+            e.currentTarget.style.backgroundColor = '#2e7d32';
+            e.currentTarget.style.opacity = selectedSchedule?.id === schedule.id ? '0.9' : '0';
           }
         }}
         onDoubleClick={(e) => {
@@ -210,11 +210,11 @@ const ScheduleItem = memo<ScheduleItemProps>(({
           height: '100%', 
           cursor: (showEditModal || isModalClosing) ? 'not-allowed' : 'ew-resize', 
           zIndex: 999,
-          backgroundColor: (showEditModal || isModalClosing) ? 'rgba(255, 0, 0, 0.3)' : 'rgba(255, 255, 255, 0.4)',
+          backgroundColor: (showEditModal || isModalClosing) ? 'rgba(255, 0, 0, 0.3)' : '#2e7d32', // 終了時刻ハンドル=緑
           border: (showEditModal || isModalClosing) ? '1px solid rgba(255, 0, 0, 0.6)' : '1px solid rgba(255, 255, 255, 0.8)',
           borderRadius: '0 2px 2px 0',
           transition: 'all 0.2s ease',
-          opacity: (showEditModal || isModalClosing) ? 0.5 : (selectedSchedule?.id === schedule.id ? 1 : 0)
+          opacity: (showEditModal || isModalClosing) ? 0.5 : (selectedSchedule?.id === schedule.id ? 0.9 : 0)
         }}
       />
     </div>

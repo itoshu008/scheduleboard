@@ -463,19 +463,38 @@ const EventBar: React.FC<EventBarProps> = ({
     };
   }, [currentStartPx, calculatedTop, currentWidthPx, height, schedule.color, showGhost, fontSize]);
 
-  const handleStyle: React.CSSProperties = {
+  // 開始時刻ハンドル（左側）のスタイル
+  const leftHandleStyle: React.CSSProperties = {
     position: 'absolute',
     top: 0,
-    width: 8, // 全社員ビューと同じサイズ
+    left: -2,
+    width: 8,
     height: '100%',
     cursor: 'ew-resize',
-    backgroundColor: 'rgba(255, 255, 255, 0.4)', // 全社員ビューと同じ色
-    border: '1px solid rgba(255, 255, 255, 0.8)', // 全社員ビューと同じ色
-    borderRadius: 2,
-    opacity: isSelected ? 1 : 0,
+    backgroundColor: '#c62828', // 開始時刻ハンドル=赤
+    border: '1px solid rgba(255, 255, 255, 0.8)',
+    borderRadius: '2px 0 0 2px',
+    opacity: isSelected ? 0.9 : 0,
     zIndex: 10001, // イベントバーより前面
     pointerEvents: 'auto', // 明示的にマウスイベントを受け取る
-    transition: 'all 0.2s ease', // 全社員ビューと同じトランジション
+    transition: 'all 0.2s ease',
+  };
+
+  // 終了時刻ハンドル（右側）のスタイル
+  const rightHandleStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: 0,
+    right: -2,
+    width: 8,
+    height: '100%',
+    cursor: 'ew-resize',
+    backgroundColor: '#2e7d32', // 終了時刻ハンドル=緑
+    border: '1px solid rgba(255, 255, 255, 0.8)',
+    borderRadius: '0 2px 2px 0',
+    opacity: isSelected ? 0.9 : 0,
+    zIndex: 10001, // イベントバーより前面
+    pointerEvents: 'auto', // 明示的にマウスイベントを受け取る
+    transition: 'all 0.2s ease',
   };
 
   return (
@@ -506,7 +525,7 @@ const EventBar: React.FC<EventBarProps> = ({
     >
       <div
         className={`${showGhost ? 'ghost-handle' : ''} resize-handle`}
-        style={{ ...handleStyle, left: -2, borderRadius: '2px 0 0 2px' }}
+        style={leftHandleStyle}
         onMouseDown={(e) => {
           if (onResizeLeftMouseDownOverride) {
             onResizeLeftMouseDownOverride(e, schedule);
@@ -521,14 +540,14 @@ const EventBar: React.FC<EventBarProps> = ({
         }}
         onMouseEnter={(e) => {
           if (!showGhost) {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
+            e.currentTarget.style.backgroundColor = '#d32f2f'; // ホバー時は少し明るい赤
             e.currentTarget.style.opacity = '1';
           }
         }}
         onMouseLeave={(e) => {
           if (!showGhost) {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
-            e.currentTarget.style.opacity = isSelected ? '1' : '0';
+            e.currentTarget.style.backgroundColor = '#c62828';
+            e.currentTarget.style.opacity = isSelected ? '0.9' : '0';
           }
         }}
         onClick={(e) => {
@@ -616,7 +635,7 @@ const EventBar: React.FC<EventBarProps> = ({
       </div>
       <div
         className={`${showGhost ? 'ghost-handle' : ''} resize-handle`}
-        style={{ ...handleStyle, right: -2, borderRadius: '0 2px 2px 0' }}
+        style={rightHandleStyle}
         onMouseDown={(e) => {
           if (onResizeRightMouseDownOverride) {
             onResizeRightMouseDownOverride(e, schedule);
@@ -631,14 +650,14 @@ const EventBar: React.FC<EventBarProps> = ({
         }}
         onMouseEnter={(e) => {
           if (!showGhost) {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
+            e.currentTarget.style.backgroundColor = '#388e3c'; // ホバー時は少し明るい緑
             e.currentTarget.style.opacity = '1';
           }
         }}
         onMouseLeave={(e) => {
           if (!showGhost) {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
-            e.currentTarget.style.opacity = isSelected ? '1' : '0';
+            e.currentTarget.style.backgroundColor = '#2e7d32';
+            e.currentTarget.style.opacity = isSelected ? '0.9' : '0';
           }
         }}
         onClick={(e) => {

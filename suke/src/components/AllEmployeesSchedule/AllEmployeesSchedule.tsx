@@ -1285,7 +1285,7 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                               )}
                             </div>
                             
-                            {/* リサイズハンドル（日別から移植、色を統一） */}
+                            {/* リサイズハンドル（開始時刻=赤、終了時刻=緑） */}
                             <div
                               className="resize-handle resize-start"
                               onMouseDown={(e) => {
@@ -1303,19 +1303,19 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                                 cursor: 'ew-resize', 
                                 zIndex: 10001, // イベントバーより前面
                                 pointerEvents: 'auto', // 明示的にマウスイベントを受け取る
-                                backgroundColor: 'rgba(255, 255, 255, 0.4)',
+                                backgroundColor: '#c62828', // 開始時刻ハンドル=赤
                                 border: '1px solid rgba(255, 255, 255, 0.8)',
                                 borderRadius: '2px 0 0 2px',
                                 transition: 'all 0.2s ease',
-                                opacity: selectedSchedule?.id === schedule.id ? 1 : 0
+                                opacity: selectedSchedule?.id === schedule.id ? 0.9 : 0
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
+                                e.currentTarget.style.backgroundColor = '#d32f2f'; // ホバー時は少し明るい赤
                                 e.currentTarget.style.opacity = '1';
                               }}
                               onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
-                                e.currentTarget.style.opacity = selectedSchedule?.id === schedule.id ? '1' : '0';
+                                e.currentTarget.style.backgroundColor = '#c62828';
+                                e.currentTarget.style.opacity = selectedSchedule?.id === schedule.id ? '0.9' : '0';
                               }}
                             />
                             <div
@@ -1335,19 +1335,19 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                                 cursor: 'ew-resize', 
                                 zIndex: 10001, // イベントバーより前面
                                 pointerEvents: 'auto', // 明示的にマウスイベントを受け取る
-                                backgroundColor: 'rgba(255, 255, 255, 0.4)',
+                                backgroundColor: '#2e7d32', // 終了時刻ハンドル=緑
                                 border: '1px solid rgba(255, 255, 255, 0.8)',
                                 borderRadius: '0 2px 2px 0',
                                 transition: 'all 0.2s ease',
-                                opacity: selectedSchedule?.id === schedule.id ? 1 : 0
+                                opacity: selectedSchedule?.id === schedule.id ? 0.9 : 0
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
+                                e.currentTarget.style.backgroundColor = '#388e3c'; // ホバー時は少し明るい緑
                                 e.currentTarget.style.opacity = '1';
                               }}
                               onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
-                                e.currentTarget.style.opacity = selectedSchedule?.id === schedule.id ? '1' : '0';
+                                e.currentTarget.style.backgroundColor = '#2e7d32';
+                                e.currentTarget.style.opacity = selectedSchedule?.id === schedule.id ? '0.9' : '0';
                               }}
                             />
                           </div>
