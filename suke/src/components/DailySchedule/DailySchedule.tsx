@@ -1298,17 +1298,9 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                               pointerEvents: 'auto' // 明示的にマウスイベントを受け取る
                             }}
                             onMouseDown={(e) => {
-                              console.log('🎯 イベントバー クリック:', schedule.id, schedule.title);
-                              
-                              // リサイズ中は選択を無効化
-                              if (isResizing || resizeData) {
-                                console.log('🚫 リサイズ中のため選択を無効化');
-                                return;
-                              }
-                              
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setSelectedSchedule(schedule);
+                              // 月別ビューと同じ仕様：handleScheduleMouseDown内で選択状態を設定
+                              // handleScheduleMouseDownはuseMonthlyEventBarHandlersから提供され、
+                              // 即座に選択状態を設定し、セル選択状態をクリアする
                               handleScheduleMouseDown(schedule, e);
                             }}
                             onDoubleClick={(e) => {

@@ -888,10 +888,14 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
         // リサイズ処理
         if (currentState.resizeData && currentState.resizeGhost) {
           const deltaX = e.clientX - currentState.resizeData.startX;
-          const slotDelta = Math.round(deltaX / scaledCellWidth);
+          // スロット計算を安定化：より明確なスナップ
+          const exactSlotDelta = deltaX / scaledCellWidth;
+          const slotDelta = Math.round(exactSlotDelta);
 
           let newStart = new Date(currentState.resizeData.originalStart);
           let newEnd = new Date(currentState.resizeData.originalEnd);
+          let newStartSlot: number;
+          let newEndSlot: number;
           
           if (currentState.resizeData.edge === 'start') {
             // 左ハンドル：開始時刻を変更、終了時刻は固定
@@ -899,7 +903,7 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
             
             // 新しい開始時刻を計算（左に伸ばすことができるように）
             const originalStartSlot = getTimeSlot(currentState.resizeData.originalStart);
-            let newStartSlot = originalStartSlot + slotDelta;
+            newStartSlot = originalStartSlot + slotDelta;
             
             // 境界チェック：0以上、終了時刻より前
             const endSlot = getTimeSlot(currentState.resizeData.originalEnd);
@@ -908,13 +912,14 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
             const startDate = new Date(currentState.resizeData.originalStart);
             startDate.setHours(0, 0, 0, 0);
             newStart = createTimeFromSlot(startDate, newStartSlot);
+            newEndSlot = endSlot; // 終了スロットは変更しない
             
           } else {
             // 右ハンドル：終了時刻を変更、開始時刻は固定
             newStart = currentState.resizeData.originalStart; // 開始時刻は固定
             
             const originalEndSlot = getTimeSlot(currentState.resizeData.originalEnd);
-            let newEndSlot = originalEndSlot + slotDelta;
+            newEndSlot = originalEndSlot + slotDelta;
             
             // 境界チェック：開始時刻より後、95以下
             const startSlot = getTimeSlot(currentState.resizeData.originalStart);
@@ -923,13 +928,15 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
             const endDate = new Date(currentState.resizeData.originalEnd);
             endDate.setHours(0, 0, 0, 0);
             newEnd = createTimeFromSlot(endDate, newEndSlot);
-            
+            newStartSlot = startSlot; // 開始スロットは変更しない
           }
           
-          // 変更があった場合のみ更新
+          // スロットが変わった場合のみ更新（揺れを防ぐ）
           const currentGhost = currentState.resizeGhost;
-          if (currentGhost.newStart.getTime() !== newStart.getTime() || 
-              currentGhost.newEnd.getTime() !== newEnd.getTime()) {
+          const currentStartSlot = getTimeSlot(currentGhost.newStart);
+          const currentEndSlot = getTimeSlot(currentGhost.newEnd);
+          
+          if (currentStartSlot !== newStartSlot || currentEndSlot !== newEndSlot) {
             setInteractionState((prev: any) => ({
               ...prev,
               resizeGhost: {

@@ -45,6 +45,8 @@ interface UseScheduleDragResizeProps {
   onReloadSchedules: () => Promise<void>;
   employees?: Array<{ id: number; name: string }>; // 社員リスト（日別スケジュール用）
   getEmployeeIdFromDelta?: (originalEmployeeId: number, delta: number) => number; // 社員ID計算関数
+  setSelectedSchedule?: (schedule: Schedule | null) => void; // 選択状態設定（月別ビューと同じ仕様）
+  setSelectedCells?: (cells: Set<string>) => void; // セル選択状態設定（月別ビューと同じ仕様）
 }
 
 // スロット番号から日時を作成する関数
@@ -59,7 +61,9 @@ export const useScheduleDragResize = ({
   onUpdateSchedule,
   onReloadSchedules,
   employees,
-  getEmployeeIdFromDelta
+  getEmployeeIdFromDelta,
+  setSelectedSchedule,
+  setSelectedCells
 }: UseScheduleDragResizeProps) => {
   // ドラッグ関連の状態
   const [dragData, setDragData] = useState<DragData | null>(null);
@@ -95,6 +99,16 @@ export const useScheduleDragResize = ({
     e.stopPropagation();
     
     console.log('🚚 ドラッグ開始:', { scheduleId: schedule.id, title: schedule.title });
+    
+    // 月別ビューと同じ仕様：即座に選択状態を設定
+    if (setSelectedSchedule) {
+      setSelectedSchedule(schedule);
+    }
+    
+    // セル選択状態をクリア（スケジュール選択のみ）
+    if (setSelectedCells) {
+      setSelectedCells(new Set());
+    }
     
     // ドラッグ開始
     const startTime = new Date(schedule.start_datetime);
@@ -134,7 +148,7 @@ export const useScheduleDragResize = ({
     });
 
     // setMousePosition({ x: e.clientX, y: e.clientY }); // 不要な再レンダリングを回避
-  }, [isResizing, resizeData]);
+  }, [isResizing, resizeData, setSelectedSchedule, setSelectedCells]);
 
   // リサイズハンドルマウスダウン
   const handleResizeMouseDown = useCallback((schedule: Schedule, edge: 'start' | 'end', e: React.MouseEvent) => {

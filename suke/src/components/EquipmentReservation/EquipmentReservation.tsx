@@ -153,6 +153,8 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
   } = useScheduleDragResize({
     scaledCellWidth: CELL_WIDTH_PX * scheduleScale,
     scaledRowHeight: 40,
+    setSelectedSchedule, // 月別ビューと同じ仕様
+    setSelectedCells, // 月別ビューと同じ仕様
     onUpdateSchedule: async (scheduleId: number, updateData: any) => {
       console.log('🔄 設備予約更新:', { scheduleId, updateData });
       
