@@ -1121,35 +1121,18 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
                           overflow: 'hidden',
                           cursor: 'pointer',
                           zIndex: 10000, // 非常に高いz-indexでセルより前面に
-                          pointerEvents: 'auto' // 明示的にマウスイベントを受け取る（日別ビューと同じ）
+                          // セル選択中はイベントバーを通過できるように（日別ビューと同じ）
+                          pointerEvents: isSelecting ? 'none' : 'auto'
                         }}
                         onMouseDown={(e) => {
+                          // セル選択中はイベントバーのクリックを無効化
+                          if (isSelecting) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            return;
+                          }
                           // 日別ビューと同じ仕様：handleScheduleMouseDown内で選択状態を設定
                           handleScheduleMouseDown(reservation as any, e);
-                        }}
-                        onMouseMove={(e) => {
-                          // セル選択中にイベントバーの上を移動した場合、下のセルのonMouseEnterを呼び出す
-                          if (isSelecting && selectionAnchor) {
-                            // イベントバーの下にあるセルを特定
-                            const scheduleContentArea = e.currentTarget.closest('.schedule-content-area') as HTMLElement;
-                            if (!scheduleContentArea) return;
-                            
-                            const rect = scheduleContentArea.getBoundingClientRect();
-                            const x = e.clientX - rect.left;
-                            const y = e.clientY - rect.top;
-                            
-                            // セルの位置を計算（設備IDとスロット）
-                            const equipmentIndex = Math.floor((y - 2) / 40); // 行の高さ40px、top: 2px
-                            const equipment = equipments[equipmentIndex];
-                            if (!equipment) return;
-                            
-                            const cellLeft = 200; // 固定設備セル幅
-                            const slot = Math.floor((x - cellLeft) / (CELL_WIDTH_PX * scheduleScale));
-                            if (slot < 0 || slot >= 96) return;
-                            
-                            // セルのonMouseEnterを呼び出す
-                            handleCellMouseEnter(equipment.id, slot);
-                          }
                         }}
                         onClick={(e) => {
                           // 日別ビューと同じ仕様：クリック時に選択状態を維持
