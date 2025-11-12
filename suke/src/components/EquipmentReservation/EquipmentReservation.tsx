@@ -507,20 +507,38 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
     }
 
     // セル選択開始（直接実装）
+    console.log('🔍 EquipmentReservation: handleCellMouseDown - Setting selection state', {
+      cellId,
+      equipmentId,
+      slot,
+      newDragData: !!newDragData,
+      newResizeData: !!newResizeData
+    });
     setSelectedCells(new Set([cellId]));
     setIsSelecting(true);
     setSelectionAnchor({ employeeId: equipmentId, slot });
+    console.log('🔍 EquipmentReservation: handleCellMouseDown - Selection state set', {
+      cellId,
+      equipmentId,
+      slot
+    });
   }, [newDragData, newResizeData, selectedDate, showRegistrationTab, setSelectedSchedule, setSelectedCells, setIsSelecting, setSelectionAnchor]);
 
   const handleCellMouseEnter = useCallback((equipmentId: number, slot: number) => {
-    // selectionAnchorがあれば選択中とみなす（isSelectingの更新タイミングの問題を回避）
-    if (!selectionAnchor) {
-      console.log('🔍 EquipmentReservation: handleCellMouseEnter - early return (no selectionAnchor)', { 
+    // selectionAnchorまたはisSelectingがあれば選択中とみなす
+    if (!selectionAnchor && !isSelecting) {
+      console.log('🔍 EquipmentReservation: handleCellMouseEnter - early return (no selectionAnchor and not selecting)', { 
         isSelecting, 
         selectionAnchor,
         equipmentId,
         slot
       });
+      return;
+    }
+    
+    // selectionAnchorがない場合は、isSelectingのみで判断（状態更新のタイミング問題を回避）
+    if (!selectionAnchor) {
+      console.log('🔍 EquipmentReservation: handleCellMouseEnter - no selectionAnchor but isSelecting is true, skipping');
       return;
     }
 
@@ -552,7 +570,7 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
     });
     
     setSelectedCells(newSelectedCells);
-  }, [selectionAnchor, selectedDate, setSelectedCells]);
+  }, [selectionAnchor, isSelecting, selectedDate, setSelectedCells]);
 
   const handleCellMouseUp = useCallback(() => {
     console.log('🖱️ セルマウスアップ');
@@ -994,37 +1012,18 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
                       onMouseDown={(e) => {
                         if (e.button !== 0) return; // 左クリック以外はセル選択無効化
 
-                        // リサイズ・移動中はセル選択を無効化
-                        if (newIsResizing || newDragData) {
-                          console.log('🚫 セルのonMouseDown: リサイズ・移動中のためセル選択無効化');
-                          return;
-                        }
-
                         // スケジュールアイテムがクリックされた場合はセル選択をスキップ
                         const target = e.target as HTMLElement;
-                        const scheduleItem = target.closest('.schedule-item');
+                        const scheduleItem = target.closest('.schedule-item') || target.closest('.excel-schedule-item');
                         if (scheduleItem) {
                           console.log('🚫 セルのonMouseDown: スケジュールアイテムがクリックされたためスキップ');
                           return;
                         }
                         
-                        console.log('🖱️ セルクリック:', {
-                          equipmentId: equipment.id,
-                          equipmentName: equipment.name,
-                          slot,
-                          time: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
-                          cellId
-                        });
-                        
                         e.stopPropagation();
                         handleCellMouseDown(equipment.id, slot, e);
                       }}
                     onMouseEnter={(e) => {
-                      // リサイズ・移動中はセル選択を無効化
-                      if (newIsResizing || newDragData) {
-                        return;
-                      }
-
                       // スケジュールアイテムがホバーされた場合はセル選択をスキップ
                       const target = e.target as HTMLElement;
                       const scheduleItem = target.closest('.schedule-item');
@@ -1033,28 +1032,8 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
                       }
                       handleCellMouseEnter(equipment.id, slot);
                     }}
-                    onMouseUp={() => {
-                      // リサイズ・移動中はセル選択を無効化
-                      if (newIsResizing || newDragData) {
-                        return;
-                      }
-                      handleCellMouseUp();
-                    }}
+                    onMouseUp={handleCellMouseUp}
                       onDoubleClick={() => {
-                        // リサイズ・移動中はセル選択を無効化
-                        if (newIsResizing || newDragData) {
-                          console.log('🚫 セルのonDoubleClick: リサイズ・移動中のためセル選択無効化');
-                          return;
-                        }
-
-                        console.log('🖱️ セルダブルクリック（直接）:', {
-                          equipmentId: equipment.id,
-                          equipmentName: equipment.name,
-                          slot,
-                          time: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
-                          cellId,
-                          selectedCellsBeforeDoubleClick: Array.from(selectedCells)
-                        });
                         handleCellDoubleClick(equipment.id, slot);
                       }}
                     title={`${equipment.name} ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`}
