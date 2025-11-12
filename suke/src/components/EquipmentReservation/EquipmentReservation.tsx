@@ -1125,14 +1125,68 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
                           pointerEvents: isSelecting ? 'none' : 'auto'
                         }}
                         onMouseDown={(e) => {
-                          // セル選択中はイベントバーのクリックを無効化
+                          // セル選択中はイベントバーのクリックを無効化して、セル選択を優先
                           if (isSelecting) {
                             e.preventDefault();
                             e.stopPropagation();
+                            // セルのonMouseDownを手動で呼び出す
+                            const scheduleContentArea = e.currentTarget.closest('.schedule-content-area') as HTMLElement;
+                            if (scheduleContentArea) {
+                              const rect = scheduleContentArea.getBoundingClientRect();
+                              const x = e.clientX - rect.left;
+                              const y = e.clientY - rect.top;
+                              
+                              // セルの位置を計算
+                              const equipmentIndex = Math.floor((y - 2) / 40);
+                              const equipment = equipments[equipmentIndex];
+                              if (equipment) {
+                                const cellLeft = 200;
+                                const slot = Math.floor((x - cellLeft) / (CELL_WIDTH_PX * scheduleScale));
+                                if (slot >= 0 && slot < 96) {
+                                  // セルのonMouseDownをシミュレート
+                                  const cellElement = scheduleContentArea.querySelector(`[data-equipment-id="${equipment.id}"][data-slot="${slot}"]`) as HTMLElement;
+                                  if (cellElement) {
+                                    const syntheticEvent = new MouseEvent('mousedown', {
+                                      bubbles: true,
+                                      cancelable: true,
+                                      button: 0,
+                                      clientX: e.clientX,
+                                      clientY: e.clientY
+                                    });
+                                    cellElement.dispatchEvent(syntheticEvent);
+                                  }
+                                }
+                              }
+                            }
                             return;
                           }
                           // 日別ビューと同じ仕様：handleScheduleMouseDown内で選択状態を設定
                           handleScheduleMouseDown(reservation as any, e);
+                        }}
+                        onMouseMove={(e) => {
+                          // セル選択中にイベントバーの上を移動した場合、下のセルのonMouseEnterを呼び出す
+                          if (isSelecting && selectionAnchor) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const scheduleContentArea = e.currentTarget.closest('.schedule-content-area') as HTMLElement;
+                            if (!scheduleContentArea) return;
+                            
+                            const rect = scheduleContentArea.getBoundingClientRect();
+                            const x = e.clientX - rect.left;
+                            const y = e.clientY - rect.top;
+                            
+                            // セルの位置を計算
+                            const equipmentIndex = Math.floor((y - 2) / 40);
+                            const equipment = equipments[equipmentIndex];
+                            if (!equipment) return;
+                            
+                            const cellLeft = 200;
+                            const slot = Math.floor((x - cellLeft) / (CELL_WIDTH_PX * scheduleScale));
+                            if (slot < 0 || slot >= 96) return;
+                            
+                            // セルのonMouseEnterを呼び出す
+                            handleCellMouseEnter(equipment.id, slot);
+                          }
                         }}
                         onClick={(e) => {
                           // 日別ビューと同じ仕様：クリック時に選択状態を維持
