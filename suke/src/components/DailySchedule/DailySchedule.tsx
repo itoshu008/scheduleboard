@@ -1439,6 +1439,92 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                   </div>
                 </div>
               )}
+              
+              {/* ドラッグゴースト（schedule-content-area内に配置） */}
+              {interactionState.dragGhost && interactionState.dragData && (() => {
+                // 月別ビューのロジックに合わせてゴースト表示を計算
+                const originalStart = new Date(interactionState.dragData.schedule.start_datetime);
+                const originalEnd = new Date(interactionState.dragData.schedule.end_datetime);
+                const originalDuration = originalEnd.getTime() - originalStart.getTime();
+                
+                // 新しい開始・終了時刻を計算
+                const { hour, minute } = getTimeFromSlot(interactionState.dragGhost.newSlot);
+                const newStart = new Date(
+                  interactionState.dragGhost.newDate.getFullYear(),
+                  interactionState.dragGhost.newDate.getMonth(),
+                  interactionState.dragGhost.newDate.getDate(),
+                  hour,
+                  minute
+                );
+                const newEnd = new Date(newStart.getTime() + originalDuration);
+                
+                const startSlot = getTimeSlot(newStart);
+                const endSlot = getEndTimeSlot(newEnd);
+                const width = (endSlot - startSlot) * scaledCellWidth;
+                
+                // 社員IDを取得（社員間移動を考慮）
+                const targetEmployeeId = interactionState.dragGhost.newEmployeeId || interactionState.dragData.schedule.employee_id;
+                const targetEmployeeIndex = filteredEmployees.findIndex(emp => emp.id === targetEmployeeId);
+                
+                // 日付が選択日と同じで、社員が表示範囲内にある場合のみ表示
+                const targetDate = interactionState.dragGhost.newDate;
+                const isSameDate = targetDate.getFullYear() === selectedDate.getFullYear() &&
+                                  targetDate.getMonth() === selectedDate.getMonth() &&
+                                  targetDate.getDate() === selectedDate.getDate();
+                
+                if (!isSameDate || targetEmployeeIndex === -1) {
+                  return null;
+                }
+                
+                // 月別ビューと同じ方式：グリッド内の正確な位置に表示
+                // 実際のイベントバーは各行（excel-date-row）内のrow-schedule-layerに配置されている
+                // row-schedule-layerは各行内でposition: absolute, top: 0, left: 80に配置
+                // イベントバーはrow-schedule-layer内でposition: absolute, top: 2px, left: startSlot * scaledCellWidthに配置
+                const rowHeight = 40; // 固定の行の高さ（minHeight: '40px'）
+                const topOffset = 2; // イベントバーのオフセット（row-schedule-layer内でのtop位置）
+                // 実際のイベントバーのleft計算: row-schedule-layerのleft(80) + イベントバーのleft(startSlot * scaledCellWidth)
+                const actualLeft = 80 + startSlot * scaledCellWidth; // scaledCellWidthを使用（精度向上）
+                // 社員インデックスは既に計算済み（targetEmployeeIndex）を使用
+                // 実際のイベントバーの位置: 各行のrow-schedule-layer内でtop: 2px
+                // ドラッグゴーストはschedule-content-areaに対してposition: absoluteで配置されるため、
+                // 各行の位置（targetEmployeeIndex * rowHeight）+ row-schedule-layer内のオフセット（topOffset）を計算
+                const actualTop = targetEmployeeIndex >= 0 ? targetEmployeeIndex * rowHeight + topOffset : 0;
+                return (
+                  <div
+                    className="drag-ghost"
+                    style={{
+                      position: 'absolute',
+                      width: `${width}px`,
+                      height: '36px', // 実際のイベントバーの高さと同じ
+                      backgroundColor: safeHexColor(interactionState.dragGhost.schedule.color || '#3498db'),
+                      border: '2px dashed rgba(255, 255, 255, 0.8)',
+                      borderRadius: '4px',
+                      pointerEvents: 'none',
+                      zIndex: 1000,
+                      opacity: 0.7,
+                      left: `${actualLeft}px`,
+                      top: `${actualTop}px`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)'
+                    }}
+                    title={`${interactionState.dragGhost.schedule.title}\n${formatTime(newStart)} - ${formatTime(newEnd)}`}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', textAlign: 'center' }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>
+                        {interactionState.dragGhost.schedule.title || '無題'}
+                      </div>
+                      <div style={{ fontSize: '9px', opacity: 0.9 }}>
+                        {formatTime(newStart)} - {formatTime(newEnd)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -1456,91 +1542,6 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
             gridContainerRef={tableContainerRef}
           />
 
-          {/* ドラッグゴースト（カーソル位置にイベントバーの中心が来るように調整） */}
-          {interactionState.dragGhost && interactionState.dragData && (() => {
-            // 月別ビューのロジックに合わせてゴースト表示を計算
-            const originalStart = new Date(interactionState.dragData.schedule.start_datetime);
-            const originalEnd = new Date(interactionState.dragData.schedule.end_datetime);
-            const originalDuration = originalEnd.getTime() - originalStart.getTime();
-            
-            // 新しい開始・終了時刻を計算
-            const { hour, minute } = getTimeFromSlot(interactionState.dragGhost.newSlot);
-            const newStart = new Date(
-              interactionState.dragGhost.newDate.getFullYear(),
-              interactionState.dragGhost.newDate.getMonth(),
-              interactionState.dragGhost.newDate.getDate(),
-              hour,
-              minute
-            );
-            const newEnd = new Date(newStart.getTime() + originalDuration);
-            
-            const startSlot = getTimeSlot(newStart);
-            const endSlot = getEndTimeSlot(newEnd);
-            const width = (endSlot - startSlot) * scaledCellWidth;
-            
-            // 社員IDを取得（社員間移動を考慮）
-            const targetEmployeeId = interactionState.dragGhost.newEmployeeId || interactionState.dragData.schedule.employee_id;
-            const targetEmployeeIndex = filteredEmployees.findIndex(emp => emp.id === targetEmployeeId);
-            
-            // 日付が選択日と同じで、社員が表示範囲内にある場合のみ表示
-            const targetDate = interactionState.dragGhost.newDate;
-            const isSameDate = targetDate.getFullYear() === selectedDate.getFullYear() &&
-                              targetDate.getMonth() === selectedDate.getMonth() &&
-                              targetDate.getDate() === selectedDate.getDate();
-            
-            if (!isSameDate || targetEmployeeIndex === -1) {
-              return null;
-            }
-            
-            // 月別ビューと同じ方式：グリッド内の正確な位置に表示
-            // 実際のイベントバーは各行（excel-date-row）内のrow-schedule-layerに配置されている
-            // row-schedule-layerは各行内でposition: absolute, top: 0, left: 80に配置
-            // イベントバーはrow-schedule-layer内でposition: absolute, top: 2px, left: startSlot * scaledCellWidthに配置
-            const rowHeight = 40; // 固定の行の高さ（minHeight: '40px'）
-            const topOffset = 2; // イベントバーのオフセット（row-schedule-layer内でのtop位置）
-            // 実際のイベントバーのleft計算: row-schedule-layerのleft(80) + イベントバーのleft(startSlot * scaledCellWidth)
-            const actualLeft = 80 + startSlot * scaledCellWidth; // scaledCellWidthを使用（精度向上）
-            // 社員インデックスは既に計算済み（targetEmployeeIndex）を使用
-            // 実際のイベントバーの位置: 各行のrow-schedule-layer内でtop: 2px
-            // ドラッグゴーストはschedule-content-areaに対してposition: absoluteで配置されるため、
-            // 各行の位置（targetEmployeeIndex * rowHeight）+ row-schedule-layer内のオフセット（topOffset）を計算
-            const actualTop = targetEmployeeIndex >= 0 ? targetEmployeeIndex * rowHeight + topOffset : 0;
-            return (
-              <div
-                className="drag-ghost"
-                style={{
-                  position: 'absolute',
-                  width: `${width}px`,
-                  height: '36px', // 実際のイベントバーの高さと同じ
-                  backgroundColor: safeHexColor(interactionState.dragGhost.schedule.color || '#3498db'),
-                  border: '2px dashed rgba(255, 255, 255, 0.8)',
-                  borderRadius: '4px',
-                  pointerEvents: 'none',
-                  zIndex: 1000,
-                  opacity: 0.7,
-                  left: `${actualLeft}px`, // カーソル位置にイベントバーの中心が来るように計算
-                  top: `${actualTop}px`, // カーソル位置にイベントバーの中心が来るように計算
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontSize: '11px',
-                  fontWeight: 'bold',
-                  boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)'
-                }}
-                title={`${interactionState.dragGhost.schedule.title}\n${formatTime(newStart)} - ${formatTime(newEnd)}`}
-              >
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', textAlign: 'center' }}>
-                  <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>
-                    {interactionState.dragGhost.schedule.title || '無題'}
-                  </div>
-                  <div style={{ fontSize: '9px', opacity: 0.9 }}>
-                    {formatTime(newStart)} - {formatTime(newEnd)}
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
         </div>
       )}
 
