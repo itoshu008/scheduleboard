@@ -1029,6 +1029,10 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
                         handleCellMouseDown(equipment.id, slot, e);
                       }}
                     onMouseEnter={(e) => {
+                      // セル選択中でない場合はスキップ
+                      if (!isSelecting || !selectionAnchor) {
+                        return;
+                      }
                       // ReusableEventBar（schedule-item）がホバーされた場合はセル選択をスキップ（日別ビューと同じ）
                       const target = e.target as HTMLElement;
                       const scheduleItem = target.closest('.schedule-item') || target.closest('.excel-schedule-item');
@@ -1121,8 +1125,7 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
                           overflow: 'hidden',
                           cursor: 'pointer',
                           zIndex: 10000, // 非常に高いz-indexでセルより前面に
-                          // セル選択中はイベントバーを通過できるように（日別ビューと同じ）
-                          pointerEvents: isSelecting ? 'none' : 'auto'
+                          pointerEvents: 'auto' // 明示的にマウスイベントを受け取る（日別ビューと同じ）
                         }}
                         onMouseDown={(e) => {
                           // 日別ビューと同じ仕様：handleScheduleMouseDown内で選択状態を設定
