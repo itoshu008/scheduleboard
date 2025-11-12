@@ -1113,16 +1113,9 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
                           overflow: 'hidden',
                           cursor: 'pointer',
                           zIndex: 10000, // 非常に高いz-indexでセルより前面に
-                          // セル選択中はイベントバーを無効化してセルのonMouseEnterを発火させる
-                          pointerEvents: isSelecting ? 'none' : 'auto'
+                          pointerEvents: 'auto' // 明示的にマウスイベントを受け取る（日別ビューと同じ）
                         }}
                         onMouseDown={(e) => {
-                          // セル選択中はイベントバーのクリックを無効化
-                          if (isSelecting) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            return;
-                          }
                           // 日別ビューと同じ仕様：handleScheduleMouseDown内で選択状態を設定
                           handleScheduleMouseDown(reservation as any, e);
                         }}
