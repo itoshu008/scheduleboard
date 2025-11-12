@@ -994,9 +994,9 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
                         handleCellMouseDown(equipment.id, slot, e);
                       }}
                     onMouseEnter={(e) => {
-                      // スケジュールアイテムがホバーされた場合はセル選択をスキップ
+                      // ReusableEventBar（schedule-item）がホバーされた場合はセル選択をスキップ（日別ビューと同じ）
                       const target = e.target as HTMLElement;
-                      const scheduleItem = target.closest('.schedule-item');
+                      const scheduleItem = target.closest('.schedule-item') || target.closest('.excel-schedule-item');
                       if (scheduleItem) {
                         return;
                       }
