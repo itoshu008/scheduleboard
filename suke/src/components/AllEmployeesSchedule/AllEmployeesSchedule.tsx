@@ -1285,39 +1285,69 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                               )}
                             </div>
                             
-                            {/* リサイズハンドル（日別から移植） */}
+                            {/* リサイズハンドル（日別から移植、色を統一） */}
                             <div
                               className="resize-handle resize-start"
-                              onMouseDown={(e) => handleResizeMouseDown(schedule, 'start', e)}
+                              onMouseDown={(e) => {
+                                console.log('🔧 左リサイズハンドル クリック:', schedule.id);
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleResizeMouseDown(schedule, 'start', e);
+                              }}
                               style={{ 
                                 position: 'absolute', 
-                                left: -6, 
-                                top: 2, 
-                                width: 16, 
-                                height: 'calc(100% - 4px)', 
+                                left: -2, 
+                                top: 0, 
+                                width: 8, 
+                                height: '100%', 
                                 cursor: 'ew-resize', 
-                                zIndex: 15,
+                                zIndex: 10001, // イベントバーより前面
+                                pointerEvents: 'auto', // 明示的にマウスイベントを受け取る
                                 backgroundColor: 'rgba(255, 255, 255, 0.4)',
-                                border: '2px solid rgba(255, 255, 255, 0.8)',
-                                borderRadius: '3px',
-                                opacity: 0.8
+                                border: '1px solid rgba(255, 255, 255, 0.8)',
+                                borderRadius: '2px 0 0 2px',
+                                transition: 'all 0.2s ease',
+                                opacity: selectedSchedule?.id === schedule.id ? 1 : 0
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
+                                e.currentTarget.style.opacity = '1';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
+                                e.currentTarget.style.opacity = selectedSchedule?.id === schedule.id ? '1' : '0';
                               }}
                             />
                             <div
                               className="resize-handle resize-end"
-                              onMouseDown={(e) => handleResizeMouseDown(schedule, 'end', e)}
+                              onMouseDown={(e) => {
+                                console.log('🔧 右リサイズハンドル クリック:', schedule.id);
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleResizeMouseDown(schedule, 'end', e);
+                              }}
                               style={{ 
                                 position: 'absolute', 
-                                right: -6, 
-                                top: 2, 
-                                width: 16, 
-                                height: 'calc(100% - 4px)', 
+                                right: -2, 
+                                top: 0, 
+                                width: 8, 
+                                height: '100%', 
                                 cursor: 'ew-resize', 
-                                zIndex: 15,
+                                zIndex: 10001, // イベントバーより前面
+                                pointerEvents: 'auto', // 明示的にマウスイベントを受け取る
                                 backgroundColor: 'rgba(255, 255, 255, 0.4)',
-                                border: '2px solid rgba(255, 255, 255, 0.8)',
-                                borderRadius: '3px',
-                                opacity: 0.8
+                                border: '1px solid rgba(255, 255, 255, 0.8)',
+                                borderRadius: '0 2px 2px 0',
+                                transition: 'all 0.2s ease',
+                                opacity: selectedSchedule?.id === schedule.id ? 1 : 0
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
+                                e.currentTarget.style.opacity = '1';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
+                                e.currentTarget.style.opacity = selectedSchedule?.id === schedule.id ? '1' : '0';
                               }}
                             />
                           </div>
