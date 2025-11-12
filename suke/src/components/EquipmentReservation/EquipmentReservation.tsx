@@ -470,10 +470,14 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
   }, [selectedCells, isSelecting, equipments, commonGetSelectedCellDateTime, selectedDate, isModalOpen]);
 
   // セル選択処理（日別スケジュールと同じ）
-  const handleCellMouseDown = useCallback((equipmentId: number, slot: number) => {
+  const handleCellMouseDown = useCallback((equipmentId: number, slot: number, e?: React.MouseEvent) => {
+    // 右クリック時はセル選択を無効化（右クリックドラッグスクロール用）
+    if (e && e.button === 2) return;
+    if (newDragData || newResizeData) return; // ドラッグ中は選択無効（月別ビューのロジックと統一）
+    
     console.log('🖱️ セルマウスダウン:', { equipmentId, slot });
     commonHandleCellMouseDown(equipmentId, slot, selectedDate);
-  }, [commonHandleCellMouseDown, selectedDate]);
+  }, [commonHandleCellMouseDown, selectedDate, newDragData, newResizeData]);
 
   const handleCellMouseEnter = useCallback((equipmentId: number, slot: number) => {
     commonHandleCellMouseEnter(equipmentId, slot, selectedDate);
@@ -493,12 +497,11 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
       return;
     }
     
+    // 共通フックのダブルクリック処理を先に呼び出す（選択状態の更新のため）
+    commonHandleCellDoubleClick(equipmentId, slot, selectedDate);
+    
     // ダブルクリック時は即座にモーダルを表示
     console.log('🔍 ダブルクリック：即座にモーダル表示');
-    
-    // セルIDを作成して選択状態を設定
-    const cellId = `${slot}-${equipmentId}`;
-    setSelectedCells(new Set([cellId]));
     
     // ダブルクリックしたセルから直接日時を計算
     const startDateTime = new Date(selectedDate);
@@ -520,10 +523,7 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
     
     setShowRegistrationTab(true);
     setIsModalOpen(true);
-    
-    // 共通フックのダブルクリック処理も呼び出す（選択状態の更新のため）
-    commonHandleCellDoubleClick(equipmentId, slot, selectedDate);
-  }, [newIsResizing, newDragData, selectedDate, equipments, getTimeFromSlot, setSelectedCells, commonHandleCellDoubleClick]);
+  }, [newIsResizing, newDragData, selectedDate, equipments, getTimeFromSlot, commonHandleCellDoubleClick]);
 
   // スケール変更処理
   const handleScaleChange = useCallback((newScale: number) => {
@@ -934,7 +934,7 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
                         });
                         
                         e.stopPropagation();
-                        handleCellMouseDown(equipment.id, slot);
+                        handleCellMouseDown(equipment.id, slot, e);
                       }}
                     onMouseEnter={(e) => {
                       // リサイズ・移動中はセル選択を無効化
