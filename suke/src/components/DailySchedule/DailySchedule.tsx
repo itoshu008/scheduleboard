@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Employee, Schedule, Department, Equipment, SCHEDULE_COLORS } from '../../types';
 import { api } from '../../api';
+import { scheduleApi, equipmentApi } from '../../utils/api';
+
 import {
   toLocalISODateTime,
   parseLocalDateTimeString,
@@ -26,8 +28,8 @@ import EventBar from '../EventBar/EventBar';
 
 // 共通フック
 import { useScheduleCellSelection } from '../../hooks/useScheduleCellSelection';
-import { useScheduleDrag } from '../../hooks/useScheduleDrag';
-import { useScheduleDragResize } from '../../hooks/useScheduleDragResize';
+// 月別ビューのイベントバー処理ロジックを使用（勤怠アプリに影響を与えないよう、ScheduleBoard専用APIのみ使用）
+import { useMonthlyEventBarHandlers } from '../../hooks/useMonthlyEventBarHandlers';
 
 import './DailySchedule.css';
 import './DailyScheduleContainer.css';
@@ -42,6 +44,7 @@ interface DailyScheduleProps {
   onDateChange: (date: Date) => void;
   departments: Department[];
   employees: Employee[];
+  schedules?: Schedule[]; // 月別ビューと統一
   onDepartmentChange: (department: Department) => Promise<void>;
   onEmployeeChange: (employee: Employee) => void;
 }
@@ -61,11 +64,29 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
   onDateChange,
   departments,
   employees,
+  schedules: propSchedules,
   onDepartmentChange,
   onEmployeeChange
 }) => {
-  // 基本状態
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  // 基本状態（propsから受け取ったスケジュールを使用、なければ独自に管理）
+  const [localSchedules, setLocalSchedules] = useState<Schedule[]>([]);
+  
+  // propsから受け取ったスケジュールを優先的に使用（App.tsxでWebSocket管理）
+  // propSchedulesが提供されている場合はそれを使用、なければlocalSchedulesを使用
+  const schedules = useMemo(() => {
+    console.log('📊 DailySchedule: schedules useMemo triggered:', {
+      propSchedules: propSchedules !== undefined ? propSchedules.length : 'undefined',
+      localSchedules: localSchedules.length
+    });
+    
+    if (propSchedules !== undefined) {
+      console.log('✅ DailySchedule: Using propSchedules:', propSchedules.length);
+      return propSchedules || [];
+    }
+    console.log('⚠️ DailySchedule: Using localSchedules:', localSchedules.length);
+    return localSchedules;
+  }, [propSchedules, localSchedules]);
+  const setSchedules = propSchedules ? (() => {}) : setLocalSchedules;
   const [equipments, setEquipments] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -135,64 +156,8 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
     return filteredEmployees[newIndex].id;
   };
   
-  // 月別スケジュールから移植した完璧なドラッグ・リサイズ機能
-  const {
-    dragData: newDragData,
-    dragGhost: newDragGhost,
-    resizeData: newResizeData,
-    resizeGhost: newResizeGhost,
-    isResizing: newIsResizing,
-    mousePosition: newMousePosition,
-    handleScheduleMouseDown: newHandleScheduleMouseDown,
-    handleResizeMouseDown: newHandleResizeMouseDown
-  } = useScheduleDragResize({
-    scaledCellWidth: CELL_WIDTH_PX * scheduleScale,
-    scaledRowHeight: 40 * scheduleScale, // 日別は社員間移動可能
-    onUpdateSchedule: async (scheduleId: number, updateData: any) => {
-      await api.put(`/schedules/${scheduleId}`, updateData);
-    },
-    onReloadSchedules: async () => {
-      await loadSchedules();
-    },
-    employees: filteredEmployees, // フィルタされた社員リスト
-    getEmployeeIdFromDelta // 外部で定義した関数を渡す
-  });
-
-  // ドラッグ機能の共通フック（既存、後で削除予定）
-  const {
-    isDragging,
-    dragData,
-    dragGhost,
-    mousePosition,
-    setDragData,
-    setDragGhost,
-    setMousePosition,
-    handleScheduleMouseDown: commonHandleScheduleMouseDown,
-    handleMouseMove: commonHandleMouseMove,
-    handleMouseUp: commonHandleMouseUp,
-    clearDrag
-  } = useScheduleDrag();
-
-  // リサイズ機能（既存のまま）
-  const [resizeData, setResizeData] = useState<{
-    schedule: Schedule;
-    edge: 'start' | 'end';
-    startX: number;
-    originalStart: Date;
-    originalEnd: Date;
-    initialPosition: { x: number; y: number };
-  } | null>(null);
-  
-  const [resizeGhost, setResizeGhost] = useState<{
-    schedule: Schedule;
-    edge: 'start' | 'end';
-    newStart: Date;
-    newEnd: Date;
-    position: { x: number; y: number };
-  } | null>(null);
-  const [pendingOperation, setPendingOperation] = useState<{ type: 'drag' | 'resize'; timeoutId: NodeJS.Timeout } | null>(null);
-  
-  const [isResizing, setIsResizing] = useState(false);
+  // 月別ビューのイベントバー処理ロジックを使用（勤怠アプリに影響を与えないよう、ScheduleBoard専用APIのみ使用）
+  // 注意: loadSchedulesを先に定義してからreloadSchedulesを定義する必要がある
   const [isPanning, setIsPanning] = useState(false);
   const [containerMarginTop, setContainerMarginTop] = useState<number>(0);
   
@@ -241,25 +206,96 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
     return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
   }, []);
 
-  // スケジュール読み込み
+  // スケジュール読み込み（propsから受け取ったスケジュールがない場合のみ）
   const loadSchedules = useCallback(async () => {
+    if (propSchedules) {
+      // propsから受け取ったスケジュールを使用（WebSocketで更新される）
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get('/schedules', { params: { date: formatDate(selectedDate), scope: 'all' } });
-      setSchedules(markOverlappingSchedules(Array.isArray(response.data) ? response.data : []));
+      const response = await scheduleApi.getDailyAll(formatDate(selectedDate));
+      setLocalSchedules(markOverlappingSchedules(Array.isArray(response.data) ? response.data : []));
     } catch (err) {
       console.error('スケジュール読み込みエラー:', err);
       setError('スケジュールの読み込みに失敗しました。');
     } finally {
       setLoading(false);
     }
+  }, [selectedDate, propSchedules]);
+
+  // reloadSchedulesをloadSchedulesの後に定義（初期化順序の問題を回避）
+  // propSchedulesが存在する場合でも、強制的にAPIから再読み込みして確実に更新を反映
+  const reloadSchedules = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await scheduleApi.getDailyAll(formatDate(selectedDate));
+      const updatedSchedules = markOverlappingSchedules(Array.isArray(response.data) ? response.data : []);
+      setLocalSchedules(updatedSchedules);
+      console.log('✅ スケジュール再読み込み完了:', updatedSchedules.length, '件');
+    } catch (err) {
+      console.error('スケジュール再読み込みエラー:', err);
+      setError('スケジュールの再読み込みに失敗しました。');
+    } finally {
+      setLoading(false);
+    }
   }, [selectedDate]);
 
-  // 設備データ読み込み
+  // 月別ビューのイベントバー処理ロジックを使用
+  const {
+    interactionState,
+    setInteractionState,
+    isResizing,
+    mousePosition,
+    handleScheduleMouseDown,
+    handleResizeMouseDown,
+    updateSchedulePosition
+  } = useMonthlyEventBarHandlers({
+    scaledCellWidth: CELL_WIDTH_PX * scheduleScale,
+    scaledRowHeight: 40 * scheduleScale, // 日別は社員間移動可能
+    reloadSchedules,
+    setSelectedSchedule,
+    setSelectedCells,
+    getEmployeeIdFromDelta, // 社員間移動をサポート
+    enableVerticalMovement: true // 縦方向移動を有効化（社員間移動）
+  });
+
+  // 月別ビューのロジックと互換性を保つため、既存の変数名をエイリアス
+  const dragData = interactionState.dragData;
+  const dragGhost = interactionState.dragGhost;
+  const resizeData = interactionState.resizeData;
+  const resizeGhost = interactionState.resizeGhost;
+
+  // セル選択（直接実装）- useMonthlyEventBarHandlersの後に定義（interactionStateにアクセスするため）
+  const handleCellMouseDown = useCallback((employeeId: number, slot: number) => {
+    if (interactionState.dragData) return; // ドラッグ中は選択無効（月別ビューのロジックと統一）
+
+    const cellId = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}-${employeeId}-${slot}`;
+    console.log('🔍 DailySchedule: handleCellMouseDown', { 
+      employeeId, 
+      slot, 
+      cellId, 
+      selectedDate,
+      selectedDateString: selectedDate.toDateString(),
+      selectedDateLocal: toLocalISODateTime(selectedDate),
+      year: selectedDate.getFullYear(),
+      month: selectedDate.getMonth() + 1,
+      day: selectedDate.getDate()
+    });
+
+    // スケジュール選択をクリア
+    setSelectedSchedule(null);
+
+    // セル選択開始
+    setSelectedCells(new Set([cellId]));
+    setIsSelecting(true);
+    setSelectionAnchor({ employeeId, slot });
+  }, [interactionState.dragData, selectedDate, setSelectedSchedule, setSelectedCells, setIsSelecting, setSelectionAnchor]);
   const loadEquipments = useCallback(async () => {
     try {
-      const response = await api.get('/equipment');
+      const response = await equipmentApi.getAll();
       setEquipments(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       console.error('設備データ読み込みエラー:', err);
@@ -283,7 +319,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
         end_datetime: new Date(scheduleData.end_datetime!),
         color: toApiColor(scheduleData.color),
       };
-      await api.put(`/schedules/${selectedSchedule.id}`, updateData);
+      await scheduleApi.update(selectedSchedule.id, updateData);
       await loadSchedules();
       setShowScheduleForm(false);
       setSelectedSchedule(null);
@@ -298,7 +334,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
   // スケジュール削除
   const handleScheduleDelete = useCallback(async (scheduleId: number) => {
     try {
-      await api.delete(`/schedules/${scheduleId}`);
+      await scheduleApi.delete(scheduleId);
       await loadSchedules();
       setShowScheduleAction(false);
       setSelectedSchedule(null);
@@ -331,7 +367,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
         color: toApiColor(scheduleData.color),
       };
       
-      await api.post('/schedules', processedData);
+      await scheduleApi.create(processedData);
       await loadSchedules();
       setShowRegistrationTab(false);
       // 保存成功後にだけ選択をクリア
@@ -511,31 +547,6 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
     };
   }, [selectedCells, employees]);
 
-  // セル選択（直接実装）
-  const handleCellMouseDown = useCallback((employeeId: number, slot: number) => {
-    if (isDragging) return; // ドラッグ中は選択無効
-
-    const cellId = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}-${employeeId}-${slot}`;
-    console.log('🔍 DailySchedule: handleCellMouseDown', { 
-      employeeId, 
-      slot, 
-      cellId, 
-      selectedDate,
-      selectedDateString: selectedDate.toDateString(),
-      selectedDateLocal: toLocalISODateTime(selectedDate),
-      year: selectedDate.getFullYear(),
-      month: selectedDate.getMonth() + 1,
-      day: selectedDate.getDate()
-    });
-
-    // スケジュール選択をクリア
-    setSelectedSchedule(null);
-
-    // セル選択開始
-    setSelectedCells(new Set([cellId]));
-    setIsSelecting(true);
-    setSelectionAnchor({ employeeId, slot });
-  }, [isDragging, selectedDate, setSelectedSchedule, setSelectedCells, setIsSelecting, setSelectionAnchor]);
 
   const handleCellMouseEnter = useCallback((employeeId: number, slot: number) => {
     if (!isSelecting || !selectionAnchor) return;
@@ -648,32 +659,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
     setContextMenuTarget({ id: schedule.id, type: 'schedule' });
   }, []);
 
-  // リサイズ開始（月別から移植）
-  const handleResizeMouseDown = (schedule: Schedule, edge: 'start' | 'end', e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    // リサイズ開始時にセル選択をクリア
-    setSelectedCells(new Set());
-    setIsSelecting(false);
-    
-    const originalStart = new Date(schedule.start_datetime);
-    const originalEnd = new Date(schedule.end_datetime);
-    
-    // シンプルなリサイズ開始
-    setResizeData({
-      schedule,
-      edge,
-      startX: e.clientX,
-      originalStart,
-      originalEnd,
-      initialPosition: { x: e.clientX, y: e.clientY }
-    });
-    
-    setIsResizing(true);
-  };
-
-  // スケジュールマウスダウン（月別から移植）
+  // リサイズ開始は月別ビューのロジック（useMonthlyEventBarHandlers）から提供されるhandleResizeMouseDownを使用
 
   // スケジュールペースト（月別から完全移植）
   const handleSchedulePaste = useCallback(async () => {
@@ -707,7 +693,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
         color: toApiColor(clipboard.color)
       };
       
-      await api.post('/schedules', newSchedule);
+      await scheduleApi.create(newSchedule);
       await loadSchedules();
     } catch (error) {
       console.error('スケジュールペーストエラー:', error);
@@ -716,121 +702,24 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
     handleContextMenuClose();
   }, [clipboard, selectedDepartment, selectedDate, selectedCells, loadSchedules]);
 
-  const handleScheduleMouseDown = (schedule: Schedule, e: React.MouseEvent) => {
-    if ((e as any).button === 2) return; // 右クリック時は選択/ドラッグを無効化（右クリックスクロール用）
-    const target = e.target as HTMLElement;
-    
-    // リサイズハンドル上ではドラッグ操作を無効
-    if (target && target.classList && target.classList.contains('resize-handle')) {
-      return;
-    }
-    
-    // リサイズ中はドラッグ操作を無効
-    if (isResizing || resizeData) {
-      return;
-    }
-    
-    // 背景クリックでの選択解除を防ぐ
-    e.stopPropagation();
-    
-    // 即座に選択状態を設定
-    setSelectedSchedule(schedule);
-    
-    // セル選択状態をクリア（スケジュール選択のみ）
-    setSelectedCells(new Set());
-    setIsSelecting(false);
-    setSelectionAnchor(null);
-    
-    // ドラッグ開始の閾値
-    const DRAG_THRESHOLD = 5;
-    
-    // イベントバーの中央を基準点として計算
-    const scheduleElement = e.target as HTMLElement;
-    const rect = scheduleElement.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    
-    const startX = centerX; // イベントバーの中央X座標
-    const startY = centerY; // イベントバーの中央Y座標
-    let dragInitiated = false;
-    
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (dragInitiated) return;
-      
-      const deltaX = Math.abs(moveEvent.clientX - startX);
-      const deltaY = Math.abs(moveEvent.clientY - startY);
-      
-      // 閾値を超えたらドラッグ開始
-      if (deltaX > DRAG_THRESHOLD || deltaY > DRAG_THRESHOLD) {
-        dragInitiated = true;
-        
-        // ドラッグ開始時にセル選択をクリア
-        setSelectedCells(new Set());
-        setIsSelecting(false);
-        
-        const originalStart = new Date(schedule.start_datetime);
-        const originalEnd = new Date(schedule.end_datetime);
-        
-        setDragData({
-          schedule,
-          startX: centerX, // イベントバーの中央X座標を基準に
-          startY: centerY, // イベントバーの中央Y座標を基準に
-          originalStart,
-          originalEnd
-        });
-        
-        // イベントバーの中央を基準にした初期ゴースト表示
-        const scheduleWidth = (getEndTimeSlot(originalEnd) - getTimeSlot(originalStart)) * 20;
-        
-        // イベントバーの中央位置を計算（既にcenterX, centerYが中央座標）
-        const initialGhostX = centerX - (scheduleWidth / 2);
-        const initialGhostY = centerY - 20; // イベントバーの高さ(40px)の半分
-        
-        setDragGhost({
-          schedule,
-          start: originalStart,
-          end: originalEnd
-        });
-        
-        // 初期マウス位置をイベントバーの中央に設定
-        setMousePosition({ x: initialGhostX, y: initialGhostY });
-        
-        // 共通フックのマウス移動処理を使用
-        commonHandleMouseMove(moveEvent, employees, selectedDate, 'daily');
-        
-        // クリーンアップ
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      }
-    };
-    
-    const handleMouseUp = async () => {
-      // クリーンアップ
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      
-      if (dragInitiated) {
-        // 共通フックのマウスアップ処理を使用
-        await commonHandleMouseUp(async (scheduleId, updateData) => {
-          await api.put(`/schedules/${scheduleId}`, updateData);
-          await loadSchedules();
-        });
-      } else {
-        // console.log('Daily - Click completed for schedule:', schedule.id);
-      }
-    };
-    
-    // イベントリスナー登録
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
+  // 月別ビューのロジックを使用（handleScheduleMouseDownはuseMonthlyEventBarHandlersから提供される）
 
 
-  // データ読み込み
+  // データ読み込み（propsから受け取ったスケジュールがない場合のみ）
   useEffect(() => {
-    loadSchedules();
+    if (!propSchedules) {
+      loadSchedules();
+    }
     loadEquipments();
-  }, [loadSchedules, loadEquipments]);
+  }, [loadSchedules, loadEquipments, propSchedules]);
+
+  // propsから受け取ったスケジュールを反映（即座に更新）
+  useEffect(() => {
+    if (propSchedules !== undefined) {
+      // propSchedulesが提供されている場合は、空配列でも反映
+      setLocalSchedules(markOverlappingSchedules(propSchedules || []));
+    }
+  }, [propSchedules]);
 
   // 部署の初期選択
   useEffect(() => {
@@ -848,276 +737,24 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
         handleScheduleCopy(selectedSchedule);
       } else if (e.ctrlKey && e.key === 'v' && clipboard) {
         handleSchedulePaste();
-      } else if (e.key === 'Escape' && pendingOperation) {
-        // ESCキーで遅延中の操作をキャンセル
-        clearTimeout(pendingOperation.timeoutId);
-        setPendingOperation(null);
-        
-        if (pendingOperation.type === 'drag') {
-          setDragData(null);
-          setDragGhost(null);
-          setMousePosition(null);
-        } else if (pendingOperation.type === 'resize') {
-          setResizeData(null);
-          setResizeGhost(null);
-        }
+      } else if (e.key === 'Escape' && (interactionState.dragData || interactionState.resizeData)) {
+        // ESCキーでドラッグ・リサイズ操作をキャンセル（月別ビューのロジックと統一）
+        setInteractionState({
+          ...interactionState,
+          dragData: null,
+          dragGhost: null,
+          resizeData: null,
+          resizeGhost: null
+        });
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedSchedule, clipboard, pendingOperation]);
+  }, [selectedSchedule, clipboard, interactionState, setInteractionState]);
 
-  // マウス移動処理（月別から移植・日別用に調整）
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      // 前のアニメーションフレームをキャンセル
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      
-      // 新しいアニメーションフレームをスケジュール
-      animationFrameRef.current = requestAnimationFrame(() => {
-        if (dragData && isDragging && !isResizing) {
-          console.log('🎯 DRAG_START - マウス移動検出');
-          
-          // ドラッグ処理（時間軸と社員軸の両方対応）
-          const deltaX = e.clientX - dragData.startX;
-          const deltaY = e.clientY - dragData.startY;
-          
-          // 時間軸の移動計算
-          const cellWidth = 20; // CELL_WIDTH_PX
-          const timeSlots = Math.round(deltaX / cellWidth);
-          
-          // 社員軸の移動計算
-          const rowHeight = 40; // 社員行の高さ
-          const employeeRows = Math.round(deltaY / rowHeight);
-          
-          // 新しい時間を計算
-          const newStart = new Date(dragData.originalStart);
-          newStart.setMinutes(newStart.getMinutes() + timeSlots * 15);
-          
-          const newEnd = new Date(dragData.originalEnd);
-          newEnd.setMinutes(newEnd.getMinutes() + timeSlots * 15);
-          
-          // 日付境界チェック（簡略化）
-          const dayStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0);
-          const dayEnd = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 23, 59, 59);
-          
-          let ghostStart = newStart;
-          let ghostEnd = newEnd;
-          const durationMs = dragData.originalEnd.getTime() - dragData.originalStart.getTime();
-          
-          if (ghostStart < dayStart) {
-            ghostStart = new Date(dayStart);
-            ghostEnd = new Date(ghostStart.getTime() + durationMs);
-          }
-          if (ghostEnd > dayEnd) {
-            ghostEnd = new Date(dayEnd);
-            ghostStart = new Date(ghostEnd.getTime() - durationMs);
-          }
-          
-          // 新しい社員を計算
-          const originalEmployee = employees.find(emp => emp.id === dragData.schedule.employee_id);
-          
-          let newEmployeeId = dragData.schedule.employee_id;
-          if (originalEmployee) {
-            const originalIndex = filteredEmployees.findIndex(emp => emp.id === originalEmployee.id);
-            const newIndex = Math.max(0, Math.min(filteredEmployees.length - 1, originalIndex + employeeRows));
-            newEmployeeId = filteredEmployees[newIndex].id;
-          }
-          
-          setDragGhost({
-            schedule: {
-              ...dragData.schedule,
-              employee_id: newEmployeeId
-            },
-            start: ghostStart,
-            end: ghostEnd
-          });
-          
-          // マウス位置を更新（イベントバーの中央基準）
-          const scheduleWidth = (getEndTimeSlot(ghostEnd) - getTimeSlot(ghostStart)) * 20;
-          const centerX = e.clientX - (scheduleWidth / 2);
-          const centerY = e.clientY - 20; // イベントバーの高さ(40px)の半分
-          setMousePosition({ x: centerX, y: centerY });
-          
-          console.log('🎯 DRAG_UPDATE:', {
-            deltaX,
-            deltaY,
-            timeSlots,
-            employeeRows,
-            originalEmployeeId: dragData.schedule.employee_id,
-            newEmployeeId,
-            newStart: toLocalISODateTime(ghostStart),
-            newEnd: toLocalISODateTime(ghostEnd)
-          });
-          
-        } else if (resizeData && isResizing && !isDragging) {
-          console.log('🔧 RESIZE_START - マウス移動検出');
-          
-          // 簡単で直感的なリサイズ処理
-          const deltaX = e.clientX - resizeData.startX;
-          const cellWidth = 20; // CELL_WIDTH_PX
-          const timeSlots = Math.round(deltaX / cellWidth);
-          
-          let newStart = new Date(resizeData.originalStart);
-          let newEnd = new Date(resizeData.originalEnd);
-          
-          if (resizeData.edge === 'start') {
-            newStart.setMinutes(newStart.getMinutes() + timeSlots * 15);
-            // 開始時刻が終了時刻を超えないように制限
-            if (newStart >= newEnd) {
-              newStart = new Date(newEnd.getTime() - 15 * 60 * 1000); // 15分前
-            }
-          } else {
-            newEnd.setMinutes(newEnd.getMinutes() + timeSlots * 15);
-            // 終了時刻が開始時刻より前にならないように制限
-            if (newEnd <= newStart) {
-              newEnd = new Date(newStart.getTime() + 15 * 60 * 1000); // 15分後
-            }
-          }
-          
-          // 即座にスケジュールを更新（リアルタイムプレビュー）
-          const updatedSchedules = (schedules ?? []).map(schedule => {
-            if (schedule.id === resizeData.schedule.id) {
-              return {
-                ...schedule,
-                start_datetime: toLocalISODateTime(newStart),
-                end_datetime: toLocalISODateTime(newEnd)
-              } as Schedule;
-            }
-            return schedule;
-          });
-          
-          setSchedules(updatedSchedules);
-          
-          console.log('🔧 RESIZE_REALTIME_UPDATE:', {
-            scheduleId: resizeData.schedule.id,
-            edge: resizeData.edge,
-            newStart: toLocalISODateTime(newStart),
-            newEnd: toLocalISODateTime(newEnd),
-            deltaX,
-            timeSlots
-          });
-        }
-      });
-    };
-
-    const handleMouseUp = async () => {
-      if (dragData && isDragging) {
-        console.log('🎯 DRAG_MOUSEUP - ドラッグ完了処理開始');
-        
-        if (!dragGhost) {
-          console.log('⚠️ DRAG_MOUSEUP - ゴーストなし、クリーンアップのみ');
-          setDragData(null);
-          // setIsDragging は共通フックで管理されるため削除
-          setDragGhost(null);
-          setMousePosition(null);
-          document.body.classList.remove('dragging');
-          return;
-        }
-
-        console.log('✅ DRAG_MOUSEUP - ドラッグ実行:', {
-          scheduleId: dragData.schedule.id,
-          originalEmployeeId: dragData.schedule.employee_id,
-          newEmployeeId: dragGhost.schedule.employee_id,
-          newStart: toLocalISODateTime(dragGhost.start),
-          newEnd: toLocalISODateTime(dragGhost.end)
-        });
-
-        // 300ms遅延でドラッグ実行
-        const timeoutId = setTimeout(async () => {
-          const newStart = new Date(dragGhost.start);
-          const newEnd = new Date(dragGhost.end);
-          
-          try {
-            await api.put(`/schedules/${dragData.schedule.id}`, {
-              employee_id: dragGhost.schedule.employee_id, // 新しい社員IDを使用
-              title: dragData.schedule.title,
-              color: toApiColor(dragData.schedule.color),
-              start_datetime: newStart,
-              end_datetime: newEnd
-            });
-            
-            await loadSchedules();
-          } catch (err) {
-            console.error('スケジュール移動エラー:', err);
-            alert('スケジュールの移動に失敗しました。');
-          } finally {
-            setDragData(null);
-            // setIsDragging は共通フックで管理されるため削除
-            setDragGhost(null);
-            setMousePosition(null);
-            document.body.classList.remove('dragging');
-            setPendingOperation(null);
-          }
-        }, 300);
-        
-        setPendingOperation({ type: 'drag', timeoutId });
-        
-        // 即座にドラッグ状態とゴーストを解除
-        // setIsDragging は共通フックで管理されるため削除
-        setDragGhost(null);
-        setMousePosition(null);
-        document.body.classList.remove('dragging');
-        
-      } else if (resizeData && isResizing) {
-        console.log('🔧 RESIZE_MOUSEUP - リサイズ完了処理開始');
-        
-        // 現在のスケジュール状態を取得
-        const currentSchedule = schedules.find(s => s.id === resizeData.schedule.id);
-        if (!currentSchedule) {
-          console.log('⚠️ RESIZE_MOUSEUP - スケジュールが見つからない');
-          setResizeData(null);
-          setIsResizing(false);
-          return;
-        }
-
-        console.log('✅ RESIZE_MOUSEUP - リサイズ保存:', {
-          scheduleId: resizeData.schedule.id,
-          newStart: currentSchedule.start_datetime,
-          newEnd: currentSchedule.end_datetime
-        });
-
-        // 即座にAPIに保存
-        try {
-          await api.put(`/schedules/${resizeData.schedule.id}`, {
-            employee_id: resizeData.schedule.employee_id,
-            title: resizeData.schedule.title,
-            color: toApiColor(resizeData.schedule.color),
-            start_datetime: new Date(currentSchedule.start_datetime),
-            end_datetime: new Date(currentSchedule.end_datetime)
-          });
-          
-          console.log('✅ RESIZE_API_SUCCESS - 保存完了');
-          // リロードは不要（既に更新済み）
-        } catch (err) {
-          console.error('❌ RESIZE_API_ERROR:', err);
-          alert('スケジュールのリサイズに失敗しました。');
-          // エラー時は元の状態に戻す
-          await loadSchedules();
-        } finally {
-          setResizeData(null);
-          setIsResizing(false);
-        }
-      }
-    };
-
-    if (isDragging || isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        // アニメーションフレームをクリーンアップ
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-        }
-      };
-    }
-  }, [dragData, isDragging, dragGhost, resizeData, isResizing, resizeGhost, selectedDate, loadSchedules]);
+  // マウス移動処理は月別ビューのロジック（useMonthlyEventBarHandlers）で管理されるため削除
+  // 日別ビュー特有の社員間移動機能は後で追加予定
 
   // スケール計算
   const scaledCellWidth = CELL_WIDTH_PX * scheduleScale;
@@ -1125,10 +762,18 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
   const scaledColWidth = 240 * scheduleScale;
 
   // 日別用のデータフィルタリング（選択日のスケジュールのみ）
-  const dailySchedules = schedules.filter(schedule => {
-    const scheduleDate = new Date(schedule.start_datetime);
-    return scheduleDate.toDateString() === selectedDate.toDateString();
-  });
+  // 重複チェックを使用（スケジュールが選択日と重複しているか）
+  const dailySchedules = useMemo(() => {
+    const dayStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0);
+    const dayEnd = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 23, 59, 59);
+    
+    return schedules.filter(schedule => {
+      const startTime = new Date(schedule.start_datetime);
+      const endTime = new Date(schedule.end_datetime);
+      // スケジュールが選択日と重複しているかチェック
+      return startTime <= dayEnd && endTime >= dayStart;
+    });
+  }, [schedules, selectedDate]);
 
   if (loading) {
     return (
@@ -1174,10 +819,10 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
             
             {/* ナビゲーションボタン */}
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button className="nav-btn" onClick={() => (window.location.href = '/monthly')}>月別</button>
-              <button className="nav-btn active" onClick={() => (window.location.href = '/daily')}>日別</button>
-              <button className="nav-btn" onClick={() => (window.location.href = '/all-employees')}>全社員</button>
-              <button className="nav-btn" onClick={() => (window.location.href = '/equipment')}>設備</button>
+              <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/monthly')}>月別</button>
+              <button className="nav-btn active" onClick={() => (window.location.href = '/scheduleboard/daily')}>日別</button>
+              <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/all-employees')}>全社員</button>
+              <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/equipment')}>設備</button>
             </div>
           </div>
           <div className="nav-btn-right">
@@ -1301,14 +946,14 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
         /* Excel風スケジュールコンテナ（月別と同じ構造） */
         <div className="excel-schedule-container" style={{
           width: '100%',
-          maxWidth: '98vw',
+          maxWidth: '100vw',
           height: 'calc(100vh - 180px)',
-                overflow: 'auto',
+          overflow: 'auto',
           border: '1px solid #ccc',
           backgroundColor: '#fff',
           position: 'relative',
           boxSizing: 'border-box',
-          margin: '0 auto'
+          margin: 0
         }}>
           {/* Excel風スケジュールテーブル（月別参照） */}
           <div 
@@ -1608,9 +1253,9 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                         let startTime = new Date(schedule.start_datetime);
                         let endTime = new Date(schedule.end_datetime);
                         
-                        if (newIsResizing && newResizeGhost && newResizeGhost.schedule.id === schedule.id) {
-                          startTime = newResizeGhost.newStart;
-                          endTime = newResizeGhost.newEnd;
+                        if (isResizing && resizeGhost && resizeGhost.schedule.id === schedule.id) {
+                          startTime = resizeGhost.newStart;
+                          endTime = resizeGhost.newEnd;
                         }
                         
                         const startSlot = getTimeSlot(startTime);
@@ -1636,8 +1281,8 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                             key={`row-item-${schedule.id}`}
                             className={`schedule-item ${selectedSchedule?.id === schedule.id ? 'selected' : ''}`}
                             style={{
-                              background: `linear-gradient(180deg, ${lightenColor(safeHexColor(schedule.color), 25)} 0%, ${safeHexColor(schedule.color)} 100%)`,
-                              border: `1px solid ${lightenColor(safeHexColor(schedule.color), -10)}`,
+                              background: `linear-gradient(180deg, ${lightenColor(safeHexColor(schedule.color || '#3498db'), 0.15)} 0%, ${safeHexColor(schedule.color || '#3498db')} 100%)`,
+                              border: `1px solid ${lightenColor(safeHexColor(schedule.color || '#3498db'), -0.10)}`,
                               width: `${width}px`,
                               left: `${left}px`, // 直接leftを使用
                               position: 'absolute',
@@ -1656,7 +1301,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                               console.log('🎯 イベントバー クリック:', schedule.id, schedule.title);
                               
                               // リサイズ中は選択を無効化
-                              if (newIsResizing || newResizeData) {
+                              if (isResizing || resizeData) {
                                 console.log('🚫 リサイズ中のため選択を無効化');
                                 return;
                               }
@@ -1664,7 +1309,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                               e.preventDefault();
                               e.stopPropagation();
                               setSelectedSchedule(schedule);
-                              newHandleScheduleMouseDown(schedule, e);
+                              handleScheduleMouseDown(schedule, e);
                             }}
                             onDoubleClick={(e) => {
                               e.preventDefault();
@@ -1705,7 +1350,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                                 console.log('🔧 左リサイズハンドル クリック:', schedule.id);
                                 e.preventDefault();
                                 e.stopPropagation();
-                                newHandleResizeMouseDown(schedule, 'start', e);
+                                handleResizeMouseDown(schedule, 'start', e);
                               }}
                               style={{ 
                                 position: 'absolute', 
@@ -1737,7 +1382,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                                 console.log('🔧 右リサイズハンドル クリック:', schedule.id);
                                 e.preventDefault();
                                 e.stopPropagation();
-                                newHandleResizeMouseDown(schedule, 'end', e);
+                                handleResizeMouseDown(schedule, 'end', e);
                               }}
                               style={{ 
                                 position: 'absolute', 
@@ -1811,62 +1456,98 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
             gridContainerRef={tableContainerRef}
           />
 
-          {/* ドラッグゴースト（月別から移植） */}
-          {dragGhost && mousePosition && (
-            <div
-              className="drag-ghost"
-              style={{
-                position: 'fixed',
-                width: `${(getEndTimeSlot(dragGhost.end) - getTimeSlot(dragGhost.start)) * 20}px`,
-                height: '40px',
-                backgroundColor: safeHexColor(dragGhost.schedule.color),
-                border: '2px dashed rgba(255, 255, 255, 0.8)',
-                borderRadius: '4px',
-                pointerEvents: 'none',
-                zIndex: 1000,
-                opacity: 0.7,
-                left: `${mousePosition.x}px`,
-                top: `${mousePosition.y}px`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: '11px',
-                fontWeight: 'bold',
-                boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)'
-              }}
-              title={(() => {
-                const targetEmployee = employees.find(emp => emp.id === dragGhost.schedule.employee_id);
-                return `${dragGhost.schedule.title}\n${targetEmployee?.name || '不明な社員'}\n${formatTime(dragGhost.start)} - ${formatTime(dragGhost.end)}`;
-              })()}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', textAlign: 'center' }}>
-                <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>
-                  📅 {dragGhost.schedule.title || '無題'}
+          {/* ドラッグゴースト（カーソル位置にイベントバーの中心が来るように調整） */}
+          {interactionState.dragGhost && interactionState.dragData && (() => {
+            // 月別ビューのロジックに合わせてゴースト表示を計算
+            const originalStart = new Date(interactionState.dragData.schedule.start_datetime);
+            const originalEnd = new Date(interactionState.dragData.schedule.end_datetime);
+            const originalDuration = originalEnd.getTime() - originalStart.getTime();
+            
+            // 新しい開始・終了時刻を計算
+            const { hour, minute } = getTimeFromSlot(interactionState.dragGhost.newSlot);
+            const newStart = new Date(
+              interactionState.dragGhost.newDate.getFullYear(),
+              interactionState.dragGhost.newDate.getMonth(),
+              interactionState.dragGhost.newDate.getDate(),
+              hour,
+              minute
+            );
+            const newEnd = new Date(newStart.getTime() + originalDuration);
+            
+            const startSlot = getTimeSlot(newStart);
+            const endSlot = getEndTimeSlot(newEnd);
+            const width = (endSlot - startSlot) * scaledCellWidth;
+            
+            // 社員IDを取得（社員間移動を考慮）
+            const targetEmployeeId = interactionState.dragGhost.newEmployeeId || interactionState.dragData.schedule.employee_id;
+            const targetEmployeeIndex = filteredEmployees.findIndex(emp => emp.id === targetEmployeeId);
+            
+            // 日付が選択日と同じで、社員が表示範囲内にある場合のみ表示
+            const targetDate = interactionState.dragGhost.newDate;
+            const isSameDate = targetDate.getFullYear() === selectedDate.getFullYear() &&
+                              targetDate.getMonth() === selectedDate.getMonth() &&
+                              targetDate.getDate() === selectedDate.getDate();
+            
+            if (!isSameDate || targetEmployeeIndex === -1) {
+              return null;
+            }
+            
+            // カーソル位置にイベントバーの中心が来るように計算
+            // グリッドコンテナの位置を取得
+            const container = tableContainerRef.current;
+            if (!container) return null;
+            
+            const containerRect = container.getBoundingClientRect();
+            const scrollLeft = container.scrollLeft || 0;
+            const scrollTop = container.scrollTop || 0;
+            
+            // カーソル位置（イベントバー中心）からグリッドコンテナ内の相対位置を計算
+            const centerX = interactionState.dragGhost.centerX || (interactionState.dragGhost.deltaX + interactionState.dragData.startX);
+            const centerY = interactionState.dragGhost.centerY || (interactionState.dragGhost.deltaY + interactionState.dragData.startY);
+            
+            // グリッドコンテナ内の相対位置
+            const relativeX = centerX - containerRect.left + scrollLeft;
+            const relativeY = centerY - containerRect.top + scrollTop;
+            
+            // イベントバーの中心位置を基準にleftとtopを計算
+            const actualLeft = relativeX - width / 2; // イベントバーの中心がカーソル位置に来るように
+            const actualTop = relativeY - 18; // イベントバーの高さ(36px)の半分
+            return (
+              <div
+                className="drag-ghost"
+                style={{
+                  position: 'absolute',
+                  width: `${width}px`,
+                  height: '36px', // 実際のイベントバーの高さと同じ
+                  backgroundColor: safeHexColor(interactionState.dragGhost.schedule.color || '#3498db'),
+                  border: '2px dashed rgba(255, 255, 255, 0.8)',
+                  borderRadius: '4px',
+                  pointerEvents: 'none',
+                  zIndex: 1000,
+                  opacity: 0.7,
+                  left: `${actualLeft}px`, // カーソル位置にイベントバーの中心が来るように計算
+                  top: `${actualTop}px`, // カーソル位置にイベントバーの中心が来るように計算
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)'
+                }}
+                title={`${interactionState.dragGhost.schedule.title}\n${formatTime(newStart)} - ${formatTime(newEnd)}`}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', textAlign: 'center' }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>
+                    {interactionState.dragGhost.schedule.title || '無題'}
+                  </div>
+                  <div style={{ fontSize: '9px', opacity: 0.9 }}>
+                    {formatTime(newStart)} - {formatTime(newEnd)}
+                  </div>
                 </div>
-                <div style={{ fontSize: '9px', opacity: 0.9 }}>
-                  {(() => {
-                    const targetEmployee = employees.find(emp => emp.id === dragGhost.schedule.employee_id);
-                    return `${targetEmployee?.name || '不明'} | ${formatTime(dragGhost.start)} - ${formatTime(dragGhost.end)}`;
-                  })()}
-                </div>
-                {(() => {
-                  const originalEmployee = employees.find(emp => emp.id === dragData?.schedule.employee_id);
-                  const targetEmployee = employees.find(emp => emp.id === dragGhost.schedule.employee_id);
-                  if (originalEmployee?.id !== targetEmployee?.id) {
-                    return (
-                      <div style={{ fontSize: '8px', opacity: 0.8, color: '#ffeb3b' }}>
-                        {originalEmployee?.name} → {targetEmployee?.name}
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
               </div>
-            </div>
-          )}
-
-          {/* リサイズ中は実際のイベントバーがリアルタイム更新される */}
+            );
+          })()}
         </div>
       )}
 
@@ -1998,63 +1679,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
         onClose={handleContextMenuClose}
       />
 
-      {/* ドラッグゴースト - マウスカーソルに追従 */}
-      {newDragData && newDragGhost && newMousePosition && (
-        <div
-          style={{
-            position: 'fixed',
-            left: `${newMousePosition.x - 50}px`, // マウスの少し左に表示
-            top: `${newMousePosition.y - 18}px`, // マウスの少し上に表示
-            width: `${(() => {
-              const originalStart = new Date(newDragData.schedule.start_datetime);
-              const originalEnd = new Date(newDragData.schedule.end_datetime);
-              const originalDuration = originalEnd.getTime() - originalStart.getTime();
-              const durationInSlots = Math.ceil(originalDuration / (15 * 60 * 1000)); // 15分単位
-              return durationInSlots * CELL_WIDTH_PX * scheduleScale;
-            })()}px`,
-            height: '36px',
-            background: `linear-gradient(180deg, ${lightenColor(safeHexColor(newDragData.schedule.color), 25)} 0%, ${safeHexColor(newDragData.schedule.color)} 100%)`,
-            border: `2px solid ${lightenColor(safeHexColor(newDragData.schedule.color), -10)}`,
-            borderRadius: '4px',
-            padding: '2px 4px',
-            fontSize: '11px',
-            color: 'white',
-            overflow: 'hidden',
-            pointerEvents: 'none',
-            zIndex: 100000,
-            opacity: 0.8,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            textAlign: 'center',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
-          }}
-        >
-          <div style={{ fontWeight: 700, color: 'white' }}>{newDragData.schedule.title || '無題'}</div>
-          <div style={{ fontSize: 10, opacity: 0.9, color: 'white' }}>
-            {(() => {
-              const { hour, minute } = getTimeFromSlot(newDragGhost.newSlot);
-              const originalStart = new Date(newDragData.schedule.start_datetime);
-              const originalEnd = new Date(newDragData.schedule.end_datetime);
-              const originalDuration = originalEnd.getTime() - originalStart.getTime();
-              const newStart = new Date(originalStart);
-              newStart.setHours(hour, minute, 0, 0);
-              const newEnd = new Date(newStart.getTime() + originalDuration);
-              return `${newStart.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} - ${newEnd.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
-            })()}
-          </div>
-          {newDragGhost.newEmployeeDelta !== 0 && (
-            <div style={{ fontSize: 9, opacity: 0.8, color: 'white' }}>
-              👤 {(() => {
-                const newEmployeeId = getEmployeeIdFromDelta(newDragData.originalEmployeeId, newDragGhost.newEmployeeDelta || 0);
-                const newEmployee = filteredEmployees.find(emp => emp.id === newEmployeeId);
-                return newEmployee?.name || '不明';
-              })()}
-            </div>
-          )}
-        </div>
-      )}
+      {/* マウスカーソルに追従するゴーストは削除（グリッド内の正確な位置に表示する方式に統一） */}
 
     </>
   );
