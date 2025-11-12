@@ -469,41 +469,88 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
     }
   }, [selectedCells, isSelecting, equipments, commonGetSelectedCellDateTime, selectedDate, isModalOpen]);
 
-  // セル選択処理（日別スケジュールと同じ）
+  // セル選択処理（日別スケジュールと同じ - 直接実装）
   const handleCellMouseDown = useCallback((equipmentId: number, slot: number, e?: React.MouseEvent) => {
     // 右クリック時はセル選択を無効化（右クリックドラッグスクロール用）
     if (e && e.button === 2) return;
     if (newDragData || newResizeData) return; // ドラッグ中は選択無効（月別ビューのロジックと統一）
     
-    console.log('🖱️ セルマウスダウン:', { equipmentId, slot });
-    commonHandleCellMouseDown(equipmentId, slot, selectedDate);
-  }, [commonHandleCellMouseDown, selectedDate, newDragData, newResizeData]);
+    // イベントバー操作中または編集モーダル閉じた後はセル選択を無効化
+    // 設備ビューではisEventBarInteractingやisModalClosingの状態がないため、このチェックは省略
+    
+    const cellId = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}-${equipmentId}-${slot}`;
+    console.log('🔍 EquipmentReservation: handleCellMouseDown', { 
+      equipmentId, 
+      slot, 
+      cellId, 
+      selectedDate,
+      selectedDateString: selectedDate.toDateString(),
+      year: selectedDate.getFullYear(),
+      month: selectedDate.getMonth() + 1,
+      day: selectedDate.getDate()
+    });
+
+    // スケジュール選択をクリア（月別ビューと同じ仕様）
+    // ただし、編集モーダルが開いている場合はクリアしない
+    // また、スケジュールアイテム上でのクリックの場合はクリアしない（ダブルクリックで編集モードに入るため）
+    if (!showRegistrationTab) {
+      // クリックされた要素がスケジュールアイテムかどうかをチェック
+      const target = e?.target as HTMLElement;
+      const isOnScheduleItem = target?.closest('.schedule-item') || target?.closest('.excel-schedule-item');
+      
+      if (!isOnScheduleItem) {
+        console.log('EquipmentReservation: handleCellMouseDown - Clearing selectedSchedule (not on schedule item)');
+        setSelectedSchedule(null);
+      } else {
+        console.log('EquipmentReservation: handleCellMouseDown - Keeping selectedSchedule (on schedule item)');
+      }
+    }
+
+    // セル選択開始（直接実装）
+    setSelectedCells(new Set([cellId]));
+    setIsSelecting(true);
+    setSelectionAnchor({ employeeId: equipmentId, slot });
+  }, [newDragData, newResizeData, selectedDate, showRegistrationTab, setSelectedSchedule, setSelectedCells, setIsSelecting, setSelectionAnchor]);
 
   const handleCellMouseEnter = useCallback((equipmentId: number, slot: number) => {
-    commonHandleCellMouseEnter(equipmentId, slot, selectedDate);
-  }, [commonHandleCellMouseEnter, selectedDate]);
+    if (!isSelecting || !selectionAnchor) return;
+
+    // 選択範囲のセルを生成（同じ設備内でのみ選択可能）
+    const newSelectedCells = new Set<string>();
+    const startEquipment = Math.min(selectionAnchor.employeeId, equipmentId);
+    const endEquipment = Math.max(selectionAnchor.employeeId, equipmentId);
+    const startSlot = Math.min(selectionAnchor.slot, slot);
+    const endSlot = Math.max(selectionAnchor.slot, slot);
+
+    // 選択範囲のセルを生成
+    for (let eqId = startEquipment; eqId <= endEquipment; eqId++) {
+      for (let s = startSlot; s <= endSlot; s++) {
+        const cellId = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}-${eqId}-${s}`;
+        newSelectedCells.add(cellId);
+      }
+    }
+
+    setSelectedCells(newSelectedCells);
+  }, [isSelecting, selectionAnchor, selectedDate, setSelectedCells]);
 
   const handleCellMouseUp = useCallback(() => {
     console.log('🖱️ セルマウスアップ');
-    commonHandleCellMouseUp();
-  }, [commonHandleCellMouseUp]);
+    setIsSelecting(false);
+    setSelectionAnchor(null);
+  }, [setIsSelecting, setSelectionAnchor]);
 
   const handleCellDoubleClick = useCallback((equipmentId: number, slot: number) => {
-    console.log('🖱️ セルダブルクリック:', { equipmentId, slot });
-    
     // リサイズ・移動中はセル選択を無効化
     if (newIsResizing || newDragData) {
       console.log('🚫 セルのダブルクリック: リサイズ・移動中のためセル選択無効化');
       return;
     }
     
-    // 共通フックのダブルクリック処理を先に呼び出す（選択状態の更新のため）
-    commonHandleCellDoubleClick(equipmentId, slot, selectedDate);
+    const cellId = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}-${equipmentId}-${slot}`;
+    setSelectedCells(new Set([cellId]));
+    setSelectedSchedule(null);
     
     // ダブルクリック時は即座にモーダルを表示
-    console.log('🔍 ダブルクリック：即座にモーダル表示');
-    
-    // ダブルクリックしたセルから直接日時を計算
     const startDateTime = new Date(selectedDate);
     const { hour: startHour, minute: startMinute } = getTimeFromSlot(slot);
     startDateTime.setHours(startHour, startMinute, 0, 0);
@@ -523,7 +570,7 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
     
     setShowRegistrationTab(true);
     setIsModalOpen(true);
-  }, [newIsResizing, newDragData, selectedDate, equipments, getTimeFromSlot, commonHandleCellDoubleClick]);
+  }, [newIsResizing, newDragData, selectedDate, equipments, getTimeFromSlot, setSelectedCells, setSelectedSchedule]);
 
   // スケール変更処理
   const handleScaleChange = useCallback((newScale: number) => {
