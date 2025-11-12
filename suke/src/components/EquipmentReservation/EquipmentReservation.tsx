@@ -351,10 +351,10 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
       }
     }
 
-    // セル選択開始
-    setSelectedCells(new Set([cellId]));
+    // セル選択開始（isSelectingを先に設定して、イベントバーのpointerEventsをnoneにする）
     setIsSelecting(true);
     setSelectionAnchor({ employeeId: equipmentId, slot });
+    setSelectedCells(new Set([cellId]));
   }, [interactionState.dragData, interactionState.resizeData, interactionState.isEventBarInteracting, interactionState.isModalClosing, selectedDate, showRegistrationTab, setSelectedSchedule, setSelectedCells, setIsSelecting, setSelectionAnchor]);
 
   // 初期データ読み込み
@@ -488,7 +488,10 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
 
   // handleCellMouseEnter（日別ビューと同じ）
   const handleCellMouseEnter = useCallback((equipmentId: number, slot: number) => {
-    if (!isSelecting || !selectionAnchor) return;
+    if (!isSelecting || !selectionAnchor) {
+      console.log('🚫 EquipmentReservation: handleCellMouseEnter skipped', { isSelecting, selectionAnchor });
+      return;
+    }
 
     const newSelectedCells = new Set<string>();
     const startEquipment = Math.min(selectionAnchor.employeeId, equipmentId);
@@ -877,7 +880,15 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
               position: 'relative',
               minWidth: `${200 + 96 * 20 * scheduleScale}px` // 設備列200px + 96セル×20px×スケール
             }}
-            onClick={handleBackgroundClick}
+            onClick={(e) => {
+              // セル選択中は背景クリックを無視（日別ビューと同じ）
+              if (isSelecting) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+              }
+              handleBackgroundClick(e);
+            }}
             onContextMenu={(e) => {
               // 右クリックをスクロール操作に割り当てる
               e.preventDefault();
