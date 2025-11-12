@@ -473,7 +473,7 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
   const handleCellMouseDown = useCallback((equipmentId: number, slot: number, e?: React.MouseEvent) => {
     // 右クリック時はセル選択を無効化（右クリックドラッグスクロール用）
     if (e && e.button === 2) return;
-    if (newDragData || newResizeData) return; // ドラッグ中は選択無効（月別ビューのロジックと統一）
+    if (newDragData || newResizeData) return; // ドラッグ中は選択無効（日別ビューと同じロジック）
     
     // イベントバー操作中または編集モーダル閉じた後はセル選択を無効化
     // 設備ビューではisEventBarInteractingやisModalClosingの状態がないため、このチェックは省略
@@ -490,7 +490,7 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
       day: selectedDate.getDate()
     });
 
-    // スケジュール選択をクリア（月別ビューと同じ仕様）
+    // スケジュール選択をクリア（日別ビューと同じ仕様）
     // ただし、編集モーダルが開いている場合はクリアしない
     // また、スケジュールアイテム上でのクリックの場合はクリアしない（ダブルクリックで編集モードに入るため）
     if (!showRegistrationTab) {
@@ -506,41 +506,15 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
       }
     }
 
-    // セル選択開始（直接実装）
-    console.log('🔍 EquipmentReservation: handleCellMouseDown - Setting selection state', {
-      cellId,
-      equipmentId,
-      slot,
-      newDragData: !!newDragData,
-      newResizeData: !!newResizeData
-    });
+    // セル選択開始（日別ビューと同じロジック）
     setSelectedCells(new Set([cellId]));
     setIsSelecting(true);
     setSelectionAnchor({ employeeId: equipmentId, slot });
-    console.log('🔍 EquipmentReservation: handleCellMouseDown - Selection state set', {
-      cellId,
-      equipmentId,
-      slot
-    });
   }, [newDragData, newResizeData, selectedDate, showRegistrationTab, setSelectedSchedule, setSelectedCells, setIsSelecting, setSelectionAnchor]);
 
   const handleCellMouseEnter = useCallback((equipmentId: number, slot: number) => {
-    // selectionAnchorまたはisSelectingがあれば選択中とみなす
-    if (!selectionAnchor && !isSelecting) {
-      console.log('🔍 EquipmentReservation: handleCellMouseEnter - early return (no selectionAnchor and not selecting)', { 
-        isSelecting, 
-        selectionAnchor,
-        equipmentId,
-        slot
-      });
-      return;
-    }
-    
-    // selectionAnchorがない場合は、isSelectingのみで判断（状態更新のタイミング問題を回避）
-    if (!selectionAnchor) {
-      console.log('🔍 EquipmentReservation: handleCellMouseEnter - no selectionAnchor but isSelecting is true, skipping');
-      return;
-    }
+    // 日別ビューと同じロジック：isSelectingとselectionAnchorの両方が必要
+    if (!isSelecting || !selectionAnchor) return;
 
     const newSelectedCells = new Set<string>();
     const startEquipment = Math.min(selectionAnchor.employeeId, equipmentId);
@@ -570,10 +544,9 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
     });
     
     setSelectedCells(newSelectedCells);
-  }, [selectionAnchor, isSelecting, selectedDate, setSelectedCells]);
+  }, [isSelecting, selectionAnchor, selectedDate, setSelectedCells]);
 
   const handleCellMouseUp = useCallback(() => {
-    console.log('🖱️ セルマウスアップ');
     setIsSelecting(false);
     setSelectionAnchor(null);
     
@@ -618,13 +591,10 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
 
   // window mouseup で必ず選択終了（日別ビューと同じ仕様）
   useEffect(() => {
-    const onUp = () => {
-      console.log('🖱️ window mouseup - 選択終了');
-      setIsSelecting(false);
-    };
+    const onUp = () => setIsSelecting(false);
     window.addEventListener('mouseup', onUp);
     return () => window.removeEventListener('mouseup', onUp);
-  }, [setIsSelecting]);
+  }, []);
 
   // スケール変更処理
   const handleScaleChange = useCallback((newScale: number) => {
