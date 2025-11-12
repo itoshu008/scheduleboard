@@ -513,9 +513,17 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
   }, [newDragData, newResizeData, selectedDate, showRegistrationTab, setSelectedSchedule, setSelectedCells, setIsSelecting, setSelectionAnchor]);
 
   const handleCellMouseEnter = useCallback((equipmentId: number, slot: number) => {
-    if (!isSelecting || !selectionAnchor) return;
+    // selectionAnchorがあれば選択中とみなす（isSelectingの更新タイミングの問題を回避）
+    if (!selectionAnchor) {
+      console.log('🔍 EquipmentReservation: handleCellMouseEnter - early return (no selectionAnchor)', { 
+        isSelecting, 
+        selectionAnchor,
+        equipmentId,
+        slot
+      });
+      return;
+    }
 
-    // 選択範囲のセルを生成（同じ設備内でのみ選択可能）
     const newSelectedCells = new Set<string>();
     const startEquipment = Math.min(selectionAnchor.employeeId, equipmentId);
     const endEquipment = Math.max(selectionAnchor.employeeId, equipmentId);
@@ -529,15 +537,33 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
         newSelectedCells.add(cellId);
       }
     }
-
+    
+    console.log('🔍 EquipmentReservation: handleCellMouseEnter', { 
+      equipmentId,
+      slot,
+      startEquipment,
+      endEquipment,
+      startSlot,
+      endSlot,
+      newSelectedCells: Array.from(newSelectedCells),
+      newSelectedCellsSize: newSelectedCells.size, 
+      isSelecting, 
+      selectionAnchor 
+    });
+    
     setSelectedCells(newSelectedCells);
-  }, [isSelecting, selectionAnchor, selectedDate, setSelectedCells]);
+  }, [selectionAnchor, selectedDate, setSelectedCells]);
 
   const handleCellMouseUp = useCallback(() => {
     console.log('🖱️ セルマウスアップ');
     setIsSelecting(false);
     setSelectionAnchor(null);
-  }, [setIsSelecting, setSelectionAnchor]);
+    
+    // 2セル以上選択時は登録タブ表示（日別ビューと同じ仕様）
+    if (selectedCells.size >= 2) {
+      setShowRegistrationTab(true);
+    }
+  }, [selectedCells.size, setIsSelecting, setSelectionAnchor, setShowRegistrationTab]);
 
   const handleCellDoubleClick = useCallback((equipmentId: number, slot: number) => {
     // リサイズ・移動中はセル選択を無効化
@@ -571,6 +597,16 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
     setShowRegistrationTab(true);
     setIsModalOpen(true);
   }, [newIsResizing, newDragData, selectedDate, equipments, getTimeFromSlot, setSelectedCells, setSelectedSchedule]);
+
+  // window mouseup で必ず選択終了（日別ビューと同じ仕様）
+  useEffect(() => {
+    const onUp = () => {
+      console.log('🖱️ window mouseup - 選択終了');
+      setIsSelecting(false);
+    };
+    window.addEventListener('mouseup', onUp);
+    return () => window.removeEventListener('mouseup', onUp);
+  }, [setIsSelecting]);
 
   // スケール変更処理
   const handleScaleChange = useCallback((newScale: number) => {
