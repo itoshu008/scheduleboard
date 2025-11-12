@@ -24,7 +24,6 @@ import DepartmentRegistration from '../DepartmentRegistration/DepartmentRegistra
 import EmployeeRegistration from '../EmployeeRegistration/EmployeeRegistration';
 import EquipmentRegistration from '../EquipmentRegistration/EquipmentRegistration';
 import ScaleControl from '../ScaleControl/ScaleControl';
-import EventBar from '../EventBar/EventBar';
 
 // 共通フック（日別スケジュールと同じ）
 import { useScheduleCellSelection } from '../../hooks/useScheduleCellSelection';
@@ -594,6 +593,10 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
     setTimeout(() => setIsScaling(false), 100);
   }, []);
 
+  // スケール計算（日別ビューと同じ）
+  const scaledCellWidth = CELL_WIDTH_PX * scheduleScale;
+  const scaledRowHeight = DAILY_BAR_HEIGHT_PX * scheduleScale;
+
   // 設備予約用のデータフィルタリング（選択日の予約のみ）
   const dailyReservations = reservations.filter(reservation => {
     const reservationDate = new Date(reservation.start_datetime);
@@ -1068,143 +1071,171 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
                   // デバッグログ削除（パフォーマンス最適化）
           
                   return rowReservations.map((reservation, reservationIndex) => {
-                    // ドラッグ中の対象はプレビュー描画に切り替え（日別ビューと同じ）
+                    // ドラッグ中の対象は非表示（日別ビューと同じ）
                     if (dragData && dragData.schedule.id === reservation.id) {
-                      const originalStart = new Date(reservation.start_datetime);
-                      const originalEnd = new Date(reservation.end_datetime);
-                      const originalStartSlot = getTimeSlot(originalStart);
-                      const originalEndSlot = getEndTimeSlot(originalEnd);
-                      const durationSlots = Math.max(1, originalEndSlot - originalStartSlot);
-                      const baseLeftPx = originalStartSlot * 20 * scheduleScale;
-                      const deltaX = dragGhost ? dragGhost.deltaX : 0;
-                      const maxTimelinePx = 96 * 20 * scheduleScale;
-
-                      // プレビューはこの行のオーバーレイに描画し、topで行オフセットを表現
-                      const baseEquipId = reservation.equipment_id || reservation.equipment_ids?.[0];
-                      const previewEquipId = (dragGhost && dragGhost.newEmployeeId !== undefined)
-                        ? dragGhost.newEmployeeId
-                        : baseEquipId;
-                      const targetIndex = Math.max(0, Math.min(equipments.length - 1, equipments.findIndex(eq => eq.id === previewEquipId)));
-                      const rowOffsetPx = (targetIndex - equipmentIndex) * 40;
-
-                      // ピクセルベースでマウスに追従（幅は固定）、範囲をクランプ
-                      const rawLeft = baseLeftPx + deltaX;
-                      const widthPx = durationSlots * 20 * scheduleScale;
-                      const leftPx = Math.max(0, Math.min(maxTimelinePx - widthPx, rawLeft));
-
-                      return (
-                        <EventBar
-                          key={`eventbar-dragging-${reservation.id}-${equipment.id}-${equipmentIndex}-${reservationIndex}`}
-                          schedule={{
-                            ...reservation,
-                            // フックのレーン判定用に employee_id は設備IDを渡す
-                            employee_id: (reservation as any).equipment_id || (reservation as any).equipment_ids?.[0],
-                            owner_employee_id: reservation.employee_id,
-                            equipment_name: equipments.find(eq => eq.id === (reservation.equipment_id || reservation.equipment_ids?.[0]))?.name,
-                            employee_name: employees.find(em => em.id === reservation.employee_id)?.name
-                          } as any}
-                          startPx={leftPx}
-                          widthPx={widthPx}
-                          height={36}
-                          topPx={2 + rowOffsetPx}
-                          laneIndex={equipmentIndex}
-                          laneHeight={40}
-                          maxTimelinePx={96 * 20 * scheduleScale}
-                          maxLaneIndex={equipments.length - 1}
-                          fontSize={11}
-                          isSelected={true}
-                          showGhost={false}
-                          snapSizeX={20 * scheduleScale}
-                          containerSelector='.equipment-reservation .schedule-grid-container'
-                          headerHeightPx={32}
-                          dateColumnWidthPx={200}
-                          onBarMouseDownOverride={(e)=>{ e.preventDefault(); e.stopPropagation(); }}
-                          onResizeLeftMouseDownOverride={(e)=>{ e.preventDefault(); e.stopPropagation(); }}
-                          onResizeRightMouseDownOverride={(e)=>{ e.preventDefault(); e.stopPropagation(); }}
-                          debug={false}
-                        />
-                      );
+                      return null;
                     }
           
-                    // リサイズ中は新しい時間を使用
+                    // リサイズ中は新しい時間を使用（日別ビューと同じ）
                     let startTime = new Date(reservation.start_datetime);
                     let endTime = new Date(reservation.end_datetime);
                     
-                    if (resizeData && resizeGhost && resizeGhost.schedule.id === reservation.id) {
+                    if (isResizing && resizeGhost && resizeGhost.schedule.id === reservation.id) {
                       startTime = resizeGhost.newStart;
                       endTime = resizeGhost.newEnd;
                     }
                     
-          const startSlot = getTimeSlot(startTime);
-          const endSlot = getEndTimeSlot(endTime);
-                    const left = startSlot * 20 * scheduleScale;
-                    const width = (endSlot - startSlot) * 20 * scheduleScale;
+                    const startSlot = getTimeSlot(startTime);
+                    const endSlot = getEndTimeSlot(endTime);
+                    const left = startSlot * scaledCellWidth; // scaledCellWidthを使用（精度向上）
+                    const width = (endSlot - startSlot) * scaledCellWidth; // scaledCellWidthを使用（精度向上）
                     
-                    // 高精度EventBarコンポーネントを使用（ドラッグ処理は無効化）
-          
-          return (
-                      <EventBar
-                        key={`eventbar-${reservation.id}-${equipment.id}-${equipmentIndex}-${reservationIndex}`}
-            schedule={{
-              ...reservation,
-              // フックのレーン判定用に employee_id は設備IDを渡す
-              employee_id: (reservation as any).equipment_id || (reservation as any).equipment_ids?.[0],
-              owner_employee_id: reservation.employee_id,
-              equipment_name: equipments.find(eq => eq.id === (reservation.equipment_id || reservation.equipment_ids?.[0]))?.name,
-              employee_name: employees.find(em => em.id === reservation.employee_id)?.name
-            } as any}
-                        startPx={left}
-                        widthPx={width}
-                        height={36}
-                        topPx={2}
-                        laneIndex={equipmentIndex}
-                        laneHeight={40}
-                        maxTimelinePx={96 * 20 * scheduleScale}
-                        maxLaneIndex={equipments.length - 1}
-                        fontSize={11}
-              isSelected={selectedSchedule?.id === reservation.id}
-                        showGhost={false}
-                        snapSizeX={20 * scheduleScale}
-                        containerSelector='.equipment-reservation .schedule-grid-container'
-                        headerHeightPx={32}
-                        dateColumnWidthPx={200}
-                        onMove={undefined}
-                        onMoveCommit={undefined}
-                        onResize={undefined}
-                        onResizeCommit={undefined}
-                        onBarMouseDownOverride={(e, s) => {
-                          // useMonthlyEventBarHandlersのドラッグ開始を使用（日別ビューと同じ）
-                          handleScheduleMouseDown(s, e);
+                    // 設備予約専用のイベントバー（位置計算を直接行う、日別ビューと同じ）
+                    return (
+                      <div
+                        key={`row-item-${reservation.id}`}
+                        className={`schedule-item ${selectedSchedule?.id === reservation.id ? 'selected' : ''}`}
+                        style={{
+                          background: `linear-gradient(180deg, ${lightenColor(safeHexColor(reservation.color || '#3498db'), 0.15)} 0%, ${safeHexColor(reservation.color || '#3498db')} 100%)`,
+                          border: `1px solid ${lightenColor(safeHexColor(reservation.color || '#3498db'), -0.10)}`,
+                          width: `${width}px`,
+                          left: `${left}px`, // 直接leftを使用
+                          position: 'absolute',
+                          height: '36px',
+                          top: '2px',
+                          borderRadius: 4,
+                          padding: '2px 4px',
+                          fontSize: 11,
+                          color: 'white',
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                          zIndex: 10000, // 非常に高いz-indexでセルより前面に
+                          pointerEvents: 'auto' // 明示的にマウスイベントを受け取る
                         }}
-                        onResizeLeftMouseDownOverride={(e, s) => {
-                          handleResizeMouseDown(s, 'start', e);
+                        onMouseDown={(e) => {
+                          // 日別ビューと同じ仕様：handleScheduleMouseDown内で選択状態を設定
+                          handleScheduleMouseDown(reservation as any, e);
                         }}
-                        onResizeRightMouseDownOverride={(e, s) => {
-                          handleResizeMouseDown(s, 'end', e);
-                        }}
-                        onClick={(e, schedule) => {
-                          e.preventDefault();
-                e.stopPropagation();
-                          setSelectedSchedule(schedule);
-                          // クリックでドラッグ開始しない（誤ってドラッグゴーストが出るのを防止）
-              }}
-                        onDoubleClick={(e, schedule) => {
-                          // ドラッグ/リサイズ中や更新中はダブルクリック無効（未コミットで戻る現象防止）
-                          if (interactionState.dragData || interactionState.resizeData || isSaving) return;
+                        onClick={(e) => {
+                          // 日別ビューと同じ仕様：クリック時に選択状態を維持
                           e.preventDefault();
                           e.stopPropagation();
-                          const fresh = reservations.find(r => r.id === schedule.id) || schedule;
-                          setSelectedSchedule(fresh as any);
+                          setSelectedSchedule(reservation as any);
+                        }}
+                        onDoubleClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setSelectedSchedule(reservation as any);
                           setShowScheduleForm(true);
                         }}
-                        onContextMenu={(e, schedule) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setSelectedSchedule(schedule);
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setSelectedSchedule(reservation as any);
                           setShowScheduleAction(true);
                         }}
-                        debug={false} // シンプル化のためデバッグ無効化
-                      />
+                        title={`${reservation.title || reservation.purpose || '予約'}\n${formatTime(new Date(reservation.start_datetime))} - ${formatTime(new Date(reservation.end_datetime))}`}
+                      >
+                        <div style={{ 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          width: '100%', 
+                          height: '100%', 
+                          textAlign: 'center', 
+                          color: 'white' 
+                        }}>
+                          <div className="schedule-title" style={{ fontWeight: 700, color: 'white' }}>
+                            {reservation.title || reservation.purpose || '無題'}
+                          </div>
+                          <div className="schedule-time" style={{ fontSize: 10, opacity: 0.9, color: 'white' }}>
+                            {`${formatTime(new Date(reservation.start_datetime))} - ${formatTime(new Date(reservation.end_datetime))}`}
+                          </div>
+                        </div>
+                        
+                        {/* リサイズハンドル（開始時刻=赤、終了時刻=緑） */}
+                        <div
+                          className="resize-handle resize-start"
+                          onMouseDown={(e) => {
+                            console.log('🔧 左リサイズハンドル クリック:', reservation.id);
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleResizeMouseDown(reservation as any, 'start', e);
+                          }}
+                          style={{ 
+                            position: 'absolute', 
+                            left: -2, 
+                            top: 0, 
+                            width: 8, 
+                            height: '100%', 
+                            cursor: 'ew-resize', 
+                            zIndex: 10001, // イベントバーより前面
+                            pointerEvents: 'auto', // 明示的にマウスイベントを受け取る
+                            backgroundColor: '#c62828', // 開始時刻ハンドル=赤
+                            border: '1px solid rgba(255, 255, 255, 0.8)',
+                            borderRadius: '2px 0 0 2px',
+                            transition: 'all 0.2s ease',
+                            opacity: selectedSchedule?.id === reservation.id ? 0.9 : 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '8px',
+                            color: 'white',
+                            fontWeight: 'bold'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#d32f2f'; // ホバー時は少し明るい赤
+                            e.currentTarget.style.opacity = '1';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#c62828';
+                            e.currentTarget.style.opacity = selectedSchedule?.id === reservation.id ? '0.9' : '0';
+                          }}
+                        >
+                          ◀
+                        </div>
+                        <div
+                          className="resize-handle resize-end"
+                          onMouseDown={(e) => {
+                            console.log('🔧 右リサイズハンドル クリック:', reservation.id);
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleResizeMouseDown(reservation as any, 'end', e);
+                          }}
+                          style={{ 
+                            position: 'absolute', 
+                            right: -2, 
+                            top: 0, 
+                            width: 8, 
+                            height: '100%', 
+                            cursor: 'ew-resize', 
+                            zIndex: 10001, // イベントバーより前面
+                            pointerEvents: 'auto', // 明示的にマウスイベントを受け取る
+                            backgroundColor: '#2e7d32', // 終了時刻ハンドル=緑
+                            border: '1px solid rgba(255, 255, 255, 0.8)',
+                            borderRadius: '0 2px 2px 0',
+                            transition: 'all 0.2s ease',
+                            opacity: selectedSchedule?.id === reservation.id ? 0.9 : 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '8px',
+                            color: 'white',
+                            fontWeight: 'bold'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#388e3c'; // ホバー時は少し明るい緑
+                            e.currentTarget.style.opacity = '1';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#2e7d32';
+                            e.currentTarget.style.opacity = selectedSchedule?.id === reservation.id ? '0.9' : '0';
+                          }}
+                        >
+                          ▶
+                        </div>
+                      </div>
                     );
                   });
                 })()}
@@ -1212,6 +1243,92 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
             </div>
           ))}
           </div>
+          
+          {/* ドラッグゴースト（schedule-content-area内に配置、日別ビューと同じ） */}
+          {interactionState.dragGhost && interactionState.dragData && (() => {
+            // 月別ビューのロジックに合わせてゴースト表示を計算
+            const originalStart = new Date(interactionState.dragData.schedule.start_datetime);
+            const originalEnd = new Date(interactionState.dragData.schedule.end_datetime);
+            const originalDuration = originalEnd.getTime() - originalStart.getTime();
+            
+            // 新しい開始・終了時刻を計算
+            const { hour, minute } = getTimeFromSlot(interactionState.dragGhost.newSlot);
+            const newStart = new Date(
+              interactionState.dragGhost.newDate.getFullYear(),
+              interactionState.dragGhost.newDate.getMonth(),
+              interactionState.dragGhost.newDate.getDate(),
+              hour,
+              minute
+            );
+            const newEnd = new Date(newStart.getTime() + originalDuration);
+            
+            const startSlot = getTimeSlot(newStart);
+            const endSlot = getEndTimeSlot(newEnd);
+            const width = (endSlot - startSlot) * scaledCellWidth;
+            
+            // 設備IDを取得（設備間移動を考慮）
+            const targetEquipmentId = interactionState.dragGhost.newEmployeeId || (interactionState.dragData.schedule as any).equipment_id || (interactionState.dragData.schedule as any).equipment_ids?.[0];
+            const targetEquipmentIndex = equipments.findIndex(eq => eq.id === targetEquipmentId);
+            
+            // 日付が選択日と同じで、設備が表示範囲内にある場合のみ表示
+            const targetDate = interactionState.dragGhost.newDate;
+            const isSameDate = targetDate.getFullYear() === selectedDate.getFullYear() &&
+                              targetDate.getMonth() === selectedDate.getMonth() &&
+                              targetDate.getDate() === selectedDate.getDate();
+            
+            if (!isSameDate || targetEquipmentIndex === -1) {
+              return null;
+            }
+            
+            // 日別ビューと同じ方式：グリッド内の正確な位置に表示
+            // 実際のイベントバーは各行（excel-date-row）内のrow-schedule-layerに配置されている
+            // row-schedule-layerは各行内でposition: absolute, top: 0, left: 200に配置
+            // イベントバーはrow-schedule-layer内でposition: absolute, top: 2px, left: startSlot * scaledCellWidthに配置
+            const rowHeight = 40; // 固定の行の高さ（minHeight: '40px'）
+            const topOffset = 2; // イベントバーのオフセット（row-schedule-layer内でのtop位置）
+            // 実際のイベントバーのleft計算: row-schedule-layerのleft(200) + イベントバーのleft(startSlot * scaledCellWidth)
+            const actualLeft = 200 + startSlot * scaledCellWidth; // scaledCellWidthを使用（精度向上）
+            // 設備インデックスは既に計算済み（targetEquipmentIndex）を使用
+            // 実際のイベントバーの位置: 各行のrow-schedule-layer内でtop: 2px
+            // ドラッグゴーストはschedule-content-areaに対してposition: absoluteで配置されるため、
+            // 各行の位置（targetEquipmentIndex * rowHeight）+ row-schedule-layer内のオフセット（topOffset）を計算
+            const actualTop = targetEquipmentIndex >= 0 ? targetEquipmentIndex * rowHeight + topOffset : 0;
+            return (
+              <div
+                className="drag-ghost"
+                style={{
+                  position: 'absolute',
+                  width: `${width}px`,
+                  height: '36px', // 実際のイベントバーの高さと同じ
+                  backgroundColor: safeHexColor(interactionState.dragGhost.schedule.color || '#3498db'),
+                  border: '2px dashed rgba(255, 255, 255, 0.8)',
+                  borderRadius: '4px',
+                  pointerEvents: 'none',
+                  zIndex: 1000,
+                  opacity: 0.7,
+                  left: `${actualLeft}px`,
+                  top: `${actualTop}px`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)'
+                }}
+                title={`${interactionState.dragGhost.schedule.title || (interactionState.dragGhost.schedule as any).purpose || '予約'}\n${formatTime(newStart)} - ${formatTime(newEnd)}`}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', textAlign: 'center' }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>
+                    {interactionState.dragGhost.schedule.title || (interactionState.dragGhost.schedule as any).purpose || '無題'}
+                  </div>
+                  <div style={{ fontSize: '9px', opacity: 0.9 }}>
+                    {formatTime(newStart)} - {formatTime(newEnd)}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
             
         {/* 現在時刻の赤い縦線 */}
