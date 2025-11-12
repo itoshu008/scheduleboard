@@ -1324,6 +1324,14 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                               // 即座に選択状態を設定し、セル選択状態をクリアする
                               handleScheduleMouseDown(schedule, e);
                             }}
+                            onClick={(e) => {
+                              // 月別ビューと同じ仕様：クリック時に選択状態を維持
+                              // handleScheduleMouseDownで既に選択状態が設定されているが、
+                              // クリック時にも明示的に選択状態を設定して確実に維持する
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setSelectedSchedule(schedule);
+                            }}
                             onDoubleClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
