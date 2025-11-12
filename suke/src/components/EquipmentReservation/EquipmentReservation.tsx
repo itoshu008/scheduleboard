@@ -28,8 +28,8 @@ import EventBar from '../EventBar/EventBar';
 
 // 共通フック（日別スケジュールと同じ）
 import { useScheduleCellSelection } from '../../hooks/useScheduleCellSelection';
-import { useScheduleDrag } from '../../hooks/useScheduleDrag';
-import { useScheduleDragResize } from '../../hooks/useScheduleDragResize';
+// 月別ビューのイベントバー処理ロジックを使用（日別ビューと完全同一）
+import { useMonthlyEventBarHandlers } from '../../hooks/useMonthlyEventBarHandlers';
 
 import './EquipmentReservation.css';
 import { CurrentTimeLineWrapper } from '../CurrentTimeLine/CurrentTimeLine';
@@ -131,7 +131,7 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
     equipmentName?: string;
   } | null>(null);
 
-  // 設備ID計算関数（日別スケジュールの社員ID計算を参考）
+  // 設備ID計算関数（日別スケジュールの社員ID計算と同じ）
   const getEquipmentIdFromDelta = (originalEquipmentId: number, delta: number) => {
     const currentIndex = equipments.findIndex((eq: any) => eq.id === originalEquipmentId);
     if (currentIndex === -1) return originalEquipmentId;
@@ -140,155 +140,7 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
     return equipments[newIndex].id;
   };
   
-  // 日別スケジュールから移植した完璧なドラッグ・リサイズ機能
-  const {
-    dragData: newDragData,
-    dragGhost: newDragGhost,
-    resizeData: newResizeData,
-    resizeGhost: newResizeGhost,
-    isResizing: newIsResizing,
-    mousePosition: newMousePosition,
-    handleScheduleMouseDown: newHandleScheduleMouseDown,
-    handleResizeMouseDown: newHandleResizeMouseDown
-  } = useScheduleDragResize({
-    scaledCellWidth: CELL_WIDTH_PX * scheduleScale,
-    scaledRowHeight: 40,
-    setSelectedSchedule, // 月別ビューと同じ仕様
-    setSelectedCells, // 月別ビューと同じ仕様
-    onUpdateSchedule: async (scheduleId: number, updateData: any) => {
-      console.log('🔄 設備予約更新:', { scheduleId, updateData });
-      
-      // 元の予約データを取得して必要な情報を補完
-      console.log('🔍 元の予約データを検索:', { scheduleId, reservationsCount: reservations.length });
-      const originalReservation = reservations.find(r => r.id === scheduleId);
-      console.log('🔍 元の予約データ:', originalReservation);
-      
-      if (!originalReservation) {
-        console.error('❌ 元の予約データが見つかりません:', scheduleId);
-        console.error('❌ 利用可能な予約一覧:', reservations.map(r => ({ id: r.id, title: r.title })));
-        throw new Error('元の予約データが見つかりません');
-      }
-      
-      // 設備予約用のデータ形式に変換
-      const equipmentReservationData = {
-        purpose: updateData.title || updateData.purpose || originalReservation.title || originalReservation.purpose || '予約',
-        color: updateData.color || originalReservation.color,
-        employee_id: originalReservation.employee_id, // 元の社員IDを保持
-        // 設備IDの決定優先度: 新しいequipment_id → employee_id(互換) → 元の値
-        equipment_id: (updateData as any).equipment_id ?? updateData.employee_id ?? originalReservation.equipment_ids?.[0] ?? originalReservation.equipment_id,
-        start_datetime: updateData.start_datetime instanceof Date 
-          ? toLocalISODateTime(updateData.start_datetime)
-          : updateData.start_datetime,
-        end_datetime: updateData.end_datetime instanceof Date 
-          ? toLocalISODateTime(updateData.end_datetime)
-          : updateData.end_datetime
-      };
-      
-      // 事前ローカル重複チェック（設備重複は絶対NG）
-      try {
-        const targetEquipId = equipmentReservationData.equipment_id;
-        const newStart = new Date(equipmentReservationData.start_datetime as any);
-        const newEnd = new Date(equipmentReservationData.end_datetime as any);
-        const hasLocalConflict = dailyReservations.some(r => {
-          if (r.id === scheduleId) return false;
-          const rEquip = r.equipment_id || r.equipment_ids?.[0];
-          if (rEquip !== targetEquipId) return false;
-          const rStart = new Date(r.start_datetime);
-          const rEnd = new Date(r.end_datetime);
-          return !(rEnd <= newStart || rStart >= newEnd);
-        });
-        if (hasLocalConflict) {
-          setConflictTab({
-            message: '設備の重複予約はできません。同一設備・時間帯に既存の予約があります。'
-          });
-          // 自動クローズ
-          setTimeout(() => setConflictTab(null), 4000);
-          return; // API呼び出しを行わず終了
-        }
-      } catch (e) {
-        // フォールバック（チェックに失敗してもサーバー側で弾かれる）
-      }
-
-      // 楽観的更新：サーバー応答前にUIを新しい位置へ反映
-      try {
-        const uiStart = equipmentReservationData.start_datetime instanceof Date
-          ? toLocalISODateTime(equipmentReservationData.start_datetime as any)
-          : (equipmentReservationData.start_datetime as any);
-        const uiEnd = equipmentReservationData.end_datetime instanceof Date
-          ? toLocalISODateTime(equipmentReservationData.end_datetime as any)
-          : (equipmentReservationData.end_datetime as any);
-        const uiEquipId = equipmentReservationData.equipment_id as number;
-        const uiEquipName = equipments.find(eq => eq.id === uiEquipId)?.name;
-        setReservations((prev) => prev.map(r => r.id === scheduleId
-          ? { ...r, start_datetime: uiStart, end_datetime: uiEnd, equipment_id: uiEquipId, equipment_ids: [uiEquipId], equipment_name: uiEquipName }
-          : r));
-        if (selectedSchedule && selectedSchedule.id === scheduleId) {
-          setSelectedSchedule({ ...(selectedSchedule as any), start_datetime: uiStart, end_datetime: uiEnd, equipment_id: uiEquipId, equipment_ids: [uiEquipId], equipment_name: uiEquipName } as any);
-        }
-      } catch {}
-
-      console.log('🔄 変換後のデータ:', {
-        ...equipmentReservationData,
-        start_datetime_type: typeof equipmentReservationData.start_datetime,
-        end_datetime_type: typeof equipmentReservationData.end_datetime,
-        start_datetime_value: equipmentReservationData.start_datetime,
-        end_datetime_value: equipmentReservationData.end_datetime
-      });
-      
-      try {
-        setIsSaving(true);
-        await updateEquipmentReservation(scheduleId, equipmentReservationData);
-        console.log('✅ 設備予約更新成功:', scheduleId);
-      } catch (error: any) {
-        console.error('❌ 設備予約更新失敗:', error);
-        console.error('❌ 送信データ:', equipmentReservationData);
-        // サーバーエラー時はUIを元に戻す
-        try { await loadReservations(); } catch {}
-        
-        // 重複エラーの場合は特別な処理
-        if (error?.response?.status === 409 && error?.response?.data?.error === 'EQUIPMENT_CONFLICT') {
-          const conflictData = error.response.data;
-          console.error('🚨 設備重複エラー:', conflictData);
-          
-          // 重複の詳細情報を表示
-          const conflictDetails = conflictData.details?.conflictingReservations || [];
-          const conflictMessages = conflictDetails.map((c: any) => 
-            `予約ID: ${c.id}, 目的: ${c.purpose}, 時間: ${c.timeRange.start} - ${c.timeRange.end}`
-          ).join('\n');
-          
-          setConflictTab({
-            message: conflictData.message,
-            details: (conflictData.details?.conflictingReservations || []).map((c: any) => ({
-              id: c.id,
-              purpose: c.purpose,
-              start: c.timeRange?.start,
-              end: c.timeRange?.end
-            }))
-          });
-          setTimeout(() => setConflictTab(null), 6000);
-      } else {
-         setConflictTab({ message: '設備予約の更新に失敗しました: ' + (error?.message || '不明なエラー') });
-         setTimeout(() => setConflictTab(null), 4000);
-        }
-        
-        throw error;
-      } finally {
-        setIsSaving(false);
-      }
-    },
-    onReloadSchedules: async () => {
-      await loadReservations();
-    },
-    employees: equipments.map(eq => ({ id: eq.id, name: eq.name })), // 設備を社員として扱う
-    getEmployeeIdFromDelta: getEquipmentIdFromDelta
-  });
-
-  // リファレンス
-  const gridRef = useRef<HTMLDivElement>(null);
-  const headerRef = useRef<HTMLDivElement>(null);
-  const controlsRef = useRef<HTMLDivElement>(null);
-
-  // 設備予約データの読み込み
+  // 設備予約データの読み込み（useMonthlyEventBarHandlersの前に定義）
   const loadReservations = useCallback(async () => {
     try {
       setLoading(true);
@@ -307,10 +159,11 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
         id: reservation.id,
         title: reservation.title || reservation.purpose || '予約',
         color: reservation.color || '#dc3545',
-      start_datetime: reservation.start_datetime,
-      end_datetime: reservation.end_datetime,
-      employee_id: reservation.employee_id,
+        start_datetime: reservation.start_datetime,
+        end_datetime: reservation.end_datetime,
+        employee_id: reservation.employee_id,
         equipment_ids: [reservation.equipment_id],
+        equipment_id: reservation.equipment_id,
         created_at: reservation.created_at || new Date().toISOString(),
         updated_at: reservation.updated_at || new Date().toISOString()
       }));
@@ -325,6 +178,185 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
       setLoading(false);
     }
   }, [selectedDate]);
+  
+  // 月別ビューのイベントバー処理ロジックを使用（日別ビューと完全同一）
+  const {
+    interactionState,
+    setInteractionState,
+    isResizing,
+    mousePosition,
+    handleScheduleMouseDown,
+    handleResizeMouseDown,
+    updateSchedulePosition: originalUpdateSchedulePosition
+  } = useMonthlyEventBarHandlers({
+    scaledCellWidth: CELL_WIDTH_PX * scheduleScale,
+    scaledRowHeight: 40, // 設備ビューでは縦方向移動なし（日別と同じ）
+    reloadSchedules: loadReservations,
+    setSelectedSchedule,
+    setSelectedCells,
+    getEmployeeIdFromDelta: getEquipmentIdFromDelta,
+    enableVerticalMovement: false // 設備ビューでは縦方向移動なし
+  });
+
+  // 月別ビューのロジックと互換性を保つため、既存の変数名をエイリアス（日別ビューと同じ）
+  const dragData = interactionState.dragData;
+  const dragGhost = interactionState.dragGhost;
+  const resizeData = interactionState.resizeData;
+  const resizeGhost = interactionState.resizeGhost;
+
+  // 設備予約用のupdateSchedulePositionラッパー（日別ビューと同じ構造）
+  const updateSchedulePosition = useCallback(async (schedule: Schedule, newDate: Date, newSlot: number, newEquipmentId?: number) => {
+    try {
+      // 元の予約データを取得
+      const originalReservation = reservations.find(r => r.id === schedule.id);
+      if (!originalReservation) {
+        console.error('❌ 元の予約データが見つかりません:', schedule.id);
+        throw new Error('元の予約データが見つかりません');
+      }
+
+      const originalStart = new Date(schedule.start_datetime);
+      const originalEnd = new Date(schedule.end_datetime);
+      const duration = originalEnd.getTime() - originalStart.getTime();
+      
+      const { createTimeFromSlot } = await import('../../utils/dateUtils');
+      const newStart = createTimeFromSlot(newDate, newSlot);
+      const newEnd = new Date(newStart.getTime() + duration);
+      
+      // 設備IDの決定（newEquipmentIdは設備IDとして扱う）
+      const finalEquipmentId = newEquipmentId !== undefined ? newEquipmentId : (originalReservation.equipment_id || originalReservation.equipment_ids?.[0]);
+
+      // 設備予約用のデータ形式に変換
+      const equipmentReservationData = {
+        purpose: schedule.title || schedule.purpose || originalReservation.title || originalReservation.purpose || '予約',
+        color: schedule.color || originalReservation.color,
+        employee_id: originalReservation.employee_id, // 元の社員IDを保持
+        equipment_id: finalEquipmentId,
+        start_datetime: toLocalISODateTime(newStart),
+        end_datetime: toLocalISODateTime(newEnd)
+      };
+
+      // 事前ローカル重複チェック（設備重複は絶対NG）
+      try {
+        const targetEquipId = equipmentReservationData.equipment_id;
+        const checkStart = new Date(equipmentReservationData.start_datetime);
+        const checkEnd = new Date(equipmentReservationData.end_datetime);
+        const hasLocalConflict = dailyReservations.some(r => {
+          if (r.id === schedule.id) return false;
+          const rEquip = r.equipment_id || r.equipment_ids?.[0];
+          if (rEquip !== targetEquipId) return false;
+          const rStart = new Date(r.start_datetime);
+          const rEnd = new Date(r.end_datetime);
+          return !(rEnd <= checkStart || rStart >= checkEnd);
+        });
+        if (hasLocalConflict) {
+          setConflictTab({
+            message: '設備の重複予約はできません。同一設備・時間帯に既存の予約があります。'
+          });
+          setTimeout(() => setConflictTab(null), 4000);
+          return;
+        }
+      } catch (e) {
+        // フォールバック
+      }
+
+      // 楽観的更新
+      try {
+        const uiEquipId = equipmentReservationData.equipment_id as number;
+        const uiEquipName = equipments.find(eq => eq.id === uiEquipId)?.name;
+        setReservations((prev) => prev.map(r => r.id === schedule.id
+          ? { ...r, start_datetime: equipmentReservationData.start_datetime, end_datetime: equipmentReservationData.end_datetime, equipment_id: uiEquipId, equipment_ids: [uiEquipId], equipment_name: uiEquipName }
+          : r));
+        if (selectedSchedule && selectedSchedule.id === schedule.id) {
+          setSelectedSchedule({ ...(selectedSchedule as any), start_datetime: equipmentReservationData.start_datetime, end_datetime: equipmentReservationData.end_datetime, equipment_id: uiEquipId, equipment_ids: [uiEquipId], equipment_name: uiEquipName } as any);
+        }
+      } catch {}
+
+      // API呼び出し
+      setIsSaving(true);
+      await updateEquipmentReservation(schedule.id, equipmentReservationData);
+      console.log('✅ 設備予約更新成功:', schedule.id);
+
+      // WebSocketの更新を待つ
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // スケジュール一覧を再読み込み
+      await loadReservations();
+    } catch (error: any) {
+      console.error('❌ 設備予約更新失敗:', error);
+      try { await loadReservations(); } catch {}
+      
+      if (error?.response?.status === 409 && error?.response?.data?.error === 'EQUIPMENT_CONFLICT') {
+        const conflictData = error.response.data;
+        setConflictTab({
+          message: conflictData.message,
+          details: (conflictData.details?.conflictingReservations || []).map((c: any) => ({
+            id: c.id,
+            purpose: c.purpose,
+            start: c.timeRange?.start,
+            end: c.timeRange?.end
+          }))
+        });
+        setTimeout(() => setConflictTab(null), 6000);
+      } else {
+        setConflictTab({ message: '設備予約の更新に失敗しました: ' + (error?.message || '不明なエラー') });
+        setTimeout(() => setConflictTab(null), 4000);
+      }
+      throw error;
+    } finally {
+      setIsSaving(false);
+    }
+  }, [reservations, dailyReservations, equipments, selectedSchedule, setSelectedSchedule, setConflictTab, loadReservations]);
+
+  // リファレンス
+  const gridRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const controlsRef = useRef<HTMLDivElement>(null);
+
+  // セル選択（直接実装）- useMonthlyEventBarHandlersの後に定義（interactionStateにアクセスするため）（日別ビューと完全同一）
+  const handleCellMouseDown = useCallback((equipmentId: number, slot: number, e?: React.MouseEvent) => {
+    // 右クリック時はセル選択を無効化（右クリックドラッグスクロール用）
+    if (e && e.button === 2) return;
+    if (interactionState.dragData || interactionState.resizeData) return; // ドラッグ中は選択無効（月別ビューのロジックと統一）
+    
+    // イベントバー操作中または編集モーダル閉じた後はセル選択を無効化
+    if (interactionState.isEventBarInteracting || interactionState.isModalClosing) {
+      console.log('🚫 EquipmentReservation: Cell selection disabled - event bar is being interacted with or modal is closing');
+      return;
+    }
+
+    const cellId = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}-${equipmentId}-${slot}`;
+    console.log('🔍 EquipmentReservation: handleCellMouseDown', { 
+      equipmentId, 
+      slot, 
+      cellId, 
+      selectedDate,
+      selectedDateString: selectedDate.toDateString(),
+      year: selectedDate.getFullYear(),
+      month: selectedDate.getMonth() + 1,
+      day: selectedDate.getDate()
+    });
+
+    // スケジュール選択をクリア（日別ビューと同じ仕様）
+    // ただし、編集モーダルが開いている場合はクリアしない
+    // また、スケジュールアイテム上でのクリックの場合はクリアしない（ダブルクリックで編集モードに入るため）
+    if (!showRegistrationTab) {
+      // クリックされた要素がスケジュールアイテムかどうかをチェック
+      const target = e?.target as HTMLElement;
+      const isOnScheduleItem = target?.closest('.schedule-item') || target?.closest('.excel-schedule-item');
+      
+      if (!isOnScheduleItem) {
+        console.log('EquipmentReservation: handleCellMouseDown - Clearing selectedSchedule (not on schedule item)');
+        setSelectedSchedule(null);
+      } else {
+        console.log('EquipmentReservation: handleCellMouseDown - Keeping selectedSchedule (on schedule item)');
+      }
+    }
+
+    // セル選択開始
+    setSelectedCells(new Set([cellId]));
+    setIsSelecting(true);
+    setSelectionAnchor({ employeeId: equipmentId, slot });
+  }, [interactionState.dragData, interactionState.resizeData, interactionState.isEventBarInteracting, interactionState.isModalClosing, selectedDate, showRegistrationTab, setSelectedSchedule, setSelectedCells, setIsSelecting, setSelectionAnchor]);
 
   // 初期データ読み込み
   useEffect(() => {
@@ -342,7 +374,7 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
       // 選択スケジュールが必須
       if (!selectedSchedule) return;
       // ドラッグ/リサイズ中は無視
-      if (newDragData || newIsResizing) return;
+      if (interactionState.dragData || interactionState.resizeData) return;
 
       // Delete: 予約削除
       if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -385,7 +417,7 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [selectedSchedule, newDragData, newIsResizing, api, loadReservations]);
+  }, [selectedSchedule, interactionState.dragData, interactionState.resizeData, api, loadReservations]);
 
   // 初期表示で14:00が中央に来るように水平スクロールを調整（スケール/日付変更時も）
   useEffect(() => {
@@ -455,51 +487,8 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
     return result;
   }, [selectedCells, equipments, commonGetSelectedCellDateTime, selectedDate]);
 
-  // セル選択処理（日別スケジュールと同じ - 直接実装）
-  const handleCellMouseDown = useCallback((equipmentId: number, slot: number, e?: React.MouseEvent) => {
-    // 右クリック時はセル選択を無効化（右クリックドラッグスクロール用）
-    if (e && e.button === 2) return;
-    if (newDragData || newResizeData) return; // ドラッグ中は選択無効（日別ビューと同じロジック）
-    
-    // イベントバー操作中または編集モーダル閉じた後はセル選択を無効化
-    // 設備ビューではisEventBarInteractingやisModalClosingの状態がないため、このチェックは省略
-    
-    const cellId = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}-${equipmentId}-${slot}`;
-    console.log('🔍 EquipmentReservation: handleCellMouseDown', { 
-      equipmentId, 
-      slot, 
-      cellId, 
-      selectedDate,
-      selectedDateString: selectedDate.toDateString(),
-      year: selectedDate.getFullYear(),
-      month: selectedDate.getMonth() + 1,
-      day: selectedDate.getDate()
-    });
-
-    // スケジュール選択をクリア（日別ビューと同じ仕様）
-    // ただし、編集モーダルが開いている場合はクリアしない
-    // また、スケジュールアイテム上でのクリックの場合はクリアしない（ダブルクリックで編集モードに入るため）
-    if (!showRegistrationTab) {
-      // クリックされた要素がスケジュールアイテムかどうかをチェック
-      const target = e?.target as HTMLElement;
-      const isOnScheduleItem = target?.closest('.schedule-item') || target?.closest('.excel-schedule-item');
-      
-      if (!isOnScheduleItem) {
-        console.log('EquipmentReservation: handleCellMouseDown - Clearing selectedSchedule (not on schedule item)');
-        setSelectedSchedule(null);
-      } else {
-        console.log('EquipmentReservation: handleCellMouseDown - Keeping selectedSchedule (on schedule item)');
-      }
-    }
-
-    // セル選択開始（日別ビューと同じロジック）
-    setSelectedCells(new Set([cellId]));
-    setIsSelecting(true);
-    setSelectionAnchor({ employeeId: equipmentId, slot });
-  }, [newDragData, newResizeData, selectedDate, showRegistrationTab, setSelectedSchedule, setSelectedCells, setIsSelecting, setSelectionAnchor]);
-
+  // handleCellMouseEnter（日別ビューと同じ）
   const handleCellMouseEnter = useCallback((equipmentId: number, slot: number) => {
-    // 日別ビューと同じロジック：isSelectingとselectionAnchorの両方が必要
     if (!isSelecting || !selectionAnchor) return;
 
     const newSelectedCells = new Set<string>();
@@ -515,7 +504,6 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
         newSelectedCells.add(cellId);
       }
     }
-    
     console.log('🔍 EquipmentReservation: handleCellMouseEnter', { 
       equipmentId,
       slot,
@@ -528,7 +516,6 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
       isSelecting, 
       selectionAnchor 
     });
-    
     setSelectedCells(newSelectedCells);
   }, [isSelecting, selectionAnchor, selectedDate, setSelectedCells]);
 
@@ -536,13 +523,51 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
     setIsSelecting(false);
     setSelectionAnchor(null);
     
-    // 2セル以上選択時は登録タブ表示（日別ビューと同じ仕様）
+    // 2セル以上選択時は登録タブ表示
     if (selectedCells.size >= 2) {
       setShowRegistrationTab(true);
     }
-  }, [selectedCells.size, setIsSelecting, setSelectionAnchor, setShowRegistrationTab]);
+  }, [selectedCells.size, setIsSelecting, setSelectionAnchor]);
 
-  // セル選択のダブルクリック（新規登録）（日別ビューと同じ仕様）
+  // 1) window mouseup で必ず選択終了（日別ビューと同じ）
+  useEffect(() => {
+    const onUp = () => setIsSelecting(false);
+    window.addEventListener('mouseup', onUp);
+    return () => window.removeEventListener('mouseup', onUp);
+  }, []);
+
+  // 2) 選択確定時に1回だけモーダルを開く（日別ビューと同じ）
+  useEffect(() => {
+    if (!isSelecting && selectedCells.size > 0) {
+      console.log('🔍 EquipmentReservation: 選択確定、モーダルを開く', { selectedCellsSize: selectedCells.size });
+      try {
+        const equipmentsAsEmployees = equipments.map(eq => ({ 
+          id: eq.id, 
+          name: eq.name, 
+          department_id: 1,
+          employee_number: `EQ${eq.id}`,
+          display_order: eq.display_order || 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }));
+        const snap = commonGetSelectedCellDateTime(equipmentsAsEmployees, selectedDate);
+        if (snap) {
+          const selectedEquipment = equipments.find(eq => eq.id === snap.employeeId);
+          setSelectionSnapshot({
+            startDateTime: snap.startDateTime,
+            endDateTime: snap.endDateTime,
+            equipmentId: snap.employeeId,
+            equipmentName: selectedEquipment?.name
+          });
+        }
+      } catch (e) {
+        console.warn('selection snapshot failed:', e);
+      }
+      setIsModalOpen(true);
+    }
+  }, [isSelecting, selectedCells.size, equipments, commonGetSelectedCellDateTime, selectedDate]);
+
+  // セル選択のダブルクリック（新規登録）（日別ビューと同じ）
   const handleCellDoubleClick = useCallback((equipmentId: number, slot: number) => {
     const cellId = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}-${equipmentId}-${slot}`;
     setSelectedCells(new Set([cellId]));
@@ -550,7 +575,7 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
     setShowRegistrationTab(true);
   }, [selectedDate, setSelectedCells, setSelectedSchedule]);
 
-  // 背景クリックでセル選択解除（日別ビューと同じ仕様）
+  // 背景クリックでセル選択解除（日別ビューと同じ）
   const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
     // スケジュールアイテムやセルのクリックでない場合のみ
     const target = e.target as HTMLElement;
@@ -561,13 +586,6 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
       setSelectionAnchor(null);
     }
   }, [setSelectedCells, setSelectedSchedule, setIsSelecting, setSelectionAnchor]);
-
-  // window mouseup で必ず選択終了（日別ビューと同じ仕様）
-  useEffect(() => {
-    const onUp = () => setIsSelecting(false);
-    window.addEventListener('mouseup', onUp);
-    return () => window.removeEventListener('mouseup', onUp);
-  }, []);
 
   // スケール変更処理
   const handleScaleChange = useCallback((newScale: number) => {
@@ -973,11 +991,11 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
                       backgroundColor: isSelected ? '#e3f2fd' : '#fff',
                       border: isSelected ? '2px solid #2196f3' : '1px solid #e0e0e0',
                       position: 'relative',
-                        cursor: (newIsResizing || newDragData) ? 'not-allowed' : 'pointer', // リサイズ・移動中は無効カーソル
+                        cursor: (interactionState.resizeData || interactionState.dragData) ? 'not-allowed' : 'pointer', // リサイズ・移動中は無効カーソル
                       fontSize: '10px',
                       boxShadow: isSelected ? '0 0 8px rgba(33, 150, 243, 0.3)' : 'none',
                       zIndex: isSelected ? 5 : 1,
-                      opacity: (newIsResizing || newDragData) ? 0.5 : 1 // リサイズ・移動中は半透明
+                      opacity: (interactionState.resizeData || interactionState.dragData) ? 0.5 : 1 // リサイズ・移動中は半透明
                     }}
                     data-equipment-id={equipment.id}
                     data-slot={slot}
@@ -1050,21 +1068,21 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
                   // デバッグログ削除（パフォーマンス最適化）
           
                   return rowReservations.map((reservation, reservationIndex) => {
-                    // ドラッグ中の対象はプレビュー描画に切り替え
-                    if (newDragData && newDragData.schedule.id === reservation.id) {
+                    // ドラッグ中の対象はプレビュー描画に切り替え（日別ビューと同じ）
+                    if (dragData && dragData.schedule.id === reservation.id) {
                       const originalStart = new Date(reservation.start_datetime);
                       const originalEnd = new Date(reservation.end_datetime);
                       const originalStartSlot = getTimeSlot(originalStart);
                       const originalEndSlot = getEndTimeSlot(originalEnd);
                       const durationSlots = Math.max(1, originalEndSlot - originalStartSlot);
                       const baseLeftPx = originalStartSlot * 20 * scheduleScale;
-                      const deltaX = newDragGhost ? newDragGhost.deltaX : 0;
+                      const deltaX = dragGhost ? dragGhost.deltaX : 0;
                       const maxTimelinePx = 96 * 20 * scheduleScale;
 
                       // プレビューはこの行のオーバーレイに描画し、topで行オフセットを表現
                       const baseEquipId = reservation.equipment_id || reservation.equipment_ids?.[0];
-                      const previewEquipId = (newDragGhost && typeof newDragGhost.newEmployeeDelta === 'number')
-                        ? getEquipmentIdFromDelta(newDragData.originalEmployeeId, newDragGhost.newEmployeeDelta || 0)
+                      const previewEquipId = (dragGhost && dragGhost.newEmployeeId !== undefined)
+                        ? dragGhost.newEmployeeId
                         : baseEquipId;
                       const targetIndex = Math.max(0, Math.min(equipments.length - 1, equipments.findIndex(eq => eq.id === previewEquipId)));
                       const rowOffsetPx = (targetIndex - equipmentIndex) * 40;
@@ -1112,9 +1130,9 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
                     let startTime = new Date(reservation.start_datetime);
                     let endTime = new Date(reservation.end_datetime);
                     
-                    if (newIsResizing && newResizeGhost && newResizeGhost.schedule.id === reservation.id) {
-                      startTime = newResizeGhost.newStart;
-                      endTime = newResizeGhost.newEnd;
+                    if (resizeData && resizeGhost && resizeGhost.schedule.id === reservation.id) {
+                      startTime = resizeGhost.newStart;
+                      endTime = resizeGhost.newEnd;
                     }
                     
           const startSlot = getTimeSlot(startTime);
@@ -1155,14 +1173,14 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
                         onResize={undefined}
                         onResizeCommit={undefined}
                         onBarMouseDownOverride={(e, s) => {
-                          // 外部フックのドラッグ開始を使用
-                          newHandleScheduleMouseDown(s, e);
+                          // useMonthlyEventBarHandlersのドラッグ開始を使用（日別ビューと同じ）
+                          handleScheduleMouseDown(s, e);
                         }}
                         onResizeLeftMouseDownOverride={(e, s) => {
-                          newHandleResizeMouseDown(s, 'start', e);
+                          handleResizeMouseDown(s, 'start', e);
                         }}
                         onResizeRightMouseDownOverride={(e, s) => {
-                          newHandleResizeMouseDown(s, 'end', e);
+                          handleResizeMouseDown(s, 'end', e);
                         }}
                         onClick={(e, schedule) => {
                           e.preventDefault();
@@ -1172,7 +1190,7 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
               }}
                         onDoubleClick={(e, schedule) => {
                           // ドラッグ/リサイズ中や更新中はダブルクリック無効（未コミットで戻る現象防止）
-                          if (newDragData || newIsResizing || isSaving) return;
+                          if (interactionState.dragData || interactionState.resizeData || isSaving) return;
                           e.preventDefault();
                           e.stopPropagation();
                           const fresh = reservations.find(r => r.id === schedule.id) || schedule;
