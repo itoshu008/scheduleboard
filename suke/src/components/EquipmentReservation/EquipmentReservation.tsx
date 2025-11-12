@@ -993,7 +993,7 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
                   left: 200, // 固定設備セル幅
                   width: 96 * 20 * scheduleScale,
                   height: 40,
-                  pointerEvents: 'auto',
+                  pointerEvents: 'none', // セル選択を可能にするため、この層ではマウスイベントを受け取らない
                   overflow: 'visible'
                 }}
               >
