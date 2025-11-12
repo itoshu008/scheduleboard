@@ -402,18 +402,11 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
     });
   }, [scheduleScale, selectedDate]);
 
-  // セル選択完了時の処理
+  // 選択確定時に1回だけモーダルを開く（日別ビューと同じ仕様）
   useEffect(() => {
-    // セル選択が完了し、選択中でない場合に処理
-    if (selectedCells.size > 0 && !isSelecting) {
-      console.log('🔍 セル選択完了検出:', {
-        selectedCellsSize: selectedCells.size,
-        selectedCells: Array.from(selectedCells),
-        isSelecting
-      });
-
-      // 少し遅延を入れてから処理（ユーザーの選択操作完了を待つ）
-      const timer = setTimeout(() => {
+    if (!isSelecting && selectedCells.size > 0) {
+      console.log('🔍 EquipmentReservation: 選択確定、モーダルを開く', { selectedCellsSize: selectedCells.size });
+      try {
         // フックのgetSelectedCellDateTimeを使用
         const equipmentsAsEmployees = equipments.map(eq => ({ 
           id: eq.id, 
@@ -424,50 +417,22 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }));
-        const cellDateTime = commonGetSelectedCellDateTime(equipmentsAsEmployees, selectedDate);
-        
-        if (cellDateTime) {
-          const selectedEquipment = equipments.find(eq => eq.id === cellDateTime.employeeId);
-          
-          console.log('🔍 自動モーダル表示:', {
-            startDateTime: cellDateTime.startDateTime.toISOString(),
-            endDateTime: cellDateTime.endDateTime.toISOString(),
-            equipmentId: cellDateTime.employeeId,
-            equipmentName: selectedEquipment?.name,
-            selectedCellsSize: selectedCells.size,
-            startTimeString: cellDateTime.startDateTime.toTimeString().slice(0, 5),
-            endTimeString: cellDateTime.endDateTime.toTimeString().slice(0, 5)
-          });
-          
-          const snapshotData = {
-            startDateTime: cellDateTime.startDateTime,
-            endDateTime: cellDateTime.endDateTime,
-            equipmentId: cellDateTime.employeeId,
+        const snap = commonGetSelectedCellDateTime(equipmentsAsEmployees, selectedDate);
+        if (snap) {
+          const selectedEquipment = equipments.find(eq => eq.id === snap.employeeId);
+          setSelectionSnapshot({
+            startDateTime: snap.startDateTime,
+            endDateTime: snap.endDateTime,
+            equipmentId: snap.employeeId,
             equipmentName: selectedEquipment?.name
-          };
-
-          console.log('🔍 セットするスナップショットデータ:', {
-            ...snapshotData,
-            startTimeForForm: snapshotData.startDateTime.toTimeString().slice(0, 5),
-            endTimeForForm: snapshotData.endDateTime.toTimeString().slice(0, 5),
-            startDateTimeISO: snapshotData.startDateTime.toISOString(),
-            endDateTimeISO: snapshotData.endDateTime.toISOString()
           });
-
-          setSelectionSnapshot(snapshotData);
-          
-          // ルール: 複数セル選択時のみ自動で登録タブを表示
-          // 単一セルはダブルクリック時に表示（handleCellDoubleClickで対応）
-          if (selectedCells.size >= 2 && !isModalOpen) {
-            setShowRegistrationTab(true);
-            setIsModalOpen(true);
-          }
         }
-      }, 500); // 500ms遅延
-
-      return () => clearTimeout(timer);
+      } catch (e) {
+        console.warn('selection snapshot failed:', e);
+      }
+      setIsModalOpen(true);
     }
-  }, [selectedCells, isSelecting, equipments, commonGetSelectedCellDateTime, selectedDate, isModalOpen]);
+  }, [isSelecting, selectedCells.size, equipments, commonGetSelectedCellDateTime, selectedDate]);
 
   // セル選択処理（日別スケジュールと同じ - 直接実装）
   const handleCellMouseDown = useCallback((equipmentId: number, slot: number, e?: React.MouseEvent) => {
@@ -1259,8 +1224,7 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
                     initialEnd: selectionSnapshot.endDateTime,
                     startTime: selectionSnapshot.startDateTime.toTimeString().slice(0, 5),
                     endTime: selectionSnapshot.endDateTime.toTimeString().slice(0, 5),
-                    purpose: '',
-                    selectedCellsSize: selectedCells.size
+                    purpose: ''
                   };
                   
                   console.log('🔍 EquipmentScheduleForm に渡すinitialValues:', {
