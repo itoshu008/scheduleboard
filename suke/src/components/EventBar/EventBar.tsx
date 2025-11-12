@@ -478,6 +478,12 @@ const EventBar: React.FC<EventBarProps> = ({
     zIndex: 10001, // イベントバーより前面
     pointerEvents: 'auto', // 明示的にマウスイベントを受け取る
     transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '8px',
+    color: 'white',
+    fontWeight: 'bold',
   };
 
   // 終了時刻ハンドル（右側）のスタイル
@@ -495,6 +501,12 @@ const EventBar: React.FC<EventBarProps> = ({
     zIndex: 10001, // イベントバーより前面
     pointerEvents: 'auto', // 明示的にマウスイベントを受け取る
     transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '8px',
+    color: 'white',
+    fontWeight: 'bold',
   };
 
   return (
@@ -554,7 +566,9 @@ const EventBar: React.FC<EventBarProps> = ({
           e.preventDefault();
           e.stopPropagation();
         }}
-      />
+      >
+        ◀
+      </div>
       <div
         style={{
           padding: showGhost ? '4px 8px' : '2px 8px',
@@ -664,7 +678,9 @@ const EventBar: React.FC<EventBarProps> = ({
           e.preventDefault();
           e.stopPropagation();
         }}
-      />
+      >
+        ▶
+      </div>
     </div>
   );
 };

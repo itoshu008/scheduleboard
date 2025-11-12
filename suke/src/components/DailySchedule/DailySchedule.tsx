@@ -1386,7 +1386,13 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                                 border: '1px solid rgba(255, 255, 255, 0.8)',
                                 borderRadius: '2px 0 0 2px',
                                 transition: 'all 0.2s ease',
-                                opacity: selectedSchedule?.id === schedule.id ? 0.9 : 0
+                                opacity: selectedSchedule?.id === schedule.id ? 0.9 : 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '8px',
+                                color: 'white',
+                                fontWeight: 'bold'
                               }}
                               onMouseEnter={(e) => {
                                 e.currentTarget.style.backgroundColor = '#d32f2f'; // ホバー時は少し明るい赤
@@ -1396,7 +1402,9 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                                 e.currentTarget.style.backgroundColor = '#c62828';
                                 e.currentTarget.style.opacity = selectedSchedule?.id === schedule.id ? '0.9' : '0';
                               }}
-                            />
+                            >
+                              ◀
+                            </div>
                             <div
                               className="resize-handle resize-end"
                               onMouseDown={(e) => {
@@ -1418,7 +1426,13 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                                 border: '1px solid rgba(255, 255, 255, 0.8)',
                                 borderRadius: '0 2px 2px 0',
                                 transition: 'all 0.2s ease',
-                                opacity: selectedSchedule?.id === schedule.id ? 0.9 : 0
+                                opacity: selectedSchedule?.id === schedule.id ? 0.9 : 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '8px',
+                                color: 'white',
+                                fontWeight: 'bold'
                               }}
                               onMouseEnter={(e) => {
                                 e.currentTarget.style.backgroundColor = '#388e3c'; // ホバー時は少し明るい緑
@@ -1428,7 +1442,9 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                                 e.currentTarget.style.backgroundColor = '#2e7d32';
                                 e.currentTarget.style.opacity = selectedSchedule?.id === schedule.id ? '0.9' : '0';
                               }}
-                            />
+                            >
+                              ▶
+                            </div>
                           </div>
                         );
                       });

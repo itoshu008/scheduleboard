@@ -140,40 +140,36 @@ const UniversalEventBar: React.FC<UniversalEventBarProps> = ({
         }}
         style={{ 
           position: 'absolute', 
-          left: -3, 
-          top: -1, 
-          width: isResizing && resizeData?.schedule.id === schedule.id && resizeData.edge === 'start' ? 12 : 10, 
-          height: 'calc(100% + 2px)', 
+          left: -2, 
+          top: 0, 
+          width: 8, 
+          height: '100%', 
           cursor: 'ew-resize', 
           zIndex: 10001,
           pointerEvents: 'auto',
-          background: isResizing && resizeData?.schedule.id === schedule.id && resizeData.edge === 'start'
-            ? 'linear-gradient(90deg, #ff0000 0%, #ff4444 50%, #ff0000 100%)'
-            : 'linear-gradient(90deg, #ff4444 0%, #ff6666 50%, #ff4444 100%)',
-          border: '2px solid rgba(255, 255, 255, 0.9)',
-          borderRadius: '4px 0 0 4px',
-          transition: isResizing && resizeData?.schedule.id === schedule.id && resizeData.edge === 'start' ? 'none' : 'all 0.2s ease',
-          opacity: isSelected || (isResizing && resizeData?.schedule.id === schedule.id && resizeData.edge === 'start') ? 1 : 0,
-          boxShadow: isResizing && resizeData?.schedule.id === schedule.id && resizeData.edge === 'start'
-            ? '0 0 8px #ff4444, 0 2px 6px rgba(0, 0, 0, 0.3)'
-            : '0 2px 6px rgba(0, 0, 0, 0.3)',
+          backgroundColor: '#c62828', // 開始時刻ハンドル=赤
+          border: '1px solid rgba(255, 255, 255, 0.8)',
+          borderRadius: '2px 0 0 2px',
+          transition: 'all 0.2s ease',
+          opacity: isSelected ? 0.9 : 0,
+          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           fontSize: '8px',
           color: 'white',
           fontWeight: 'bold',
-          transform: isResizing && resizeData?.schedule.id === schedule.id && resizeData.edge === 'start' ? 'scaleX(1.3)' : 'scaleX(1)'
+          transform: 'scaleX(1)'
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.opacity = '1';
           e.currentTarget.style.transform = 'scaleX(1.2)';
-          e.currentTarget.style.background = 'linear-gradient(90deg, #ff2222 0%, #ff4444 50%, #ff2222 100%)';
+          e.currentTarget.style.backgroundColor = '#d32f2f'; // ホバー時は少し明るい赤
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.opacity = isSelected ? '0.9' : '0';
           e.currentTarget.style.transform = 'scaleX(1)';
-          e.currentTarget.style.background = 'linear-gradient(90deg, #ff4444 0%, #ff6666 50%, #ff4444 100%)';
+          e.currentTarget.style.backgroundColor = '#c62828';
         }}
         title="開始時刻をリサイズ"
       >
@@ -191,40 +187,36 @@ const UniversalEventBar: React.FC<UniversalEventBarProps> = ({
         }}
         style={{ 
           position: 'absolute', 
-          right: -3, 
-          top: -1, 
-          width: isResizing && resizeData?.schedule.id === schedule.id && resizeData.edge === 'end' ? 12 : 10, 
-          height: 'calc(100% + 2px)', 
+          right: -2, 
+          top: 0, 
+          width: 8, 
+          height: '100%', 
           cursor: 'ew-resize', 
           zIndex: 10001,
           pointerEvents: 'auto',
-          background: isResizing && resizeData?.schedule.id === schedule.id && resizeData.edge === 'end'
-            ? 'linear-gradient(90deg, #00ff00 0%, #44ff44 50%, #00ff00 100%)'
-            : 'linear-gradient(90deg, #44ff44 0%, #66ff66 50%, #44ff44 100%)',
-          border: '2px solid rgba(255, 255, 255, 0.9)',
-          borderRadius: '0 4px 4px 0',
-          transition: isResizing && resizeData?.schedule.id === schedule.id && resizeData.edge === 'end' ? 'none' : 'all 0.2s ease',
-          opacity: isSelected || (isResizing && resizeData?.schedule.id === schedule.id && resizeData.edge === 'end') ? 1 : 0,
-          boxShadow: isResizing && resizeData?.schedule.id === schedule.id && resizeData.edge === 'end'
-            ? '0 0 8px #44ff44, 0 2px 6px rgba(0, 0, 0, 0.3)'
-            : '0 2px 6px rgba(0, 0, 0, 0.3)',
+          backgroundColor: '#2e7d32', // 終了時刻ハンドル=緑
+          border: '1px solid rgba(255, 255, 255, 0.8)',
+          borderRadius: '0 2px 2px 0',
+          transition: 'all 0.2s ease',
+          opacity: isSelected ? 0.9 : 0,
+          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           fontSize: '8px',
           color: 'white',
           fontWeight: 'bold',
-          transform: isResizing && resizeData?.schedule.id === schedule.id && resizeData.edge === 'end' ? 'scaleX(1.3)' : 'scaleX(1)'
+          transform: 'scaleX(1)'
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.opacity = '1';
           e.currentTarget.style.transform = 'scaleX(1.2)';
-          e.currentTarget.style.background = 'linear-gradient(90deg, #22ff22 0%, #44ff44 50%, #22ff22 100%)';
+          e.currentTarget.style.backgroundColor = '#388e3c'; // ホバー時は少し明るい緑
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.opacity = isSelected ? '0.9' : '0';
           e.currentTarget.style.transform = 'scaleX(1)';
-          e.currentTarget.style.background = 'linear-gradient(90deg, #44ff44 0%, #66ff66 50%, #44ff44 100%)';
+          e.currentTarget.style.backgroundColor = '#2e7d32';
         }}
         title="終了時刻をリサイズ"
       >

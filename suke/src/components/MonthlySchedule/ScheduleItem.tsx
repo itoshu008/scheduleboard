@@ -160,9 +160,17 @@ const ScheduleItem = memo<ScheduleItemProps>(({
           border: (showEditModal || isModalClosing) ? '1px solid rgba(255, 0, 0, 0.6)' : '1px solid rgba(255, 255, 255, 0.8)',
           borderRadius: '2px 0 0 2px',
           transition: 'all 0.2s ease',
-          opacity: (showEditModal || isModalClosing) ? 0.5 : (selectedSchedule?.id === schedule.id ? 0.9 : 0)
+          opacity: (showEditModal || isModalClosing) ? 0.5 : (selectedSchedule?.id === schedule.id ? 0.9 : 0),
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '8px',
+          color: 'white',
+          fontWeight: 'bold'
         }}
-      />
+      >
+        ◀
+      </div>
       <div
         className="resize-handle resize-end"
         onMouseDown={(e) => {
@@ -216,9 +224,17 @@ const ScheduleItem = memo<ScheduleItemProps>(({
           border: (showEditModal || isModalClosing) ? '1px solid rgba(255, 0, 0, 0.6)' : '1px solid rgba(255, 255, 255, 0.8)',
           borderRadius: '0 2px 2px 0',
           transition: 'all 0.2s ease',
-          opacity: (showEditModal || isModalClosing) ? 0.5 : (selectedSchedule?.id === schedule.id ? 0.9 : 0)
+          opacity: (showEditModal || isModalClosing) ? 0.5 : (selectedSchedule?.id === schedule.id ? 0.9 : 0),
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '8px',
+          color: 'white',
+          fontWeight: 'bold'
         }}
-      />
+      >
+        ▶
+      </div>
     </div>
   );
 }, (prevProps, nextProps) => {
