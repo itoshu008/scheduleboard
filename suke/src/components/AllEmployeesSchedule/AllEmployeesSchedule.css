@@ -935,25 +935,11 @@ body .app-main .grid-top-controls {
 
 
 
-/* リサイズハンドル色 */
-.resize-handle.resize-start { 
-  left: -4px;
-  background: #2e7d32; 
-  opacity: 0.9; 
-  cursor: ew-resize;
-}
-.resize-handle.resize-end { 
-  right: -4px;
-  background: #c62828; 
-  opacity: 0.9; 
-  cursor: ew-resize;
-}
-
-/* リサイズハンドルホバー効果 */
-.resize-handle:hover {
-  opacity: 1;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
-}
+/* リサイズハンドル色（TSXファイルのインラインスタイルで上書きされるため、ここでは定義しない）
+   TSXファイルで統一：
+   - resize-start（開始時刻ハンドル）= 赤 (#c62828)
+   - resize-end（終了時刻ハンドル）= 緑 (#2e7d32)
+*/
 
 /* =================================================================== */
 /* 全社員スケジュール 社員名表示スタイル - 日別スケジュールと完全統一 */

@@ -154,7 +154,8 @@ const ScheduleItem = memo<ScheduleItemProps>(({
           width: 8, 
           height: '100%', 
           cursor: (showEditModal || isModalClosing) ? 'not-allowed' : 'ew-resize', 
-          zIndex: 999,
+          zIndex: 10001, // 全社員ビューと同じ（イベントバーより前面）
+          pointerEvents: 'auto', // 全社員ビューと同じ（明示的にマウスイベントを受け取る）
           backgroundColor: (showEditModal || isModalClosing) ? 'rgba(255, 0, 0, 0.3)' : '#c62828', // 開始時刻ハンドル=赤
           border: (showEditModal || isModalClosing) ? '1px solid rgba(255, 0, 0, 0.6)' : '1px solid rgba(255, 255, 255, 0.8)',
           borderRadius: '2px 0 0 2px',
@@ -209,7 +210,8 @@ const ScheduleItem = memo<ScheduleItemProps>(({
           width: 8, 
           height: '100%', 
           cursor: (showEditModal || isModalClosing) ? 'not-allowed' : 'ew-resize', 
-          zIndex: 999,
+          zIndex: 10001, // 全社員ビューと同じ（イベントバーより前面）
+          pointerEvents: 'auto', // 全社員ビューと同じ（明示的にマウスイベントを受け取る）
           backgroundColor: (showEditModal || isModalClosing) ? 'rgba(255, 0, 0, 0.3)' : '#2e7d32', // 終了時刻ハンドル=緑
           border: (showEditModal || isModalClosing) ? '1px solid rgba(255, 0, 0, 0.6)' : '1px solid rgba(255, 255, 255, 0.8)',
           borderRadius: '0 2px 2px 0',
