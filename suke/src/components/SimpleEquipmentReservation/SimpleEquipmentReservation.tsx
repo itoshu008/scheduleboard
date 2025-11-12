@@ -1,7 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Equipment, Employee } from '../../types';
 import { api } from '../../api';
 import dayjs from 'dayjs';
+import { formatDate, getTimeSlot, getTimeFromSlot, getEndTimeSlot } from '../../utils/dateUtils';
+import { CELL_WIDTH_PX } from '../../utils/uiConstants';
+import ScheduleRegistrationModal from '../ScheduleRegistrationModal/ScheduleRegistrationModal';
+import { useScheduleCellSelection } from '../../hooks/useScheduleCellSelection';
+// 月別ビューのイベントバー処理ロジックを使用（勤怠アプリに影響を与えないよう、ScheduleBoard専用APIのみ使用）
+import { useMonthlyEventBarHandlers } from '../../hooks/useMonthlyEventBarHandlers';
+import { safeHexColor, lightenColor, toApiColor } from '../../utils/color';
+import './SimpleEquipmentReservation.css';
 
 interface SimpleEquipmentReservationProps {
   selectedDate: Date;
@@ -17,6 +25,8 @@ interface Reservation {
   start_datetime: string;
   end_datetime: string;
   color?: string;
+  equipment_name?: string;
+  employee_name?: string;
 }
 
 const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
@@ -26,25 +36,36 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
 }) => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
-    title: '',
-    equipment_id: 1,
-    employee_id: 1,
-    start_time: '09:00',
-    end_time: '10:00'
-  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  const [selectedSchedule, setSelectedSchedule] = useState<Reservation | null>(null);
+  const [selectedEquipmentId, setSelectedEquipmentId] = useState<number | null>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const controlsRef = useRef<HTMLDivElement>(null);
 
-  // 時間スロット（15分間隔、0:00-23:45）
-  const timeSlots = Array.from({ length: 96 }, (_, i) => {
-    const hour = Math.floor(i / 4);
-    const minute = (i % 4) * 15;
-    return {
-      slot: i,
-      time: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
-    };
-  });
+  // セル選択フック
+  const {
+    selectedCells,
+    isSelecting,
+    selectionAnchor,
+    selectedSchedule: selectedScheduleFromHook,
+    setSelectedCells,
+    setIsSelecting,
+    setSelectionAnchor,
+    setSelectedSchedule: setSelectedScheduleFromHook,
+    handleCellMouseDown,
+    handleCellMouseEnter,
+    handleCellMouseUp,
+    handleCellDoubleClick,
+    getSelectedCellDateTime,
+    clearSelection
+  } = useScheduleCellSelection();
+
+  // 月別ビューのイベントバー処理ロジックを使用（勤怠アプリに影響を与えないよう、ScheduleBoard専用APIのみ使用）
+  // 注意: loadReservationsを先に定義してからreloadSchedulesを定義する必要がある
+  const scheduleScale = 100; // 設備ビューは固定スケール
 
   // 初期データ読み込み
   useEffect(() => {
@@ -54,29 +75,58 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
 
   const loadEmployees = async () => {
     try {
-      const response = await api.get('/employees');
-      setEmployees(response.data);
-      if (response.data.length > 0) {
-        setFormData(prev => ({ ...prev, employee_id: response.data[0].id }));
-      }
+      const response = await api.get('/admin/employees');
+      setEmployees(response.data || []);
     } catch (error) {
       console.error('従業員データの読み込みに失敗:', error);
     }
   };
 
-  const loadReservations = async () => {
+  const loadReservations = useCallback(async () => {
     try {
-      const dateStr = dayjs(selectedDate).format('YYYY-MM-DD');
+      setLoading(true);
+      const dateStr = formatDate(selectedDate);
       const response = await api.get(`/equipment-reservations?date=${dateStr}`);
       setReservations(response.data || []);
     } catch (error) {
       console.error('予約データの読み込みに失敗:', error);
+      setError('予約データの読み込みに失敗しました');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [selectedDate]);
 
-  // セルクリック処理
+  // reloadSchedulesをloadReservationsの後に定義（初期化順序の問題を回避）
+  const reloadSchedules = useCallback(async () => {
+    await loadReservations();
+  }, [loadReservations]);
+
+  // 月別ビューのイベントバー処理ロジックを使用
+  const {
+    interactionState,
+    setInteractionState,
+    isResizing,
+    mousePosition,
+    handleScheduleMouseDown,
+    handleResizeMouseDown,
+    updateSchedulePosition
+  } = useMonthlyEventBarHandlers({
+    scaledCellWidth: CELL_WIDTH_PX * scheduleScale,
+    scaledRowHeight: 40 * scheduleScale,
+    reloadSchedules,
+    setSelectedSchedule: (schedule: any) => setSelectedSchedule(schedule),
+    setSelectedCells
+  });
+
+  // 月別ビューのロジックと互換性を保つため、既存の変数名をエイリアス
+  const dragData = interactionState.dragData;
+  const dragGhost = interactionState.dragGhost;
+  const resizeData = interactionState.resizeData;
+  const resizeGhost = interactionState.resizeGhost;
+
+  // セルクリック処理（セル選択フックを使用）
   const handleCellClick = (equipmentId: number, slot: number) => {
-    const cellId = `${equipmentId}-${slot}`;
+    const cellId = `equipment-${equipmentId}-${slot}`;
     const newSelectedCells = new Set(selectedCells);
     
     if (selectedCells.has(cellId)) {
@@ -88,66 +138,52 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     setSelectedCells(newSelectedCells);
   };
 
-  // フォーム表示
-  const openForm = () => {
-    if (selectedCells.size === 0) {
-      alert('時間を選択してください');
-      return;
-    }
-
-    // 選択されたセルから時間を計算
-    const cellIds = Array.from(selectedCells);
-    const slots = cellIds.map(id => parseInt(id.split('-')[1]));
-    const equipmentId = parseInt(cellIds[0].split('-')[0]);
-    
-    const minSlot = Math.min(...slots);
-    const maxSlot = Math.max(...slots);
-    
-    const startTime = timeSlots[minSlot].time;
-    const endTime = timeSlots[maxSlot + 1]?.time || '23:59';
-
-    setFormData(prev => ({
-      ...prev,
-      equipment_id: equipmentId,
-      start_time: startTime,
-      end_time: endTime
-    }));
-    
-    setShowForm(true);
-  };
-
   // 予約保存
-  const saveReservation = async () => {
-    if (!formData.title.trim()) {
-      alert('タイトルを入力してください');
-      return;
-    }
-
+  const handleReservationSave = async (scheduleData: any) => {
     try {
-      const dateStr = dayjs(selectedDate).format('YYYY-MM-DD');
-      const startDateTime = `${dateStr}T${formData.start_time}:00`;
-      const endDateTime = `${dateStr}T${formData.end_time}:00`;
+      // 選択されたセルから時間を計算
+      let startDateTime: string;
+      let endDateTime: string;
+      let equipmentId: number;
+
+      if (selectedCells.size > 0) {
+        const cellIds = Array.from(selectedCells);
+        const slots = cellIds.map(id => parseInt(id.split('-')[2]));
+        equipmentId = parseInt(cellIds[0].split('-')[1]);
+        const minSlot = Math.min(...slots);
+        const maxSlot = Math.max(...slots);
+        const startHour = Math.floor(minSlot / 4);
+        const startMinute = (minSlot % 4) * 15;
+        const endHour = Math.floor((maxSlot + 1) / 4);
+        const endMinute = ((maxSlot + 1) % 4) * 15;
+        
+        const dateStr = formatDate(selectedDate);
+        startDateTime = `${dateStr}T${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}:00`;
+        endDateTime = `${dateStr}T${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}:00`;
+      } else {
+        // フォームから取得
+        const dateStr = formatDate(selectedDate);
+        startDateTime = scheduleData.start_datetime || `${dateStr}T09:00:00`;
+        endDateTime = scheduleData.end_datetime || `${dateStr}T10:00:00`;
+        equipmentId = scheduleData.equipment_id || selectedEquipmentId || equipments[0]?.id || 1;
+      }
 
       const payload = {
-        title: formData.title,
-        equipment_id: formData.equipment_id,
-        employee_id: formData.employee_id,
+        title: scheduleData.title || scheduleData.purpose || '予約',
+        equipment_id: equipmentId,
+        employee_id: scheduleData.employee_id || employees[0]?.id || 1,
         start_datetime: startDateTime,
         end_datetime: endDateTime,
-        color: '#dc3545'
+        color: scheduleData.color || '#dc3545'
       };
 
-      console.log('予約作成:', payload);
-      
+      console.log('設備予約作成:', payload);
       await api.post('/equipment-reservations', payload);
-      
-      // 成功後の処理
-      setShowForm(false);
-      setSelectedCells(new Set());
-      setFormData({ title: '', equipment_id: 1, employee_id: 1, start_time: '09:00', end_time: '10:00' });
       await loadReservations();
-      
-      alert('予約を作成しました');
+      setShowRegistrationModal(false);
+      setSelectedCells(new Set());
+      setSelectedSchedule(null);
+      setSelectedEquipmentId(null);
     } catch (error: any) {
       console.error('予約作成エラー:', error);
       const message = error.response?.data?.message || error.response?.data?.error || '予約の作成に失敗しました';
@@ -155,26 +191,38 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     }
   };
 
-  // 予約の表示位置を計算
+  // 予約をSchedule型に変換（月別ビューのロジックと互換性を保つため）
+  const reservationToSchedule = useCallback((reservation: Reservation): any => {
+    return {
+      id: reservation.id,
+      title: reservation.title,
+      employee_id: reservation.employee_id,
+      start_datetime: reservation.start_datetime,
+      end_datetime: reservation.end_datetime,
+      color: reservation.color || '#dc3545'
+    };
+  }, []);
+
+  // 予約の表示位置を計算（月別ビューのロジックと統一）
   const getReservationStyle = (reservation: Reservation, equipmentIndex: number) => {
     const startTime = dayjs(reservation.start_datetime);
     const endTime = dayjs(reservation.end_datetime);
     
-    const startSlot = startTime.hour() * 4 + Math.floor(startTime.minute() / 15);
-    const endSlot = endTime.hour() * 4 + Math.floor(endTime.minute() / 15);
+    const startSlot = getTimeSlot(startTime.toDate());
+    const endSlot = getEndTimeSlot(endTime.toDate());
     
-    const left = 200 + startSlot * 20;
+    const left = 80 + startSlot * 20;
     const width = (endSlot - startSlot) * 20;
-    const top = 32 + equipmentIndex * 40;
+    const top = 40 + equipmentIndex * 40;
     
     return {
       position: 'absolute' as const,
       left: `${left}px`,
       top: `${top}px`,
       width: `${width}px`,
-      height: '38px',
-      backgroundColor: reservation.color || '#dc3545',
-      border: '1px solid rgba(0,0,0,0.1)',
+      height: '36px',
+      background: `linear-gradient(180deg, ${lightenColor(safeHexColor(reservation.color || '#dc3545'), 0.15)} 0%, ${safeHexColor(reservation.color || '#dc3545')} 100%)`,
+      border: `1px solid ${lightenColor(safeHexColor(reservation.color || '#dc3545'), -0.10)}`,
       borderRadius: '4px',
       padding: '2px 4px',
       fontSize: '11px',
@@ -183,182 +231,433 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       zIndex: 10,
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'center'
+      justifyContent: 'center',
+      cursor: 'pointer',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
     };
   };
 
+  if (loading) {
+    return (
+      <div className="loading-center">
+        <div className="loading-spinner"></div>
+        <p>データを読み込み中...</p>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ width: '100%', height: 'calc(100vh - 180px)', overflow: 'scroll' }}>
+    <div className="equipment-schedule">
       {/* ヘッダー */}
-      <div style={{ display: 'flex', alignItems: 'center', padding: '20px', gap: '20px' }}>
-        <h2>設備予約</h2>
-        <input
-          type="date"
-          value={dayjs(selectedDate).format('YYYY-MM-DD')}
-          onChange={(e) => onDateChange(new Date(e.target.value))}
-        />
-        <button
-          onClick={openForm}
-          disabled={selectedCells.size === 0}
+      <div className="schedule-header" ref={headerRef}>
+        <h2 style={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px', margin: 0 }}>
+          <span style={{ fontSize: '18px', fontWeight: 'normal', color: '#666' }}>
+            設備予約 - {selectedDate.toLocaleDateString('ja-JP', { 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric',
+              weekday: 'long'
+            })}
+          </span>
+        </h2>
+      </div>
+
+      {/* ナビゲーションコントロール */}
+      <div className="grid-top-controls" ref={controlsRef}>
+        <div className="grid-controls-row">
+          <div className="nav-btn-left" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+            {/* ナビゲーションボタン */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/monthly')}>月別</button>
+              <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/daily')}>日別</button>
+              <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/all-employees')}>全社員</button>
+              <button className="nav-btn active" onClick={() => (window.location.href = '/scheduleboard/equipment')}>設備</button>
+            </div>
+          </div>
+        </div>
+        <div className="grid-controls-row-second">
+          <div className="date-section">
+            <div className="date-controls">
+              <button 
+                className="date-nav-btn day-btn" 
+                onClick={() => onDateChange(new Date(selectedDate.getTime() - 24 * 60 * 60 * 1000))}
+                title="前日"
+              >
+                &lsaquo;
+              </button>
+              <input
+                type="date"
+                value={formatDate(selectedDate)}
+                onChange={(e) => {
+                  const [year, month, day] = e.target.value.split('-').map(Number);
+                  onDateChange(new Date(year, month - 1, day));
+                }}
+                className="date-input"
+              />
+              <button 
+                className="date-nav-btn day-btn" 
+                onClick={() => onDateChange(new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000))}
+                title="翌日"
+              >
+                &rsaquo;
+              </button>
+              <button 
+                className="date-nav-btn today-btn" 
+                onClick={() => onDateChange(new Date())}
+                title="本日"
+              >
+                本日
+              </button>
+              <button 
+                className="nav-btn registration-btn" 
+                onClick={() => {
+                  if (selectedCells.size === 0) {
+                    alert('時間を選択してください');
+                    return;
+                  }
+                  // 選択されたセルから設備IDを取得
+                  const cellIds = Array.from(selectedCells);
+                  const equipmentId = parseInt(cellIds[0].split('-')[1]);
+                  setSelectedEquipmentId(equipmentId);
+                  setShowRegistrationModal(true);
+                }}
+                style={{ 
+                  backgroundColor: '#dc3545', 
+                  color: 'white',
+                  fontSize: '16px',
+                  padding: '12px 20px',
+                  minWidth: 'auto',
+                  border: 'none',
+                  borderRadius: '25px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  boxShadow: '0 4px 8px rgba(220, 53, 69, 0.3)',
+                  transition: 'all 0.3s ease',
+                  marginLeft: '15px'
+                }}
+              >
+                ✨ 予約新規登録 ({selectedCells.size}セル選択中)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
+
+      {/* Excel風スケジュールコンテナ */}
+      <div className="excel-schedule-container" style={{
+        width: '100%',
+        maxWidth: '100vw',
+        height: 'calc(100vh - 180px)',
+        overflow: 'auto',
+        border: '1px solid #ccc',
+        backgroundColor: '#fff',
+        position: 'relative',
+        boxSizing: 'border-box',
+        margin: 0
+      }}>
+        <div 
+          className="excel-schedule-container" 
+          ref={tableContainerRef}
           style={{
-            padding: '8px 16px',
-            backgroundColor: selectedCells.size > 0 ? '#dc3545' : '#ccc',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: selectedCells.size > 0 ? 'pointer' : 'not-allowed'
+            width: '100%',
+            height: 'calc(100vh - 200px)',
+            overflow: 'auto',
+            border: '1px solid #ccc',
+            backgroundColor: '#fff',
+            position: 'relative',
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#c0c0c0 #f5f5f5'
           }}
         >
-          新規予約 ({selectedCells.size}セル選択中)
-        </button>
-      </div>
-
-      {/* グリッド */}
-      <div style={{ position: 'relative', minWidth: '2120px' }}>
-        {/* 時間ヘッダー */}
-        <div style={{ position: 'sticky', top: 0, zIndex: 100, backgroundColor: 'white' }}>
-          <div style={{ display: 'flex', borderBottom: '2px solid #ddd' }}>
-            <div style={{ width: '200px', height: '32px', border: '1px solid #ddd', backgroundColor: '#f8f9fa', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-              設備 / 時間
-            </div>
-            {Array.from({ length: 24 }, (_, hour) => (
-              <div key={hour} style={{ width: '80px', height: '32px', border: '1px solid #ddd', backgroundColor: '#f8f9fa', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-                {hour.toString().padStart(2, '0')}:00
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 設備行 */}
-        {equipments.map((equipment, equipmentIndex) => (
-          <div key={equipment.id} style={{ display: 'flex', position: 'relative' }}>
-            {/* 設備名 */}
-            <div style={{ width: '200px', height: '40px', border: '1px solid #ddd', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8f9fa', fontWeight: 'bold' }}>
-              {equipment.name}
+          {/* 固定ヘッダー：時間軸 */}
+          <div className="time-header-fixed" style={{
+            position: 'sticky',
+            top: 0,
+            left: 0,
+            zIndex: 100,
+            backgroundColor: '#f0f0f0',
+            borderBottom: '2px solid #ccc',
+            display: 'flex',
+            minWidth: `${80 + 96 * 20}px`
+          }}>
+            {/* 左上の空白セル */}
+            <div style={{
+              width: '80px',
+              height: '40px',
+              backgroundColor: '#e0e0e0',
+              border: '1px solid #ccc',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 'bold',
+              fontSize: '12px',
+              position: 'sticky',
+              left: 0,
+              zIndex: 101,
+              flexShrink: 0
+            }}>
+              設備/時間
             </div>
             
-            {/* 時間セル */}
-            {timeSlots.map(({ slot, time }) => {
-              const cellId = `${equipment.id}-${slot}`;
-              const isSelected = selectedCells.has(cellId);
-              const hour = Math.floor(slot / 4);
-              const minute = (slot % 4) * 15;
-              const isHourBorder = minute === 0;
-              
-              return (
-                <div
-                  key={slot}
-                  onClick={() => handleCellClick(equipment.id, slot)}
-                  style={{
-                    width: '20px',
-                    height: '40px',
-                    border: '1px solid #ddd',
-                    borderLeft: isHourBorder ? '2px solid #666' : '1px solid #ddd',
-                    backgroundColor: isSelected ? '#007bff' : 'white',
-                    cursor: 'pointer',
-                    opacity: isSelected ? 0.7 : 1
-                  }}
-                  title={`${equipment.name} ${time}`}
-                />
-              );
-            })}
-            
-            {/* 予約バー */}
-            {reservations
-              .filter(reservation => reservation.equipment_id === equipment.id)
-              .map(reservation => (
-                <div
-                  key={reservation.id}
-                  style={getReservationStyle(reservation, equipmentIndex)}
-                  title={`${reservation.title} (${dayjs(reservation.start_datetime).format('HH:mm')}-${dayjs(reservation.end_datetime).format('HH:mm')})`}
-                >
-                  {reservation.title}
+            {/* 時間ヘッダー（0:00～23:00の24マス） */}
+            <div style={{ display: 'flex', flexShrink: 0 }}>
+              {Array.from({ length: 24 }, (_, hour) => (
+                <div key={hour} style={{
+                  width: '80px',
+                  height: '40px',
+                  backgroundColor: '#f0f0f0',
+                  border: '1px solid #ccc',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  color: '#333',
+                  flexShrink: 0
+                }}>
+                  {`${hour.toString().padStart(2, '0')}:00`}
                 </div>
               ))}
+            </div>
           </div>
-        ))}
-      </div>
 
-      {/* 予約フォーム */}
-      {showForm && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', width: '400px', maxHeight: '80vh', overflow: 'auto' }}>
-            <h3>新規予約</h3>
-            
-            <div style={{ marginBottom: '15px' }}>
-              <label>タイトル:</label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', marginTop: '5px' }}
-                placeholder="予約のタイトルを入力"
-              />
-            </div>
-
-            <div style={{ marginBottom: '15px' }}>
-              <label>設備:</label>
-              <select
-                value={formData.equipment_id}
-                onChange={(e) => setFormData(prev => ({ ...prev, equipment_id: parseInt(e.target.value) }))}
-                style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', marginTop: '5px' }}
-              >
-                {equipments.map(equipment => (
-                  <option key={equipment.id} value={equipment.id}>{equipment.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ marginBottom: '15px' }}>
-              <label>担当者:</label>
-              <select
-                value={formData.employee_id}
-                onChange={(e) => setFormData(prev => ({ ...prev, employee_id: parseInt(e.target.value) }))}
-                style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', marginTop: '5px' }}
-              >
-                {employees.map(employee => (
-                  <option key={employee.id} value={employee.id}>{employee.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-              <div style={{ flex: 1 }}>
-                <label>開始時刻:</label>
-                <input
-                  type="time"
-                  value={formData.start_time}
-                  onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', marginTop: '5px' }}
-                />
+          {/* スクロール可能なコンテンツエリア */}
+          <div 
+            className="schedule-content-area" 
+            style={{
+              position: 'relative',
+              minWidth: `${80 + 96 * 20}px`
+            }}
+          >
+            {/* 設備行とスケジュールセル */}
+            {equipments.length === 0 ? (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '300px',
+                backgroundColor: '#f8f9fa',
+                border: '2px dashed #dee2e6',
+                margin: '20px',
+                borderRadius: '8px'
+              }}>
+                <div style={{
+                  textAlign: 'center',
+                  color: '#6c757d',
+                  fontSize: '18px'
+                }}>
+                  <div style={{ marginBottom: '10px', fontSize: '24px' }}>📋</div>
+                  <div>設備が登録されていません</div>
+                  <div style={{ fontSize: '14px', marginTop: '8px', opacity: 0.7 }}>
+                    管理画面から設備を登録してください
+                  </div>
+                </div>
               </div>
-              <div style={{ flex: 1 }}>
-                <label>終了時刻:</label>
-                <input
-                  type="time"
-                  value={formData.end_time}
-                  onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', marginTop: '5px' }}
-                />
-              </div>
-            </div>
+            ) : (
+              equipments.map((equipment, equipmentIndex) => (
+                <div key={equipment.id} className="excel-date-row" style={{
+                  display: 'flex',
+                  borderBottom: '1px solid #ccc',
+                  minHeight: '40px',
+                  position: 'relative',
+                  overflow: 'visible'
+                }}>
+                  {/* 固定設備セル */}
+                  <div className="date-cell-fixed" style={{
+                    position: 'sticky',
+                    left: 0,
+                    zIndex: 50,
+                    width: '80px',
+                    backgroundColor: '#f8f9fa',
+                    border: '1px solid #ccc',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '2px',
+                    fontSize: '11px',
+                    fontWeight: '500',
+                    lineHeight: '1.1',
+                    borderRight: '2px solid #999'
+                  }}>
+                    <div style={{ margin: 0 }}>{equipment.name}</div>
+                  </div>
 
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setShowForm(false)}
-                style={{ padding: '8px 16px', border: '1px solid #ddd', backgroundColor: 'white', borderRadius: '4px', cursor: 'pointer' }}
-              >
-                キャンセル
-              </button>
-              <button
-                onClick={saveReservation}
-                style={{ padding: '8px 16px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-              >
-                保存
-              </button>
-            </div>
+                  {/* 時間セル（96マス：15分間隔） */}
+                  {Array.from({ length: 96 }, (_, slot) => {
+                    const hour = Math.floor(slot / 4);
+                    const minute = (slot % 4) * 15;
+                    const cellId = `equipment-${equipment.id}-${slot}`;
+                    const isSelected = selectedCells.has(cellId);
+                    const isHourBorder = minute === 0;
+
+                    return (
+                      <div
+                        key={slot}
+                        className={`time-cell-15min ${isSelected ? 'selected' : ''} ${isHourBorder ? 'hour-border' : ''}`}
+                        style={{
+                          width: '20px',
+                          height: '40px',
+                          border: '1px solid #eee',
+                          borderLeft: isHourBorder ? '2px solid #999' : '1px solid #ccc',
+                          backgroundColor: isSelected ? '#007bff' : 'white',
+                          cursor: 'pointer',
+                          opacity: isSelected ? 0.7 : 1,
+                          transition: 'background-color 0.2s ease'
+                        }}
+                        onClick={() => handleCellClick(equipment.id, slot)}
+                        title={`${equipment.name} ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`}
+                      />
+                    );
+                  })}
+
+                  {/* 予約バー（月別ビューのロジックと統一） */}
+                  {reservations
+                    .filter(reservation => reservation.equipment_id === equipment.id)
+                    .map(reservation => {
+                      const schedule = reservationToSchedule(reservation);
+                      const isSelected = selectedSchedule?.id === reservation.id;
+                      
+                      return (
+                        <div
+                          key={reservation.id}
+                          style={getReservationStyle(reservation, equipmentIndex)}
+                          onMouseDown={(e) => handleScheduleMouseDown(schedule, e)}
+                          onDoubleClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setSelectedSchedule(reservation);
+                            setShowRegistrationModal(true);
+                          }}
+                          title={`${reservation.title} (${dayjs(reservation.start_datetime).format('HH:mm')}-${dayjs(reservation.end_datetime).format('HH:mm')}) ${reservation.employee_name || ''}`}
+                        >
+                          <div style={{ 
+                            overflow: 'hidden', 
+                            textOverflow: 'ellipsis', 
+                            whiteSpace: 'nowrap',
+                            width: '100%',
+                            textAlign: 'center'
+                          }}>
+                            {reservation.title}
+                          </div>
+                          
+                          {/* リサイズハンドル（月別ビューのロジックと統一） */}
+                          {isSelected && (
+                            <>
+                              <div
+                                className="resize-handle resize-start"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleResizeMouseDown(schedule, 'start', e);
+                                }}
+                                style={{ 
+                                  position: 'absolute', 
+                                  left: -2, 
+                                  top: 0, 
+                                  width: 8, 
+                                  height: '100%', 
+                                  cursor: 'ew-resize', 
+                                  zIndex: 10001,
+                                  pointerEvents: 'auto',
+                                  backgroundColor: 'rgba(255, 255, 255, 0.4)',
+                                  border: '1px solid rgba(255, 255, 255, 0.8)',
+                                  borderRadius: '2px 0 0 2px',
+                                  transition: 'all 0.2s ease',
+                                  opacity: 1
+                                }}
+                              />
+                              <div
+                                className="resize-handle resize-end"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleResizeMouseDown(schedule, 'end', e);
+                                }}
+                                style={{ 
+                                  position: 'absolute', 
+                                  right: -2, 
+                                  top: 0, 
+                                  width: 8, 
+                                  height: '100%', 
+                                  cursor: 'ew-resize', 
+                                  zIndex: 10001,
+                                  pointerEvents: 'auto',
+                                  backgroundColor: 'rgba(255, 255, 255, 0.4)',
+                                  border: '1px solid rgba(255, 255, 255, 0.8)',
+                                  borderRadius: '0 2px 2px 0',
+                                  transition: 'all 0.2s ease',
+                                  opacity: 1
+                                }}
+                              />
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              ))
+            )}
           </div>
         </div>
+      </div>
+
+      {/* 予約登録モーダル */}
+      {showRegistrationModal && (
+        <ScheduleRegistrationModal
+          isOpen={showRegistrationModal}
+          onClose={() => {
+            setShowRegistrationModal(false);
+            setSelectedSchedule(null);
+            setSelectedCells(new Set());
+          }}
+          defaultStart={(() => {
+            if (selectedCells.size > 0) {
+              const cellIds = Array.from(selectedCells);
+              const slots = cellIds.map(id => parseInt(id.split('-')[2]));
+              const minSlot = Math.min(...slots);
+              const hour = Math.floor(minSlot / 4);
+              const minute = (minSlot % 4) * 15;
+              const date = new Date(selectedDate);
+              date.setHours(hour, minute, 0, 0);
+              return date;
+            }
+            const date = new Date(selectedDate);
+            date.setHours(9, 0, 0, 0);
+            return date;
+          })()}
+          defaultEnd={(() => {
+            if (selectedCells.size > 0) {
+              const cellIds = Array.from(selectedCells);
+              const slots = cellIds.map(id => parseInt(id.split('-')[2]));
+              const maxSlot = Math.max(...slots);
+              const hour = Math.floor((maxSlot + 1) / 4);
+              const minute = ((maxSlot + 1) % 4) * 15;
+              const date = new Date(selectedDate);
+              date.setHours(hour, minute, 0, 0);
+              return date;
+            }
+            const date = new Date(selectedDate);
+            date.setHours(10, 0, 0, 0);
+            return date;
+          })()}
+          selectedDepartmentId={0}
+          defaultEmployeeId={employees[0]?.id}
+          employees={employees}
+          equipments={equipments}
+          defaultEquipmentId={selectedEquipmentId || equipments[0]?.id}
+          initialValues={selectedSchedule ? {
+            title: selectedSchedule.title,
+            scheduleId: selectedSchedule.id
+          } : undefined}
+          onCreated={handleReservationSave}
+        />
       )}
     </div>
   );

@@ -16,22 +16,22 @@ export const testBackendConnection = async () => {
     
     // 部署データ取得テスト
     console.log('2️⃣ Testing departments endpoint...')
-    const departmentsResponse = await api.get('/departments')
+    const departmentsResponse = await api.get('/admin/departments')
     console.log('✅ Departments data:', departmentsResponse.data?.length || 0, 'items')
     
     // 社員データ取得テスト
     console.log('3️⃣ Testing employees endpoint...')
-    const employeesResponse = await api.get('/employees')
+    const employeesResponse = await api.get('/admin/employees')
     console.log('✅ Employees data:', employeesResponse.data?.length || 0, 'items')
     
     // 設備データ取得テスト
     console.log('4️⃣ Testing equipment endpoint...')
-    const equipmentResponse = await api.get('/equipment')
+    const equipmentResponse = await api.get('/admin/equipment')
     console.log('✅ Equipment data:', equipmentResponse.data?.length || 0, 'items')
     
     // スケジュールデータ取得テスト
     console.log('5️⃣ Testing schedules endpoint...')
-    const schedulesResponse = await api.get('/schedules')
+    const schedulesResponse = await api.get('/admin/schedules')
     console.log('✅ Schedules data:', schedulesResponse.data?.length || 0, 'items')
     
     console.log('🎉 All backend connections successful!')

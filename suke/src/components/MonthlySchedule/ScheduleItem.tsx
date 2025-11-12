@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { Schedule, Employee } from '../../types';
+import { safeHexColor } from '../../utils/color';
 
 interface ScheduleItemProps {
   schedule: Schedule;
@@ -61,8 +62,8 @@ const ScheduleItem = memo<ScheduleItemProps>(({
       key={`schedule-${schedule.id}`}
       className={`schedule-item ${selectedSchedule?.id === schedule.id ? 'selected' : ''}`}
       style={{
-        background: `linear-gradient(180deg, ${lightenColor(schedule.color || '#3498db', 25)} 0%, ${schedule.color || '#3498db'} 100%)`,
-        border: `1px solid ${lightenColor(schedule.color || '#3498db', -10)}`,
+        background: `linear-gradient(180deg, ${lightenColor(schedule.color || '#3498db', 0.15)} 0%, ${safeHexColor(schedule.color || '#3498db')} 100%)`,
+        border: `1px solid ${lightenColor(schedule.color || '#3498db', -0.10)}`,
         width: `${width}px`,
         left: `${leftOffset}px`,
         position: 'absolute',

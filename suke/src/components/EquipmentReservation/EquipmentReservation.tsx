@@ -574,10 +574,10 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
             
             {/* ナビゲーションボタン */}
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <button className="nav-btn" onClick={() => (window.location.href = '/monthly')}>月別</button>
-            <button className="nav-btn" onClick={() => (window.location.href = '/daily')}>日別</button>
-            <button className="nav-btn" onClick={() => (window.location.href = '/all-employees')}>全社員</button>
-            <button className="nav-btn active" onClick={() => (window.location.href = '/equipment')}>設備</button>
+            <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/monthly')}>月別</button>
+            <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/daily')}>日別</button>
+            <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/all-employees')}>全社員</button>
+            <button className="nav-btn active" onClick={() => (window.location.href = '/scheduleboard/equipment')}>設備</button>
             </div>
 
             {/* スケール制御 */}

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
 import { Schedule } from '../../types';
+import { safeHexColor } from '../../utils/color';
 import './EventBarGhost.css';
 
 type DragMode = 'none' | 'move' | 'resize-left' | 'resize-right';
@@ -425,19 +426,8 @@ const EventBar: React.FC<EventBarProps> = ({
   // if (debug) { ... }
   
   const barStyle: React.CSSProperties = useMemo(() => {
-    // 日別スケジュール風のシンプルなスタイル
-    const safeColor = schedule.color || '#6c757d';
-    const lightenColor = (color: string, percent: number) => {
-      // 簡易的な色の明度調整
-      const num = parseInt(color.replace('#', ''), 16);
-      const amt = Math.round(2.55 * percent);
-      const R = (num >> 16) + amt;
-      const G = (num >> 8 & 0x00FF) + amt;
-      const B = (num & 0x0000FF) + amt;
-      return '#' + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
-        (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
-        (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
-    };
+    // 統一されたイベントバースタイル
+    const baseColor = safeHexColor(schedule.color || '#3498db');
 
     return {
       position: 'absolute',
@@ -445,13 +435,13 @@ const EventBar: React.FC<EventBarProps> = ({
       top: `${calculatedTop}px`,
       width: `${currentWidthPx}px`,
       height: `${height}px`,
-      // 日別スケジュール風のグラデーション背景
+      // 統一されたグラデーション背景
       background: showGhost 
-        ? `${safeColor}80` // ゴースト時は半透明
-        : `linear-gradient(180deg, ${lightenColor(safeColor, 25)} 0%, ${safeColor} 100%)`,
+        ? `${baseColor}80` // ゴースト時は半透明
+        : `linear-gradient(180deg, ${lightenColor(baseColor, 0.15)} 0%, ${baseColor} 100%)`,
       border: showGhost 
         ? '2px dashed #333' // ゴースト時は点線
-        : `1px solid ${lightenColor(safeColor, -10)}`, // 通常時は濃い色の境界線
+        : `1px solid ${lightenColor(baseColor, -0.10)}`, // 通常時は濃い色の境界線
       borderRadius: 4,
       display: 'flex',
       flexDirection: 'column',

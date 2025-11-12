@@ -94,7 +94,7 @@ div.schedule-table-container.equipment-reservation.schedule-grid-container {
 /* 親コンテナのレスポンシブ対応 */
 @media (max-width: 1200px) {
   .schedule-content {
-    max-width: 98vw;
+    max-width: 100vw;
     min-width: 600px;
   }
 }

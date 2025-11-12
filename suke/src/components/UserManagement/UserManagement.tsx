@@ -78,9 +78,9 @@ const UserManagement: React.FC<UserManagementProps> = ({
     
     try {
       if (editingDepartment) {
-        await api.put(`/departments/${editingDepartment.id}`, departmentForm);
+        await api.put(`/admin/departments/${editingDepartment.id}`, departmentForm);
       } else {
-        await api.post('/departments', departmentForm);
+        await api.post('/admin/departments', departmentForm);
       }
       
       onDataRefresh();
@@ -99,7 +99,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
     setError(null);
     
     try {
-      await api.delete(`/departments/${id}`);
+      await api.delete(`/admin/departments/${id}`);
       onDataRefresh();
     } catch (err: any) {
       setError(err.response?.data?.error || 'エラーが発生しました');
@@ -129,7 +129,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
     setError(null);
     
     try {
-      await api.put(`/departments/${id}/move`, { direction });
+      await api.put(`/admin/departments/${id}/move`, { direction });
       onDataRefresh();
     } catch (err: any) {
       setError(err.response?.data?.error || '移動に失敗しました');
@@ -146,9 +146,9 @@ const UserManagement: React.FC<UserManagementProps> = ({
     
     try {
       if (editingEmployee) {
-        await api.put(`/employees/${editingEmployee.id}`, employeeForm);
+        await api.put(`/admin/employees/${editingEmployee.id}`, employeeForm);
       } else {
-        await api.post('/employees', employeeForm);
+        await api.post('/admin/employees', employeeForm);
       }
       
       onDataRefresh();
@@ -167,7 +167,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
     setError(null);
     
     try {
-      await api.delete(`/employees/${id}`);
+      await api.delete(`/admin/employees/${id}`);
       onDataRefresh();
     } catch (err: any) {
       setError(err.response?.data?.error || 'エラーが発生しました');
@@ -199,7 +199,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
     setError(null);
     
     try {
-      await api.put(`/employees/${id}/move`, { direction });
+      await api.put(`/admin/employees/${id}/move`, { direction });
       onDataRefresh();
     } catch (err: any) {
       setError(err.response?.data?.error || '移動に失敗しました');
@@ -216,9 +216,9 @@ const UserManagement: React.FC<UserManagementProps> = ({
     
     try {
       if (editingEquipment) {
-        await api.put(`/equipment/${editingEquipment.id}`, equipmentForm);
+        await api.put(`/admin/equipment/${editingEquipment.id}`, equipmentForm);
       } else {
-        await api.post('/equipment', equipmentForm);
+        await api.post('/admin/equipment', equipmentForm);
       }
       
       onDataRefresh();
@@ -237,7 +237,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
     setError(null);
     
     try {
-      await api.delete(`/equipment/${id}`);
+      await api.delete(`/admin/equipment/${id}`);
       onDataRefresh();
     } catch (err: any) {
       setError(err.response?.data?.error || 'エラーが発生しました');
@@ -270,7 +270,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
     setError(null);
     
     try {
-      await api.put(`/equipment/${id}/move`, { direction });
+      await api.put(`/admin/equipment/${id}/move`, { direction });
       onDataRefresh();
     } catch (err: any) {
       setError(err.response?.data?.error || '移動に失敗しました');

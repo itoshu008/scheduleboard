@@ -20,8 +20,11 @@ const fmtYMD = (d: Date) => {
 };
 
 const getMonthRange = (base = new Date()) => {
+  // タイムゾーン変換を考慮して前後1日広げる
   const first = new Date(base.getFullYear(), base.getMonth(), 1);
+  first.setDate(first.getDate() - 1); // 前月末も含める
   const last  = new Date(base.getFullYear(), base.getMonth() + 1, 0);
+  last.setDate(last.getDate() + 1); // 翌月1日も含める
   return { start_date: fmtYMD(first), end_date: fmtYMD(last) };
 };
 
@@ -43,10 +46,10 @@ export function useAutoRealTime(intervalMs: number = 3000, selectedDate?: Date) 
         const range = getMonthRange(selectedDate ?? new Date());
         
         const [departmentsRes, employeesRes, equipmentRes, schedulesRes] = await Promise.all([
-          api.get('/departments'),
-          api.get('/employees'),
-          api.get('/equipment'),
-          api.get('/schedules', { params: range }), // ★ここだけパラメータ必須
+          api.get('/admin/departments'),
+          api.get('/admin/employees'),
+          api.get('/admin/equipment'),
+          api.get('/admin/schedules', { params: range }), // ★ここだけパラメータ必須
         ])
 
       const newState = {

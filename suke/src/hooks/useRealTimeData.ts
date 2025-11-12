@@ -33,10 +33,10 @@ export function useRealTimeData() {
       console.log('🔄 Fetching real-time data...')
       
       const [departmentsRes, employeesRes, equipmentRes, schedulesRes] = await Promise.all([
-        api.get('/departments'),
-        api.get('/employees'),
-        api.get('/equipment'),
-        api.get('/schedules'),
+        api.get('/admin/departments'),
+        api.get('/admin/employees'),
+        api.get('/admin/equipment'),
+        api.get('/admin/schedules'),
       ])
 
       const newState = {
@@ -127,7 +127,7 @@ export function useRealTimeData() {
   // 特定データの更新
   const refreshSchedules = useCallback(async () => {
     try {
-      const response = await api.get('/schedules')
+      const response = await api.get('/admin/schedules')
       const newSchedules = Array.isArray(response.data) ? response.data : []
       
       setState(prev => ({

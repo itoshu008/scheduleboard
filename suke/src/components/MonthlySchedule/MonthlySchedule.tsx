@@ -849,8 +849,11 @@ const MonthlySchedule: React.FC<MonthlyScheduleProps> = ({
           const deltaX = e.clientX - currentState.dragData.startX;
           const deltaY = e.clientY - currentState.dragData.startY;
           
-          // 時間軸の移動（横方向）
-          const slotDelta = Math.round(deltaX / scaledCellWidth);
+          // 時間軸の移動（横方向）- セルにスナップするように計算
+          // より明確なスナップのために、スロット計算を確実に整数にする
+          const exactSlotDelta = deltaX / scaledCellWidth;
+          const slotDelta = Math.round(exactSlotDelta);
+          // スロットは必ず整数値にスナップ
           const newStartSlot = Math.max(0, Math.min(95, currentState.dragData.startSlot + slotDelta));
           
           // 日付軸の移動（縦方向）

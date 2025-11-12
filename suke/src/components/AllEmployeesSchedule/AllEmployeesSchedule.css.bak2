@@ -1,124 +1,7 @@
 /* =================================================================== */
 /* 全社員スケジュール専用CSS - 完全独立名前空間 */
 /* 他のスケジュール（日別、月別）からの影響を完全遮断 */
-/* 名前空間: .all-employees-schedule */
-/* =================================================================== */
-
-/* 全社員スケジュールのルートコンテナ */
-.all-employees-schedule {
-  height: auto !important;
-  min-height: auto !important;
-  max-height: none !important;
-  display: flex !important;
-  flex-direction: column !important;
-  background: transparent !important;
-  overflow: visible !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-/* App.tsxの.app-mainからの影響を完全無効化 */
-/* 注意: .app-main全体に影響を与えると他のページにも影響するため、全社員スケジュール専用のセレクタを使用 */
-
-/* 全社員スケジュールの最初の要素（schedule-header）のマージンを強制削除 */
-/* 他のページのCSSを上書きするため、より具体的なセレクタを使用 */
-.app-main .schedule-header:first-child,
-.schedule-header:first-child,
-.schedule-header {
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-  padding-top: 16px !important;
-  padding-bottom: 16px !important;
-  padding-left: 20px !important;
-  padding-right: 20px !important;
-}
-
-/* grid-top-controlsのマージンを強制削除 */
-/* 他のページのCSSを上書きするため、より具体的なセレクタを使用 */
-.app-main .grid-top-controls,
-.grid-top-controls {
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  padding-left: 0 !important;
-  padding-right: 0 !important;
-}
-
-/* excel-schedule-containerのマージンを強制削除 */
-/* 全社員スケジュール専用ルールは下記で上書き */
-
-/* 全要素のマージンとパディングを強制削除（最後の手段） */
-/* 全社員スケジュールのexcel-schedule-containerは除外（下記の専用ルールで上書き） */
-/* 注意: :not()セレクタは単純セレクタのみを受け付けるため、このルールは削除 */
-
-/* 全社員スケジュールページ専用の強力な上書きルール */
-/* 他のページのCSSファイル（DailyScheduleContainer.css、SimpleEquipmentReservation.cssなど）を上書き */
-body .app-main .schedule-header,
-body .app-main .grid-top-controls {
-  margin: 0 !important;
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-}
-
-/* このルールはファイルの最後（1737行目以降）に統合 */
-
-/* 全社員スケジュールのschedule-headerとgrid-top-controlsの間の余白を削除 */
-.app-main .schedule-header + .grid-top-controls {
-  margin-top: 0 !important;
-}
-
-/* 全社員スケジュールのgrid-top-controlsとexcel-schedule-containerの間の余白を削除 */
-/* このルールは下記の統合ルールで上書きされる */
-
-/* 全社員スケジュール内のすべての要素の余白を強制削除 */
-/* excel-schedule-containerは除外（下記の専用ルールで上書き） */
-/* 注意: :not()セレクタは単純セレクタのみを受け付けるため、このルールは削除 */
-
-.all-employees-schedule .schedule-header {
-  margin-bottom: 0 !important;
-}
-
-.all-employees-schedule .grid-top-controls {
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-/* grid-controls-row-thirdを非表示にして高さを0に */
-.all-employees-schedule .grid-controls-row-third {
-  display: none !important;
-  height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  visibility: hidden !important;
-  overflow: hidden !important;
-}
-
-/* grid-top-controlsの直後の要素（error-message、loading-center、excel-schedule-container）のマージンを削除 */
-.all-employees-schedule .grid-top-controls + * {
-  margin-top: 0 !important;
-}
-
-.all-employees-schedule .error-message {
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-}
-
-.all-employees-schedule .loading-center {
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-}
-
-/* =================================================================== */
-/* 【最重要】全社員スケジュールのexcel-schedule-containerを上に移動 */
-/* このルールはファイルの最後（1737行目以降）に配置 */
+/* 名前空間: .all-employees-schedule-page */
 /* =================================================================== */
 
 /* === イベントバー選択状態（月別から完全移植） === */
@@ -150,28 +33,23 @@ body .app-main .grid-top-controls {
 }
 
 /* 全社員スケジュール専用スケジュールテーブルコンテナ - 完全独立名前空間 */
-/* 注意: ルート要素がFragmentなので、汎用セレクタも追加 */
-.schedule-table-container,
-.all-employees-schedule .schedule-table-container,
-.all-employees-schedule .all-employees-schedule-container,
-.all-employees-schedule .schedule-table-container.all-employees-schedule.schedule-grid-container,
 .all-employees-schedule-page .all-employees-schedule .schedule-table-container,
 .all-employees-schedule-page .all-employees-schedule-container,
 .all-employees-schedule-page .schedule-table-container.all-employees-schedule.schedule-grid-container {
   /* 基本サイズ設定 */
-  width: 100% !important;
-  max-width: 100vw !important;
-  min-width: 0 !important;
+  width: 2070px;
+  max-width: 2070px;
+  min-width: 2070px;
   height: auto;
   min-height: 400px;
   max-height: none;
   
   /* 位置設定 */
-  margin: 0 !important;
+  margin: 16px;
   margin-top: 0 !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-  margin-bottom: 0 !important;
+  margin-left: 16px !important;
+  margin-right: 16px !important;
+  margin-bottom: 16px;
   
   /* スクロール設定 */
   overflow: auto !important;
@@ -226,10 +104,10 @@ body .app-main .grid-top-controls {
   transform: translateZ(0);
   
   /* スタイル設定 */
-  border: 1px solid #ccc !important;
-  border-radius: 0 !important;
-  background: #fff !important;
-  box-shadow: none !important;
+  border: 2px solid var(--border-blue);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 4px 12px var(--shadow);
   cursor: grab;
   
   /* カスタムプロパティ設定 */
@@ -486,8 +364,18 @@ body .app-main .grid-top-controls {
 
 
 
-/* 全社員スケジュール専用のschedule-header（他のページのCSSを上書き） */
-/* 重複定義を削除し、上記の定義を使用 */
+.schedule-header {
+  background: var(--surface);
+  border-bottom: 2px solid var(--primary-blue);
+  box-shadow: 0 2px 8px var(--shadow);
+  padding: 8px 20px;
+  flex-shrink: 0;
+  position: relative;
+  top: auto;
+  z-index: 1000;
+  width: 100%;
+  margin-bottom: 0;
+}
 
 /* Schedule Controls - 添付画像スタイル */
 .schedule-controls {
@@ -500,34 +388,6 @@ body .app-main .grid-top-controls {
   top: auto;
   z-index: 999;
   width: 100%;
-}
-
-/* grid-top-controls - 日別スケジュールと同じ定義 */
-/* 他のページのCSSを上書きするため、より具体的なセレクタを使用 */
-.app-main .grid-top-controls,
-.grid-top-controls {
-  position: relative;
-  top: auto;
-  left: auto;
-  right: auto;
-  z-index: 1000;
-  overflow: visible !important;
-  overflow-x: visible !important;
-  overflow-y: visible !important;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border-blue);
-  width: 100%;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  margin: 0 !important;
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-  padding: 0 !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  padding-left: 0 !important;
-  padding-right: 0 !important;
 }
 
 .action-buttons {
@@ -600,23 +460,19 @@ body .app-main .grid-top-controls {
 }
 
 /* 全社員スケジュールコンテナ - 超強力な拘束設定 */
-/* 注意: ルート要素がFragmentなので、汎用セレクタも追加 */
-.schedule-table-container,
 .all-employees-schedule .schedule-table-container {
-  /* 超強力な位置拘束 - 初期レンダリング時から適用 */
-  position: relative !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: auto !important;
-  margin-top: 0 !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-  margin-bottom: 0 !important;
-  transform: none !important;
+  /* 超強力な位置拘束 */
+  position: relative;
+  top: auto;
+  left: auto;
+  right: auto;
+  margin-top: 0;
+  margin-left: 10px;
+  margin-right: 10px;
+  transform: none;
   
   /* 超強力なサイズ拘束 */
-  width: 100% !important;
-  max-width: 100vw !important;
+  width: 95%;
   /* 高さは動的に計算されるため、CSSでは最小値のみ設定 */
   min-height: 200px;
   
@@ -1005,102 +861,6 @@ body .app-main .grid-top-controls {
   text-align: center !important;
 }
 
-/* 社員名の横の三角形アイコンを完全削除 - 最強のルール */
-html body .app-main .all-employees-schedule .date-cell-fixed::after,
-html body .app-main .all-employees-schedule .date-cell-fixed::before,
-html body .app-main .all-employees-schedule .date-cell-fixed *::after,
-html body .app-main .all-employees-schedule .date-cell-fixed *::before,
-html body .app-main .all-employees-schedule .date-cell-fixed * *::after,
-html body .app-main .all-employees-schedule .date-cell-fixed * *::before,
-.all-employees-schedule .date-cell-fixed::after,
-.all-employees-schedule .date-cell-fixed::before,
-.all-employees-schedule .date-cell-fixed *::after,
-.all-employees-schedule .date-cell-fixed *::before,
-.all-employees-schedule .date-cell-fixed * *::after,
-.all-employees-schedule .date-cell-fixed * *::before,
-.all-employees-schedule .employee-name::after,
-.all-employees-schedule .employee-name::before,
-.all-employees-schedule .employee-name *::after,
-.all-employees-schedule .employee-name *::before {
-  content: none !important;
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  width: 0 !important;
-  height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: none !important;
-  background: none !important;
-  position: absolute !important;
-  left: -9999px !important;
-  top: -9999px !important;
-}
-
-/* 三角形アイコンを完全に削除（すべての可能性をカバー） */
-html body .app-main .all-employees-schedule .date-cell-fixed button,
-html body .app-main .all-employees-schedule .date-cell-fixed .dropdown,
-html body .app-main .all-employees-schedule .date-cell-fixed .triangle,
-html body .app-main .all-employees-schedule .date-cell-fixed .arrow,
-html body .app-main .all-employees-schedule .date-cell-fixed [class*="triangle"],
-html body .app-main .all-employees-schedule .date-cell-fixed [class*="dropdown"],
-html body .app-main .all-employees-schedule .date-cell-fixed [class*="arrow"],
-.all-employees-schedule .date-cell-fixed button,
-.all-employees-schedule .date-cell-fixed .dropdown,
-.all-employees-schedule .date-cell-fixed .triangle,
-.all-employees-schedule .date-cell-fixed .arrow,
-.all-employees-schedule .date-cell-fixed [class*="triangle"],
-.all-employees-schedule .date-cell-fixed [class*="dropdown"],
-.all-employees-schedule .date-cell-fixed [class*="arrow"],
-.all-employees-schedule .date-cell-fixed svg,
-.all-employees-schedule .date-cell-fixed i,
-.all-employees-schedule .date-cell-fixed span[class*="icon"],
-.all-employees-schedule .date-cell-fixed div[class*="icon"] {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  width: 0 !important;
-  height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  position: absolute !important;
-  left: -9999px !important;
-  top: -9999px !important;
-}
-
-/* 社員セル - 全社員スケジュール専用名前空間（日別スケジュールと同じスタイル） */
-/* 汎用ルール（.date-cell-fixed）を上書き */
-html body .app-main .all-employees-schedule .date-cell-fixed,
-.all-employees-schedule .date-cell-fixed {
-  position: sticky !important;
-  left: 0 !important;
-  z-index: 50 !important;
-  width: 150px !important;
-  box-sizing: border-box !important;
-  background: #f8f9fa !important;
-  border: 1px solid #ccc !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 2px !important;
-  font-size: 11px !important;
-  font-weight: 500 !important;
-  line-height: 1.1 !important;
-  color: #333 !important;
-  text-align: center !important;
-  box-shadow: none !important;
-  transition: none !important;
-  min-height: 40px !important;
-  height: 40px !important;
-  /* 三角形アイコンを完全に削除 */
-  overflow: visible !important;
-  /* すべての疑似要素と子要素を無効化 */
-  appearance: none !important;
-  -webkit-appearance: none !important;
-  -moz-appearance: none !important;
-}
-
 /* 社員セル - 全社員スケジュール専用名前空間 */
 .all-employees-schedule-page .all-employees-schedule .schedule-employee-cell {
   width: 150px !important;
@@ -1137,19 +897,36 @@ html body .app-main .all-employees-schedule .date-cell-fixed,
   display: none !important;
 }
 
+.schedule-header {
+  padding: 20px;
+  border-bottom: 1px solid #dee2e6;
+  background-color: #f8f9fa;
+}
+
+.schedule-header h2 {
+  margin: 0 0 8px 0;
+  color: #333;
+  font-size: 24px;
+}
+
+.schedule-header p {
+  margin: 0;
+  color: #666;
+  font-size: 16px;
+}
+
 .error-message {
   background-color: #f8d7da;
   color: #721c24;
   padding: 12px 20px;
   border: 1px solid #f5c6cb;
-  margin: 0 !important;
+  margin: 0 20px 20px 20px;
   border-radius: 4px;
 }
 
 .schedule-content {
   flex: 1;
-  padding: 0 !important;
-  margin: 0 !important;
+  padding: 20px;
   overflow-y: auto;
 }
 
@@ -1461,6 +1238,8 @@ html body .app-main .all-employees-schedule .date-cell-fixed,
   border-bottom: 1px solid var(--border-blue);
   width: 100%;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 4px;
+  padding: 4px 16px;
 }
 
 .grid-controls-row {
@@ -1469,9 +1248,6 @@ html body .app-main .all-employees-schedule .date-cell-fixed,
   padding: 12px 16px;
   justify-content: space-between;
   align-items: center;
-  overflow: visible !important;
-  overflow-x: visible !important;
-  overflow-y: visible !important;
   flex-wrap: wrap;
 }
 
@@ -1514,9 +1290,6 @@ html body .app-main .all-employees-schedule .date-cell-fixed,
   align-items: center;
   flex-wrap: wrap;
   border-top: 1px solid var(--border-blue);
-  overflow: visible !important;
-  overflow-x: visible !important;
-  overflow-y: visible !important;
 }
 
 .date-section {
@@ -1532,12 +1305,15 @@ html body .app-main .all-employees-schedule .date-cell-fixed,
 }
 
 .date-input {
-  padding: 8px 12px;
-  border: 1px solid var(--border-blue);
-  border-radius: 6px;
-  font-size: 0.9rem;
+  padding: 6px 10px;
+  border: 2px solid var(--border-blue);
+  border-radius: 8px;
   background: var(--surface);
   color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .date-input:hover, .date-input:focus {
@@ -1578,19 +1354,25 @@ html body .app-main .all-employees-schedule .date-cell-fixed,
 /* 日付ナビゲーションボタン */
 .date-controls {
   display: flex;
-  gap: 4px;
   align-items: center;
+  gap: 4px;
 }
 
 .date-nav-btn {
-  padding: 8px 12px;
-  border: 1px solid var(--border-blue);
+  padding: 6px 8px;
+  border: 2px solid var(--border-blue);
   background: var(--surface);
   color: var(--text-primary);
   border-radius: 6px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-weight: 600;
+  font-size: 0.8rem;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
 }
 
 .date-nav-btn:hover {
@@ -1649,32 +1431,6 @@ html body .app-main .all-employees-schedule .date-cell-fixed,
 /* 拘束設定：レイアウト、スクロールバー、サイズ等の変更禁止 */
 
 /* Excel風スケジュールコンテナの極細1pxスライダー */
-/* 注意: 汎用セレクタは削除 - 全社員スケジュール専用セレクタのみ使用 */
-
-/* excel-schedule-container - 汎用セレクタ（ルート要素がFragmentのため） */
-.excel-schedule-container {
-  /* Firefox用 - 細いスライダー */
-  scrollbar-width: thin !important;
-  scrollbar-color: #888 #f1f1f1 !important;
-  
-  /* スクロール動作を滑らかに */
-  scroll-behavior: smooth !important;
-  overflow: scroll !important;
-  overflow-x: scroll !important;
-  overflow-y: scroll !important;
-  
-  /* 横方向の余白を削減 */
-  max-width: 100vw !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  width: 100% !important;
-  top: 0 !important;
-  left: 0 !important;
-  position: relative !important;
-}
-
-/* 全社員スケジュール専用（後方互換性のため残す） */
-/* margin-topは上記の統合ルール（111-134行目）で設定（-60px !important） */
 .all-employees-schedule .excel-schedule-container {
   /* Firefox用 - 細いスライダー */
   scrollbar-width: thin !important;
@@ -1688,16 +1444,8 @@ html body .app-main .all-employees-schedule .date-cell-fixed,
   
   /* 横方向の余白を削減 */
   max-width: 100vw !important;
-  /* margin-topは上記の統合ルール（111-134行目）で設定（-60px !important） */
-  /* このルールではmargin-topを設定しない（上記のルールを尊重） */
-  margin-bottom: 0 !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-  padding: 0 !important;
+  margin: 0 !important;
   width: 100% !important;
-  top: 0 !important;
-  left: 0 !important;
-  position: relative !important;
 }
 
 /* WebKit（Chrome/Safari）用 - 極細1pxスライダー */
@@ -1833,52 +1581,4 @@ html body .app-main .all-employees-schedule .date-cell-fixed,
   box-shadow: 0 0 8px rgba(255, 215, 0, 0.5) !important;
   z-index: 20 !important;
   transform: scale(1.02) !important;
-}
-
-/* =================================================================== */
-/* 【最終手段】全社員スケジュールのexcel-schedule-containerを上に移動 */
-/* ファイルの最後に配置し、すべての他のルールを確実に上書き */
-/* grid-top-controlsの高さ分（約120px）を上に移動 */
-/* =================================================================== */
-html body .app-main .all-employees-schedule .grid-top-controls {
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-html body .app-main .all-employees-schedule .grid-top-controls + .error-message,
-html body .app-main .all-employees-schedule .grid-top-controls ~ .error-message {
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-}
-
-/* DailyScheduleのCSSを利用して、excel-schedule-containerのスタイルを統一 */
-.all-employees-schedule.daily-schedule .excel-schedule-container {
-  /* DailySchedule.cssのルールを継承 */
-  scrollbar-width: thin !important;
-  scrollbar-color: #888 #f1f1f1 !important;
-  scroll-behavior: smooth !important;
-  overflow: scroll !important;
-  overflow-x: scroll !important;
-  overflow-y: scroll !important;
-}
-
-/* 【重要】margin-topの制約を完全に解除 */
-/* インラインスタイルで動的に設定するため、CSSでは制約をかけない */
-html body .app-main .all-employees-schedule .error-message + .excel-schedule-container,
-html body .app-main .all-employees-schedule .grid-top-controls ~ .excel-schedule-container,
-html body .app-main .all-employees-schedule .excel-schedule-container:not(.loading-center),
-.all-employees-schedule.daily-schedule .excel-schedule-container,
-.all-employees-schedule .excel-schedule-container {
-  /* margin-topはインラインスタイルで動的に設定するため、CSSでは制約しない */
-  margin-bottom: 0 !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  padding-left: 0 !important;
-  padding-right: 0 !important;
-  position: relative !important;
-  z-index: 1 !important;
-  top: 0 !important;
-  left: 0 !important;
 }

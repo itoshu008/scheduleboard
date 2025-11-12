@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Page</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .box {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border: 2px solid #333;
+            border-radius: 8px;
+        }
+        h1 { color: #2196f3; }
+    </style>
+</head>
+<body>
+    <h1>✅ ScheduleBoard デプロイテスト</h1>
+    <div class="box">
+        <h2>このページが見える場合</h2>
+        <p>デプロイは正常に動作しています。</p>
+        <p>メインアプリに戻る: <a href="/scheduleboard/">ScheduleBoard</a></p>
+    </div>
+    <div class="box">
+        <h2>タイムスタンプ</h2>
+        <p id="timestamp"></p>
+    </div>
+    <script>
+        document.getElementById('timestamp').textContent = new Date().toLocaleString('ja-JP');
+    </script>
+</body>
+</html>
+
+
+
+
+

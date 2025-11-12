@@ -11,6 +11,8 @@ interface DragData {
   startDate: Date;
   originalEmployeeId: number; // 元の社員ID
   originalEquipmentId?: number; // 元の設備ID（設備予約の場合）
+  offsetX: number; // マウス位置とスケジュールバーの左上角の相対位置（横方向）
+  offsetY: number; // マウス位置とスケジュールバーの左上角の相対位置（縦方向）
 }
 
 interface DragGhost {
@@ -105,6 +107,16 @@ export const useUniversalDragResize = ({
     
     console.log('🚚 ドラッグ開始:', { scheduleId: schedule.id, title: schedule.title, scheduleType });
     
+    // スケジュールバーのDOM要素を取得（親要素から探す）
+    const scheduleElement = (e.currentTarget as HTMLElement);
+    const rect = scheduleElement.getBoundingClientRect();
+    
+    // マウス位置とスケジュールバーの左上角の相対位置を計算
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+    
+    console.log('🚚 ドラッグオフセット:', { offsetX, offsetY, rect: { left: rect.left, top: rect.top }, clientX: e.clientX, clientY: e.clientY });
+    
     // ドラッグ開始
     const startTime = new Date(schedule.start_datetime);
     const startSlot = getTimeSlot(startTime);
@@ -124,7 +136,9 @@ export const useUniversalDragResize = ({
       startSlot,
       startDate,
       originalEmployeeId: schedule.employee_id,
-      originalEquipmentId: schedule.equipment_ids?.[0] // 設備IDsの最初の要素
+      originalEquipmentId: schedule.equipment_ids?.[0], // 設備IDsの最初の要素
+      offsetX, // マウス位置とスケジュールバーの左上角の相対位置
+      offsetY
     });
 
     // 初期ドラッグゴーストを設定
@@ -183,8 +197,17 @@ export const useUniversalDragResize = ({
       animationFrameRef.current = requestAnimationFrame(() => {
         // ドラッグ処理
         if (dragData && dragGhost) {
-          const deltaX = e.clientX - dragData.startX;
-          const deltaY = e.clientY - dragData.startY;
+          // マウス位置からオフセットを引いて、スケジュールバーの左上角の位置を計算
+          const currentBarLeft = e.clientX - dragData.offsetX;
+          const currentBarTop = e.clientY - dragData.offsetY;
+          
+          // 開始時のスケジュールバーの左上角の位置を計算
+          const startBarLeft = dragData.startX - dragData.offsetX;
+          const startBarTop = dragData.startY - dragData.offsetY;
+          
+          // スケジュールバーの左上角の移動量を計算
+          const deltaX = currentBarLeft - startBarLeft;
+          const deltaY = currentBarTop - startBarTop;
           
           // 時間軸の移動（横方向）
           const slotDelta = Math.round(deltaX / scaledCellWidth);
@@ -318,12 +341,15 @@ export const useUniversalDragResize = ({
             equipmentDelta: dragGhost.newEquipmentDelta
           });
           
+          // toServerISOを使用してUTC ISO文字列に変換
+          const { toServerISO } = await import('../utils/datetime');
+          
           const updateData: any = {
             title: dragData.schedule.title || '無題',
             color: toApiColor(dragData.schedule.color),
             employee_id: newEmployeeId,
-            start_datetime: newStart,
-            end_datetime: newEnd
+            start_datetime: toServerISO(newStart),
+            end_datetime: toServerISO(newEnd)
           };
           
           // 設備IDがある場合は追加
@@ -336,6 +362,10 @@ export const useUniversalDragResize = ({
           console.log('🚚 API更新データ:', updateData);
           await onUpdateSchedule(dragData.schedule.id, updateData);
           console.log('🚚 API更新完了、リロード開始');
+          
+          // WebSocket更新を待つ
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
           await onReloadSchedules();
           console.log('🚚 リロード完了');
         } catch (error) {

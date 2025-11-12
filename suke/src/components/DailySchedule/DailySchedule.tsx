@@ -1260,8 +1260,8 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
                         
                         const startSlot = getTimeSlot(startTime);
                         const endSlot = getEndTimeSlot(endTime);
-                        const left = startSlot * 20 * scheduleScale;
-                        const width = (endSlot - startSlot) * 20 * scheduleScale;
+                        const left = startSlot * scaledCellWidth; // scaledCellWidthを使用（精度向上）
+                        const width = (endSlot - startSlot) * scaledCellWidth; // scaledCellWidthを使用（精度向上）
                         
                         // デバッグ情報（リサイズ中のスケジュールのみ）
                         if (resizeData && resizeData.schedule.id === schedule.id) {
@@ -1492,26 +1492,19 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
               return null;
             }
             
-            // カーソル位置にイベントバーの中心が来るように計算
-            // グリッドコンテナの位置を取得
-            const container = tableContainerRef.current;
-            if (!container) return null;
-            
-            const containerRect = container.getBoundingClientRect();
-            const scrollLeft = container.scrollLeft || 0;
-            const scrollTop = container.scrollTop || 0;
-            
-            // カーソル位置（イベントバー中心）からグリッドコンテナ内の相対位置を計算
-            const centerX = interactionState.dragGhost.centerX || (interactionState.dragGhost.deltaX + interactionState.dragData.startX);
-            const centerY = interactionState.dragGhost.centerY || (interactionState.dragGhost.deltaY + interactionState.dragData.startY);
-            
-            // グリッドコンテナ内の相対位置
-            const relativeX = centerX - containerRect.left + scrollLeft;
-            const relativeY = centerY - containerRect.top + scrollTop;
-            
-            // イベントバーの中心位置を基準にleftとtopを計算
-            const actualLeft = relativeX - width / 2; // イベントバーの中心がカーソル位置に来るように
-            const actualTop = relativeY - 18; // イベントバーの高さ(36px)の半分
+            // 月別ビューと同じ方式：グリッド内の正確な位置に表示
+            // 実際のイベントバーは各行（excel-date-row）内のrow-schedule-layerに配置されている
+            // row-schedule-layerは各行内でposition: absolute, top: 0, left: 80に配置
+            // イベントバーはrow-schedule-layer内でposition: absolute, top: 2px, left: startSlot * scaledCellWidthに配置
+            const rowHeight = 40; // 固定の行の高さ（minHeight: '40px'）
+            const topOffset = 2; // イベントバーのオフセット（row-schedule-layer内でのtop位置）
+            // 実際のイベントバーのleft計算: row-schedule-layerのleft(80) + イベントバーのleft(startSlot * scaledCellWidth)
+            const actualLeft = 80 + startSlot * scaledCellWidth; // scaledCellWidthを使用（精度向上）
+            // 社員インデックスは既に計算済み（targetEmployeeIndex）を使用
+            // 実際のイベントバーの位置: 各行のrow-schedule-layer内でtop: 2px
+            // ドラッグゴーストはschedule-content-areaに対してposition: absoluteで配置されるため、
+            // 各行の位置（targetEmployeeIndex * rowHeight）+ row-schedule-layer内のオフセット（topOffset）を計算
+            const actualTop = targetEmployeeIndex >= 0 ? targetEmployeeIndex * rowHeight + topOffset : 0;
             return (
               <div
                 className="drag-ghost"

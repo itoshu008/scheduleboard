@@ -62,13 +62,11 @@ const UniversalEventBar: React.FC<UniversalEventBarProps> = ({
       className={`schedule-item ${isSelected ? 'selected' : ''}`}
       style={{
         background: isResizing && resizeData?.schedule.id === schedule.id
-          ? `linear-gradient(180deg, ${lightenColor(safeHexColor(schedule.color), 40)} 0%, ${lightenColor(safeHexColor(schedule.color), 10)} 100%)`
-          : `linear-gradient(180deg, ${lightenColor(safeHexColor(schedule.color), 25)} 0%, ${safeHexColor(schedule.color)} 100%)`,
-        // デバッグ用：一時的に目立つ色を追加
-        backgroundColor: schedule.color || '#ff0000',
+          ? `linear-gradient(180deg, ${lightenColor(safeHexColor(schedule.color || '#3498db'), 0.25)} 0%, ${lightenColor(safeHexColor(schedule.color || '#3498db'), 0.05)} 100%)`
+          : `linear-gradient(180deg, ${lightenColor(safeHexColor(schedule.color || '#3498db'), 0.15)} 0%, ${safeHexColor(schedule.color || '#3498db')} 100%)`,
         border: isResizing && resizeData?.schedule.id === schedule.id
           ? `3px solid ${resizeData.edge === 'start' ? '#ff4444' : '#44ff44'}`
-          : `1px solid ${lightenColor(safeHexColor(schedule.color), -10)}`,
+          : `1px solid ${lightenColor(safeHexColor(schedule.color || '#3498db'), -0.10)}`,
         width: `${Math.max(width, 50)}px`, // 最小幅を50pxに設定
         left: `${left}px`,
         position: 'absolute',

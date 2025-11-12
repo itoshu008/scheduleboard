@@ -79,6 +79,36 @@ CREATE TABLE IF NOT EXISTS events (
     ON DELETE SET NULL ON UPDATE CASCADE,
   INDEX idx_events_user_time (user_id, start_at, end_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS equipment (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  description TEXT NULL,
+  display_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS equipment_reservations (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  equipment_id INT NOT NULL,
+  employee_id INT NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  start_datetime DATETIME NOT NULL,
+  end_datetime DATETIME NOT NULL,
+  color VARCHAR(7) NOT NULL DEFAULT '#3174ad',
+  note TEXT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_equipment_reservations_equipment
+    FOREIGN KEY (equipment_id) REFERENCES equipment(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_equipment_reservations_employee
+    FOREIGN KEY (employee_id) REFERENCES users(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  INDEX idx_equipment_datetime (equipment_id, start_datetime, end_datetime),
+  INDEX idx_datetime_range (start_datetime, end_datetime)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 `;
 
   // Run multiple statements safely

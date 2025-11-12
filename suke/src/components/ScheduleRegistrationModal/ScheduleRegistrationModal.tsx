@@ -33,6 +33,7 @@ interface ScheduleRegistrationModalProps {
   defaultEnd: Date;
   selectedDepartmentId: number;
   defaultEmployeeId?: number;
+  defaultEquipmentId?: number; // 設備ページ用
   employees?: Employee[];
   equipments?: Equipment[];
   colors?: string[];
@@ -108,6 +109,7 @@ const ScheduleRegistrationModal: React.FC<ScheduleRegistrationModalProps> = ({
   defaultEnd,
   selectedDepartmentId,
   defaultEmployeeId,
+  defaultEquipmentId,
   employees = [],
   equipments = [],
   colors = ['#3174ad', '#ff9800', '#4caf50', '#e91e63', '#9c27b0', '#607d8b', '#795548', '#ff5722'],
@@ -149,15 +151,15 @@ const ScheduleRegistrationModal: React.FC<ScheduleRegistrationModalProps> = ({
     titleValue: initialValues?.title
   });
   
-  // 編集モードの詳細確認
-  if (isEditMode) {
-    console.log('✅ ScheduleRegistrationModal: EDIT MODE DETECTED');
-    console.log('✅ ScheduleRegistrationModal: Schedule ID:', initialValues?.scheduleId);
-    console.log('✅ ScheduleRegistrationModal: Initial title:', initialValues?.title);
-  } else {
-    console.log('❌ ScheduleRegistrationModal: NEW MODE');
-    console.log('❌ ScheduleRegistrationModal: initialValues:', initialValues);
-  }
+  // 編集モードの詳細確認（デバッグログを削除）
+  // if (isEditMode) {
+  //   console.log('✅ ScheduleRegistrationModal: EDIT MODE DETECTED');
+  //   console.log('✅ ScheduleRegistrationModal: Schedule ID:', initialValues?.scheduleId);
+  //   console.log('✅ ScheduleRegistrationModal: Initial title:', initialValues?.title);
+  // } else {
+  //   console.log('❌ ScheduleRegistrationModal: NEW MODE');
+  //   console.log('❌ ScheduleRegistrationModal: initialValues:', initialValues);
+  // }
   
   // 担当者は参加者の最初の人を自動設定
   
@@ -189,6 +191,16 @@ const ScheduleRegistrationModal: React.FC<ScheduleRegistrationModalProps> = ({
   const [dateYMD, setDateYMD] = React.useState<string>(toYMD(defaultStart));
   const [startHM, setStartHM] = React.useState<string>(toHM(defaultStart));
   const [endHM, setEndHM] = React.useState<string>(toHM(defaultEnd));
+
+  // 設備IDの初期化（設備ページ用）
+  React.useEffect(() => {
+    if (defaultEquipmentId && equipments.length > 0) {
+      const equipment = equipments.find(eq => eq.id === defaultEquipmentId);
+      if (equipment && !selectedEquipments.find(e => e.id === equipment.id)) {
+        setSelectedEquipments([{ id: equipment.id, name: equipment.name }]);
+      }
+    }
+  }, [defaultEquipmentId, equipments]);
 
   // モーダルopen/選択変更で再初期化
   React.useEffect(() => {
@@ -264,6 +276,15 @@ const ScheduleRegistrationModal: React.FC<ScheduleRegistrationModalProps> = ({
       
       if (participants.length === 0) {
         alert('参加者を1人以上選択してください');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // employee_idを取得（参加者の最初の人、またはdefaultEmployeeId、またはemployees[0]）
+      const employeeId = participants[0]?.id || defaultEmployeeId || employees[0]?.id;
+      if (!employeeId) {
+        alert('担当者を選択してください');
+        setIsSubmitting(false);
         return;
       }
       
@@ -276,11 +297,16 @@ const ScheduleRegistrationModal: React.FC<ScheduleRegistrationModalProps> = ({
       const startISO = toServerISO(startDate);
       const endISO   = toServerISO(endDate);
       
+      // 設備IDを取得（選択された設備がある場合はそれを使用、なければdefaultEquipmentId）
+      const equipmentId = selectedEquipments.length > 0 
+        ? selectedEquipments[0].id 
+        : (defaultEquipmentId || 0);
+      
       const payload = {
         title: purpose,
         purpose: purpose,
-        employee_id: participants[0].id, // 参加者の最初の人を担当者に設定
-        equipment_id: 0,
+        employee_id: employeeId, // 参加者の最初の人を担当者に設定
+        equipment_id: equipmentId, // 設備ページ用
         start_datetime: startISO,
         end_datetime: endISO,
         color: selectedColor,
@@ -311,10 +337,10 @@ const ScheduleRegistrationModal: React.FC<ScheduleRegistrationModalProps> = ({
         console.log('✅ ScheduleRegistrationModal: EDIT MODE - Changing schedule:', initialValues.scheduleId);
         console.log('🔄 ScheduleRegistrationModal: Change payload:', payload);
         console.log('🔄 ScheduleRegistrationModal: Initial values:', initialValues);
-        console.log('🔄 ScheduleRegistrationModal: API URL:', `/schedules/${initialValues.scheduleId}`);
+        console.log('🔄 ScheduleRegistrationModal: API URL:', `/admin/schedules/${initialValues.scheduleId}`);
         console.log('🔄 ScheduleRegistrationModal: Request method: PUT');
         
-        const response = await api.put(`/schedules/${initialValues.scheduleId}`, payload);
+        const response = await api.put(`/admin/schedules/${initialValues.scheduleId}`, payload);
         const updated = response.data;
         console.log('🔄 ScheduleRegistrationModal: Change response:', updated);
         console.log('🔄 ScheduleRegistrationModal: Response status:', response.status);
@@ -328,9 +354,10 @@ const ScheduleRegistrationModal: React.FC<ScheduleRegistrationModalProps> = ({
         onCreated(updatedWithFlag);
       } else {
         // 新規登録モード: 作成API呼び出し
-        console.log('❌ ScheduleRegistrationModal: NEW SCHEDULE MODE - Creating schedule (SHOULD BE EDIT!)');
-        console.log('❌ ScheduleRegistrationModal: Why is this NEW mode? initialValues:', initialValues);
-        const response = await api.post('/schedules', payload);
+        // デバッグログを削除
+        // console.log('❌ ScheduleRegistrationModal: NEW SCHEDULE MODE - Creating schedule (SHOULD BE EDIT!)');
+        // console.log('❌ ScheduleRegistrationModal: Why is this NEW mode? initialValues:', initialValues);
+        const response = await api.post('/admin/schedules', payload);
         const created = response.data;
         console.log('✨ ScheduleRegistrationModal: Create response:', created);
         onCreated(created);

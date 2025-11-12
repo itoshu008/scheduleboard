@@ -208,31 +208,31 @@ export const useMonthlyEventBarHandlers = ({
       setSelectedCells(new Set());
     }
 
-    // イベントバーの中央を基準点として計算
+    // ドラッグ開始（月別ビューと同じシンプルな方式）
+    const startTime = new Date(schedule.start_datetime);
+    const startSlot = getTimeSlot(startTime);
+    const startDate = new Date(startTime.getFullYear(), startTime.getMonth(), startTime.getDate());
+    
+    // イベントバーの中央を基準点として計算（表示用）
     const scheduleElement = e.currentTarget as HTMLElement;
     const rect = scheduleElement.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
     
-    // カーソル位置とイベントバー中心のオフセットを計算
+    // カーソル位置とイベントバー中心のオフセットを計算（表示用）
     const offsetX = e.clientX - centerX;
     const offsetY = e.clientY - centerY;
-    
-    // ドラッグ開始
-    const startTime = new Date(schedule.start_datetime);
-    const startSlot = getTimeSlot(startTime);
-    const startDate = new Date(startTime.getFullYear(), startTime.getMonth(), startTime.getDate());
     
     setInteractionState((prev: any) => ({
       ...prev,
       dragData: {
         schedule,
-        startX: e.clientX,
-        startY: e.clientY,
+        startX: e.clientX, // カーソル位置を基準に（月別ビューと同じ）
+        startY: e.clientY, // カーソル位置を基準に（月別ビューと同じ）
         startSlot,
         startDate,
-        offsetX, // カーソル位置とイベントバー中心のXオフセット
-        offsetY  // カーソル位置とイベントバー中心のYオフセット
+        offsetX, // カーソル位置とイベントバー中心のXオフセット（表示用）
+        offsetY  // カーソル位置とイベントバー中心のYオフセット（表示用）
       }
     }));
     
@@ -267,12 +267,12 @@ export const useMonthlyEventBarHandlers = ({
           ...prev,
           dragData: {
             schedule,
-            startX: moveEvent.clientX, // 現在のカーソル位置
-            startY: moveEvent.clientY, // 現在のカーソル位置
+            startX: moveEvent.clientX, // 現在のカーソル位置（月別ビューと同じ）
+            startY: moveEvent.clientY, // 現在のカーソル位置（月別ビューと同じ）
             startSlot: getTimeSlot(startTime),
             startDate,
-            offsetX, // カーソル位置とイベントバー中心のXオフセット
-            offsetY  // カーソル位置とイベントバー中心のYオフセット
+            offsetX, // カーソル位置とイベントバー中心のXオフセット（表示用）
+            offsetY  // カーソル位置とイベントバー中心のYオフセット（表示用）
           },
           dragGhost: {
             schedule,
@@ -280,8 +280,8 @@ export const useMonthlyEventBarHandlers = ({
             newDate: new Date(startTime),
             deltaX: 0,
             deltaY: 0,
-            centerX: moveEvent.clientX, // カーソル位置（イベントバー中心）
-            centerY: moveEvent.clientY  // カーソル位置（イベントバー中心）
+            centerX: moveEvent.clientX, // カーソル位置（イベントバー中心表示用）
+            centerY: moveEvent.clientY  // カーソル位置（イベントバー中心表示用）
           }
         }));
 
@@ -376,30 +376,16 @@ export const useMonthlyEventBarHandlers = ({
         
         // ドラッグ処理
         if (currentState.dragData && currentState.dragGhost) {
-          // カーソル位置からイベントバー中心位置を計算
-          const centerX = e.clientX - currentState.dragData.offsetX;
-          const centerY = e.clientY - currentState.dragData.offsetY;
+          // 月別ビューと同じシンプルな計算（ドラッグ開始位置からの移動量を直接使用）
+          const deltaX = e.clientX - currentState.dragData.startX;
+          const deltaY = e.clientY - currentState.dragData.startY;
           
-          // イベントバー中心位置からの移動量を計算
-          const originalStart = new Date(currentState.dragData.schedule.start_datetime);
-          const originalEnd = new Date(currentState.dragData.schedule.end_datetime);
-          const originalDuration = originalEnd.getTime() - originalStart.getTime();
-          
-          // 元のイベントバーの中心位置を計算（グリッド座標系）
-          // これは実際のグリッドコンテナの位置を取得する必要がある
-          // とりあえず、カーソル位置を基準にスロットを計算
-          // グリッドコンテナの左端からの相対位置を取得する必要がある
-          // ここでは、カーソル位置から直接スロットを計算するのではなく、
-          // イベントバー中心位置を基準にスロットを計算する
-          
-          // 時間軸の移動（横方向）- カーソル位置からオフセットを引いた位置を基準に
-          // 実際のグリッドコンテナの位置を取得する必要があるが、ここでは簡易的に
-          // カーソル位置から直接計算する（後でグリッドコンテナの位置を考慮する必要がある）
-          const deltaX = centerX - (currentState.dragData.startX - currentState.dragData.offsetX);
-          const deltaY = centerY - (currentState.dragData.startY - currentState.dragData.offsetY);
-          
-          // 時間軸の移動（横方向）
-          const slotDelta = Math.round(deltaX / scaledCellWidth);
+          // 時間軸の移動（横方向）- セルに明確にスナップするように計算
+          // より明確なスナップのために、スロット計算を確実に整数にする
+          const exactSlotDelta = deltaX / scaledCellWidth;
+          // スロットは必ず整数値にスナップ（Math.roundで最も近い整数に）
+          const slotDelta = Math.round(exactSlotDelta);
+          // スロット範囲を制限（0-95）
           const newStartSlot = Math.max(0, Math.min(95, currentState.dragData.startSlot + slotDelta));
           
           let newDate: Date;
@@ -419,6 +405,9 @@ export const useMonthlyEventBarHandlers = ({
           }
           
           // 新しい開始・終了時刻を計算
+          const originalStart = new Date(currentState.dragData.schedule.start_datetime);
+          const originalEnd = new Date(currentState.dragData.schedule.end_datetime);
+          const originalDuration = originalEnd.getTime() - originalStart.getTime();
           const newStart = createTimeFromSlot(newDate, newStartSlot);
           const newEnd = new Date(newStart.getTime() + originalDuration);
           
@@ -433,11 +422,11 @@ export const useMonthlyEventBarHandlers = ({
                 schedule: currentState.dragData!.schedule,
                 newSlot: newStartSlot,
                 newDate: newDate,
-                deltaX: e.clientX - currentState.dragData!.startX,
-                deltaY: e.clientY - currentState.dragData!.startY,
+                deltaX: deltaX,
+                deltaY: deltaY,
                 newEmployeeId: enableVerticalMovement ? newEmployeeId : undefined,
-                centerX: e.clientX, // カーソル位置（イベントバー中心）
-                centerY: e.clientY  // カーソル位置（イベントバー中心）
+                centerX: e.clientX, // カーソル位置（イベントバー中心表示用）
+                centerY: e.clientY  // カーソル位置（イベントバー中心表示用）
               }
             }));
           }

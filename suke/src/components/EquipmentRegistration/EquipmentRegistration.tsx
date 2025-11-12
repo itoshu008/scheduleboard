@@ -23,7 +23,7 @@ const EquipmentRegistration: React.FC<EquipmentRegistrationProps> = ({ onClose }
   const loadEquipment = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/equipment');
+      const response = await api.get('/admin/equipment');
       setEquipment(response.data);
     } catch (error) {
       console.error('設備データの読み込みエラー:', error);
@@ -40,7 +40,7 @@ const EquipmentRegistration: React.FC<EquipmentRegistrationProps> = ({ onClose }
     }
 
     try {
-      await api.post('/equipment', {
+      await api.post('/admin/equipment', {
         name: newEquipment.name.trim(),
         description: newEquipment.description.trim() || ''
       });

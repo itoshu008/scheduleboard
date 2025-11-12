@@ -26,8 +26,8 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onClose }) 
     try {
       setLoading(true);
       const [employeesResponse, departmentsResponse] = await Promise.all([
-        api.get('/employees'),
-        api.get('/departments')
+        api.get('/admin/employees'),
+        api.get('/admin/departments')
       ]);
       setEmployees(employeesResponse.data);
       setDepartments(departmentsResponse.data);
@@ -46,7 +46,7 @@ const EmployeeRegistration: React.FC<EmployeeRegistrationProps> = ({ onClose }) 
     }
 
     try {
-      await api.post('/employees', {
+      await api.post('/admin/employees', {
         employee_number: newEmployee.employee_number.trim(),
         name: newEmployee.name.trim(),
         department_id: parseInt(newEmployee.department_id)
