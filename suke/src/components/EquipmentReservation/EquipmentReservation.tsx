@@ -486,37 +486,44 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
 
   const handleCellDoubleClick = useCallback((equipmentId: number, slot: number) => {
     console.log('🖱️ セルダブルクリック:', { equipmentId, slot });
-    commonHandleCellDoubleClick(equipmentId, slot, selectedDate);
     
-    // ダブルクリック時は即座にモーダルを表示（自動表示をキャンセル）
+    // リサイズ・移動中はセル選択を無効化
+    if (newIsResizing || newDragData) {
+      console.log('🚫 セルのダブルクリック: リサイズ・移動中のためセル選択無効化');
+      return;
+    }
+    
+    // ダブルクリック時は即座にモーダルを表示
     console.log('🔍 ダブルクリック：即座にモーダル表示');
     
-    // 現在の選択状態を使用してモーダルを表示
-    const equipmentsAsEmployees = equipments.map(eq => ({ 
-      id: eq.id, 
-      name: eq.name, 
-      department_id: 1,
-      employee_number: `EQ${eq.id}`,
-      display_order: eq.display_order || 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }));
-    const cellDateTime = commonGetSelectedCellDateTime(equipmentsAsEmployees, selectedDate);
+    // セルIDを作成して選択状態を設定
+    const cellId = `${slot}-${equipmentId}`;
+    setSelectedCells(new Set([cellId]));
     
-    if (cellDateTime) {
-      const selectedEquipment = equipments.find(eq => eq.id === cellDateTime.employeeId);
-      
-      setSelectionSnapshot({
-        startDateTime: cellDateTime.startDateTime,
-        endDateTime: cellDateTime.endDateTime,
-        equipmentId: cellDateTime.employeeId,
-        equipmentName: selectedEquipment?.name
-      });
-      
-      setShowRegistrationTab(true);
-      setIsModalOpen(true);
-    }
-  }, [commonHandleCellDoubleClick, commonGetSelectedCellDateTime, selectedDate, equipments]);
+    // ダブルクリックしたセルから直接日時を計算
+    const startDateTime = new Date(selectedDate);
+    const { hour: startHour, minute: startMinute } = getTimeFromSlot(slot);
+    startDateTime.setHours(startHour, startMinute, 0, 0);
+    
+    const endDateTime = new Date(selectedDate);
+    const { hour: endHour, minute: endMinute } = getTimeFromSlot(slot + 1);
+    endDateTime.setHours(endHour, endMinute, 0, 0);
+    
+    const selectedEquipment = equipments.find(eq => eq.id === equipmentId);
+    
+    setSelectionSnapshot({
+      startDateTime,
+      endDateTime,
+      equipmentId: equipmentId,
+      equipmentName: selectedEquipment?.name
+    });
+    
+    setShowRegistrationTab(true);
+    setIsModalOpen(true);
+    
+    // 共通フックのダブルクリック処理も呼び出す（選択状態の更新のため）
+    commonHandleCellDoubleClick(equipmentId, slot, selectedDate);
+  }, [newIsResizing, newDragData, selectedDate, equipments, getTimeFromSlot, setSelectedCells, commonHandleCellDoubleClick]);
 
   // スケール変更処理
   const handleScaleChange = useCallback((newScale: number) => {
