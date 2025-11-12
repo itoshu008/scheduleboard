@@ -434,6 +434,27 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
     }
   }, [isSelecting, selectedCells.size, equipments, commonGetSelectedCellDateTime, selectedDate]);
 
+  // 3) 選択セルから日時を算出（既存の getSelectedCellDateTime を利用）（日別ビューと同じ仕様）
+  const selection = useMemo(() => {
+    if (selectedCells.size === 0) return null;
+    const equipmentsAsEmployees = equipments.map(eq => ({ 
+      id: eq.id, 
+      name: eq.name, 
+      department_id: 1,
+      employee_number: `EQ${eq.id}`,
+      display_order: eq.display_order || 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }));
+    const result = commonGetSelectedCellDateTime(equipmentsAsEmployees, selectedDate);
+    console.log('🔍 EquipmentReservation selection useMemo:', {
+      selectedCellsSize: selectedCells.size,
+      selectedCells: Array.from(selectedCells),
+      result
+    });
+    return result;
+  }, [selectedCells, equipments, commonGetSelectedCellDateTime, selectedDate]);
+
   // セル選択処理（日別スケジュールと同じ - 直接実装）
   const handleCellMouseDown = useCallback((equipmentId: number, slot: number, e?: React.MouseEvent) => {
     // 右クリック時はセル選択を無効化（右クリックドラッグスクロール用）
@@ -521,38 +542,25 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
     }
   }, [selectedCells.size, setIsSelecting, setSelectionAnchor, setShowRegistrationTab]);
 
+  // セル選択のダブルクリック（新規登録）（日別ビューと同じ仕様）
   const handleCellDoubleClick = useCallback((equipmentId: number, slot: number) => {
-    // リサイズ・移動中はセル選択を無効化
-    if (newIsResizing || newDragData) {
-      console.log('🚫 セルのダブルクリック: リサイズ・移動中のためセル選択無効化');
-      return;
-    }
-    
     const cellId = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}-${equipmentId}-${slot}`;
     setSelectedCells(new Set([cellId]));
     setSelectedSchedule(null);
-    
-    // ダブルクリック時は即座にモーダルを表示
-    const startDateTime = new Date(selectedDate);
-    const { hour: startHour, minute: startMinute } = getTimeFromSlot(slot);
-    startDateTime.setHours(startHour, startMinute, 0, 0);
-    
-    const endDateTime = new Date(selectedDate);
-    const { hour: endHour, minute: endMinute } = getTimeFromSlot(slot + 1);
-    endDateTime.setHours(endHour, endMinute, 0, 0);
-    
-    const selectedEquipment = equipments.find(eq => eq.id === equipmentId);
-    
-    setSelectionSnapshot({
-      startDateTime,
-      endDateTime,
-      equipmentId: equipmentId,
-      equipmentName: selectedEquipment?.name
-    });
-    
     setShowRegistrationTab(true);
-    setIsModalOpen(true);
-  }, [newIsResizing, newDragData, selectedDate, equipments, getTimeFromSlot, setSelectedCells, setSelectedSchedule]);
+  }, [selectedDate, setSelectedCells, setSelectedSchedule]);
+
+  // 背景クリックでセル選択解除（日別ビューと同じ仕様）
+  const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
+    // スケジュールアイテムやセルのクリックでない場合のみ
+    const target = e.target as HTMLElement;
+    if (!target.closest('.excel-schedule-item') && !target.closest('.excel-time-cell')) {
+      setSelectedCells(new Set());
+      setSelectedSchedule(null);
+      setIsSelecting(false);
+      setSelectionAnchor(null);
+    }
+  }, [setSelectedCells, setSelectedSchedule, setIsSelecting, setSelectionAnchor]);
 
   // window mouseup で必ず選択終了（日別ビューと同じ仕様）
   useEffect(() => {
@@ -847,6 +855,36 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
             style={{
               position: 'relative',
               minWidth: `${200 + 96 * 20 * scheduleScale}px` // 設備列200px + 96セル×20px×スケール
+            }}
+            onClick={handleBackgroundClick}
+            onContextMenu={(e) => {
+              // 右クリックをスクロール操作に割り当てる
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onMouseDown={(e) => {
+              if (e.button !== 2) return; // 右クリックのみ
+              e.preventDefault();
+              e.stopPropagation();
+              const container = (document.querySelector('.excel-schedule-container') as HTMLElement) || (e.currentTarget.parentElement as HTMLElement);
+              if (!container) return;
+              const startX = e.clientX;
+              const startY = e.clientY;
+              const startScrollLeft = container.scrollLeft;
+              const startScrollTop = container.scrollTop;
+              const handleMove = (moveEvent: MouseEvent) => {
+                moveEvent.preventDefault();
+                const dx = moveEvent.clientX - startX;
+                const dy = moveEvent.clientY - startY;
+                container.scrollLeft = startScrollLeft - dx;
+                container.scrollTop = startScrollTop - dy;
+              };
+              const handleUp = () => {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              };
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
             }}
           >
           {/* 設備行とスケジュールセル（日別の社員行を設備行に変更） */}
