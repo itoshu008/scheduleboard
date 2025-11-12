@@ -466,15 +466,16 @@ const EventBar: React.FC<EventBarProps> = ({
   const handleStyle: React.CSSProperties = {
     position: 'absolute',
     top: 0,
-    width: 12, // シンプルなサイズ
+    width: 8, // 全社員ビューと同じサイズ
     height: '100%',
-    cursor: 'col-resize',
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    border: '1px solid rgba(255, 255, 255, 0.6)',
+    cursor: 'ew-resize',
+    backgroundColor: 'rgba(255, 255, 255, 0.4)', // 全社員ビューと同じ色
+    border: '1px solid rgba(255, 255, 255, 0.8)', // 全社員ビューと同じ色
     borderRadius: 2,
     opacity: isSelected ? 1 : 0,
-    zIndex: 15,
-    transition: 'opacity 0.2s ease',
+    zIndex: 10001, // イベントバーより前面
+    pointerEvents: 'auto', // 明示的にマウスイベントを受け取る
+    transition: 'all 0.2s ease', // 全社員ビューと同じトランジション
   };
 
   return (
@@ -505,7 +506,7 @@ const EventBar: React.FC<EventBarProps> = ({
     >
       <div
         className={`${showGhost ? 'ghost-handle' : ''} resize-handle`}
-        style={{ ...handleStyle, left: -8 }}
+        style={{ ...handleStyle, left: -2, borderRadius: '2px 0 0 2px' }}
         onMouseDown={(e) => {
           if (onResizeLeftMouseDownOverride) {
             onResizeLeftMouseDownOverride(e, schedule);
@@ -517,6 +518,18 @@ const EventBar: React.FC<EventBarProps> = ({
           }
           e.stopPropagation();
           handleMouseDown(e, 'resize-left');
+        }}
+        onMouseEnter={(e) => {
+          if (!showGhost) {
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
+            e.currentTarget.style.opacity = '1';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!showGhost) {
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
+            e.currentTarget.style.opacity = isSelected ? '1' : '0';
+          }
         }}
         onClick={(e) => {
           e.preventDefault();
@@ -603,7 +616,7 @@ const EventBar: React.FC<EventBarProps> = ({
       </div>
       <div
         className={`${showGhost ? 'ghost-handle' : ''} resize-handle`}
-        style={{ ...handleStyle, right: -8 }}
+        style={{ ...handleStyle, right: -2, borderRadius: '0 2px 2px 0' }}
         onMouseDown={(e) => {
           if (onResizeRightMouseDownOverride) {
             onResizeRightMouseDownOverride(e, schedule);
@@ -615,6 +628,18 @@ const EventBar: React.FC<EventBarProps> = ({
           }
           e.stopPropagation();
           handleMouseDown(e, 'resize-right');
+        }}
+        onMouseEnter={(e) => {
+          if (!showGhost) {
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
+            e.currentTarget.style.opacity = '1';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!showGhost) {
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
+            e.currentTarget.style.opacity = isSelected ? '1' : '0';
+          }
         }}
         onClick={(e) => {
           e.preventDefault();
