@@ -64,9 +64,7 @@ const UniversalEventBar: React.FC<UniversalEventBarProps> = ({
         background: isResizing && resizeData?.schedule.id === schedule.id
           ? `linear-gradient(180deg, ${lightenColor(safeHexColor(schedule.color || '#3498db'), 0.25)} 0%, ${lightenColor(safeHexColor(schedule.color || '#3498db'), 0.05)} 100%)`
           : `linear-gradient(180deg, ${lightenColor(safeHexColor(schedule.color || '#3498db'), 0.15)} 0%, ${safeHexColor(schedule.color || '#3498db')} 100%)`,
-        border: isResizing && resizeData?.schedule.id === schedule.id
-          ? `3px solid ${resizeData.edge === 'start' ? '#ff4444' : '#44ff44'}`
-          : `1px solid ${lightenColor(safeHexColor(schedule.color || '#3498db'), -0.10)}`,
+        border: `1px solid ${lightenColor(safeHexColor(schedule.color || '#3498db'), -0.10)}`,
         width: `${Math.max(width, 50)}px`, // 最小幅を50pxに設定
         left: `${left}px`,
         position: 'absolute',
@@ -83,7 +81,7 @@ const UniversalEventBar: React.FC<UniversalEventBarProps> = ({
         transform: isResizing && resizeData?.schedule.id === schedule.id ? 'scale(1.02)' : 'scale(1)',
         transition: isResizing && resizeData?.schedule.id === schedule.id ? 'none' : 'all 0.2s ease',
         boxShadow: isResizing && resizeData?.schedule.id === schedule.id 
-          ? `0 4px 12px rgba(0, 0, 0, 0.4), inset 0 0 0 2px ${resizeData.edge === 'start' ? '#ff4444' : '#44ff44'}`
+          ? '0 4px 12px rgba(0, 0, 0, 0.4)'
           : '0 2px 4px rgba(0, 0, 0, 0.2)'
       }}
       onMouseDown={(e) => {
