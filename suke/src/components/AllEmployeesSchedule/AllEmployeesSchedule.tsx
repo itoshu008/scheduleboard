@@ -1398,6 +1398,8 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                             >
                               ◀
                             </div>
+                            {/* 終了時刻ハンドル（緑のフレーム）は非表示 */}
+                            {false && (
                             <div
                               className="resize-handle resize-end"
                               onMouseDown={(e) => {
@@ -1462,6 +1464,7 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                             >
                               ▶
                             </div>
+                            )}
                           </div>
                         );
                       })}
