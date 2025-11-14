@@ -227,6 +227,8 @@ app.put('/api/scheduleboard/admin/departments/order/update', asyncH(async (req, 
     return res.status(400).json({ error: 'orders must be an array' });
   }
   // 簡易実装: 実際の順序管理が必要な場合は display_order カラムを追加
+  // 順序が変更されたことを通知
+  broadcastDataChange('department', { type: 'order_updated', orders });
   res.json({ ok: true });
 }));
 
@@ -305,6 +307,8 @@ app.put('/api/scheduleboard/admin/employees/order/update', asyncH(async (req, re
     return res.status(400).json({ error: 'orders must be an array' });
   }
   // 簡易実装: 実際の順序管理が必要な場合は display_order カラムを追加
+  // 順序が変更されたことを通知
+  broadcastDataChange('employee', { type: 'order_updated', orders });
   res.json({ ok: true });
 }));
 
@@ -820,7 +824,9 @@ app.post('/api/scheduleboard/admin/equipment', asyncH(async (req, res) => {
     'INSERT INTO equipment(name, description) VALUES (?, ?);',
     [name, description || null]
   );
-  res.json({ id: r.insertId, name, description });
+  const result = { id: r.insertId, name, description };
+  broadcastDataChange('equipment', result);
+  res.json(result);
 }));
 
 app.get('/api/scheduleboard/admin/equipment/:id', asyncH(async (req, res) => {
@@ -837,7 +843,9 @@ app.put('/api/scheduleboard/admin/equipment/:id', asyncH(async (req, res) => {
   const { name, description } = req.body || {};
   try {
     await getPool().query('UPDATE equipment SET name = ?, description = ? WHERE id = ?;', [name, description, req.params.id]);
-    res.json({ id: req.params.id, name, description });
+    const result = { id: req.params.id, name, description };
+    broadcastDataChange('equipment', result);
+    res.json(result);
   } catch (e) {
     res.status(404).json({ error: 'Not found' });
   }
@@ -846,6 +854,7 @@ app.put('/api/scheduleboard/admin/equipment/:id', asyncH(async (req, res) => {
 app.delete('/api/scheduleboard/admin/equipment/:id', asyncH(async (req, res) => {
   try {
     await getPool().query('DELETE FROM equipment WHERE id = ?;', [req.params.id]);
+    broadcastDataChange('equipment', { id: req.params.id, deleted: true });
     res.json({ ok: true });
   } catch (e) {
     res.status(404).json({ error: 'Not found' });
@@ -867,6 +876,8 @@ app.put('/api/scheduleboard/admin/equipment/order/update', asyncH(async (req, re
     return res.status(400).json({ error: 'orders must be an array' });
   }
   // 簡易実装: 実際の順序管理が必要な場合は display_order カラムを追加
+  // 順序が変更されたことを通知
+  broadcastDataChange('equipment', { type: 'order_updated', orders });
   res.json({ ok: true });
 }));
 
