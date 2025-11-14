@@ -161,8 +161,8 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
             color: toApiColor(state.dragData.schedule.color),
             employee_id: state.dragData.schedule.employee_id,
             equipment_id: state.dragData.schedule.equipment_id || (state.dragData.schedule as any).equipment_id,
-            start_datetime: newStart,
-            end_datetime: newEnd
+            start_datetime: toLocalISODateTime(newStart),
+            end_datetime: toLocalISODateTime(newEnd)
           };
           
           console.log(`🔄 Update payload:`, updateData);
@@ -197,8 +197,8 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
             color: toApiColor(state.resizeData.schedule.color),
             employee_id: state.resizeData.schedule.employee_id,
             equipment_id: state.resizeData.schedule.equipment_id || (state.resizeData.schedule as any).equipment_id,
-            start_datetime: state.resizeGhost.newStart,
-            end_datetime: state.resizeGhost.newEnd
+            start_datetime: toLocalISODateTime(state.resizeGhost.newStart),
+            end_datetime: toLocalISODateTime(state.resizeGhost.newEnd)
           };
           
           console.log(`🔄 Update payload:`, updateData);
@@ -1015,6 +1015,8 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                     .map(reservation => {
                       const schedule = reservationToSchedule(reservation);
                       const isSelected = selectedSchedule?.id === reservation.id;
+                      const isDragging = dragData?.schedule.id === reservation.id;
+                      const isResizing = resizeData?.schedule.id === reservation.id;
                       const style = getReservationStyle(reservation, equipmentIndex);
                       
                       // 予約バーが非表示の場合はレンダリングしない
@@ -1048,13 +1050,19 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                           data-reservation-id={reservation.id}
                           style={{
                             ...style,
-                            border: isSelected ? '2px solid #2196f3' : style.border,
-                            boxShadow: isSelected ? '0 0 8px rgba(33, 150, 243, 0.5)' : style.boxShadow
+                            border: isSelected && !isDragging && !isResizing ? '2px solid #2196f3' : style.border,
+                            boxShadow: isSelected && !isDragging && !isResizing ? '0 0 8px rgba(33, 150, 243, 0.5)' : style.boxShadow,
+                            opacity: isDragging || isResizing ? 0.3 : 1
                           }}
                           onMouseDown={(e) => {
                             if (e.button === 0) { // 左クリック
-                              handleScheduleMouseDown(schedule, e);
-                              setSelectedSchedule(reservation);
+                              // リサイズハンドルのクリックでない場合のみドラッグ開始とスケジュール選択
+                              const target = e.target as HTMLElement;
+                              if (!target.classList.contains('resize-handle') && !target.closest('.resize-handle')) {
+                                setInteractionState((prev: any) => ({ ...prev, isEventBarInteracting: true }));
+                                setSelectedSchedule(reservation);
+                                handleScheduleMouseDown(schedule, e);
+                              }
                             }
                           }}
                           onDoubleClick={(e) => {
@@ -1136,6 +1144,94 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                         </div>
                       );
                     })}
+
+                  {/* ドラッグゴースト表示 */}
+                  {dragGhost && dragData && dragData.schedule.equipment_id === equipment.id && (
+                    (() => {
+                      // 新しい開始時刻を計算
+                      const { hour, minute } = getTimeFromSlot(dragGhost.newSlot);
+                      const newStart = new Date(
+                        dragGhost.newDate.getFullYear(),
+                        dragGhost.newDate.getMonth(),
+                        dragGhost.newDate.getDate(),
+                        hour,
+                        minute
+                      );
+                      const originalStart = new Date(dragData.schedule.start_datetime);
+                      const originalEnd = new Date(dragData.schedule.end_datetime);
+                      const originalDuration = originalEnd.getTime() - originalStart.getTime();
+                      const newEnd = new Date(newStart.getTime() + originalDuration);
+                      
+                      const ghostStyle = getReservationStyle({
+                        ...reservationToSchedule(dragData.schedule),
+                        start_datetime: newStart.toISOString(),
+                        end_datetime: newEnd.toISOString()
+                      } as Reservation, equipmentIndex);
+                      if (ghostStyle.display === 'none') return null;
+                      return (
+                        <div
+                          className="equipment-reservation-bar drag-ghost"
+                          style={{
+                            ...ghostStyle,
+                            opacity: 0.5,
+                            border: '2px dashed #2196f3',
+                            backgroundColor: 'rgba(33, 150, 243, 0.2)',
+                            pointerEvents: 'none',
+                            zIndex: 10000
+                          }}
+                        >
+                          <div style={{ 
+                            overflow: 'hidden', 
+                            textOverflow: 'ellipsis', 
+                            whiteSpace: 'nowrap',
+                            width: '100%',
+                            textAlign: 'center',
+                            color: '#2196f3',
+                            fontWeight: 'bold'
+                          }}>
+                            {dragData.schedule.title}
+                          </div>
+                        </div>
+                      );
+                    })()
+                  )}
+
+                  {/* リサイズゴースト表示 */}
+                  {resizeGhost && resizeData && resizeData.schedule.equipment_id === equipment.id && (
+                    (() => {
+                      const ghostStyle = getReservationStyle({
+                        ...reservationToSchedule(resizeData.schedule),
+                        start_datetime: resizeGhost.newStart.toISOString(),
+                        end_datetime: resizeGhost.newEnd.toISOString()
+                      } as Reservation, equipmentIndex);
+                      if (ghostStyle.display === 'none') return null;
+                      return (
+                        <div
+                          className="equipment-reservation-bar resize-ghost"
+                          style={{
+                            ...ghostStyle,
+                            opacity: 0.5,
+                            border: '2px dashed #4caf50',
+                            backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                            pointerEvents: 'none',
+                            zIndex: 10000
+                          }}
+                        >
+                          <div style={{ 
+                            overflow: 'hidden', 
+                            textOverflow: 'ellipsis', 
+                            whiteSpace: 'nowrap',
+                            width: '100%',
+                            textAlign: 'center',
+                            color: '#4caf50',
+                            fontWeight: 'bold'
+                          }}>
+                            {resizeData.schedule.title}
+                          </div>
+                        </div>
+                      );
+                    })()
+                  )}
                 </div>
               ))
             )}
