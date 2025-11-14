@@ -515,20 +515,29 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       
       // 予約が選択日と重なるか確認（開始日または終了日が選択日の範囲内、または予約が選択日をまたぐ場合）
       // 選択日の00:00:00から23:59:59の範囲と予約の時間範囲が重なるかを確認
-      const selectedDateStart = new Date(selectedDate);
-      selectedDateStart.setHours(0, 0, 0, 0);
-      const selectedDateEnd = new Date(selectedDate);
-      selectedDateEnd.setHours(23, 59, 59, 999);
+      // ローカル時間で統一して比較する
+      const selectedDateStart = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate(),
+        0, 0, 0, 0
+      );
+      const selectedDateEnd = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate(),
+        23, 59, 59, 999
+      );
       
-      // 予約が選択日の範囲と重なるか確認
+      // 予約が選択日の範囲と重なるか確認（すべてローカル時間で比較）
       const overlaps = startDate <= selectedDateEnd && endDate >= selectedDateStart;
       
       if (!overlaps) {
         console.log('🔍 [getReservationStyle] Reservation does not overlap with selected date:', reservation.id, {
-          reservationStart: startDate.toISOString(),
-          reservationEnd: endDate.toISOString(),
-          selectedDateStart: selectedDateStart.toISOString(),
-          selectedDateEnd: selectedDateEnd.toISOString()
+          reservationStartLocal: `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')} ${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`,
+          reservationEndLocal: `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')} ${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`,
+          selectedDateStartLocal: `${selectedDateStart.getFullYear()}-${String(selectedDateStart.getMonth() + 1).padStart(2, '0')}-${String(selectedDateStart.getDate()).padStart(2, '0')} ${String(selectedDateStart.getHours()).padStart(2, '0')}:${String(selectedDateStart.getMinutes()).padStart(2, '0')}`,
+          selectedDateEndLocal: `${selectedDateEnd.getFullYear()}-${String(selectedDateEnd.getMonth() + 1).padStart(2, '0')}-${String(selectedDateEnd.getDate()).padStart(2, '0')} ${String(selectedDateEnd.getHours()).padStart(2, '0')}:${String(selectedDateEnd.getMinutes()).padStart(2, '0')}`
         });
         return { display: 'none' };
       }
