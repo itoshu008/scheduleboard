@@ -352,7 +352,11 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
   }, []);
 
   // セル選択（日別から強化移植）
-  const handleCellMouseDown = useCallback((employeeId: number, slot: number) => {
+  const handleCellMouseDown = useCallback((employeeId: number, slot: number, e?: React.MouseEvent) => {
+    // 右クリック時はセル選択を無効化（右クリックドラッグスクロール用）
+    if (e && e.button === 2) return;
+    if (e && e.button !== 0) return; // 左クリック以外はセル選択無効化
+    
     // セルIDに日付情報を含める（他のスケジュールと統一）
     const year = selectedDate.getFullYear();
     const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
@@ -406,6 +410,21 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
       setShowRegistrationTab(true);
     }
   }, [selectedCells.size]);
+
+  // グローバルなmouseupイベントリスナーでドラッグ終了を検知
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isSelecting) {
+        setIsSelecting(false);
+        setSelectionAnchor(null);
+      }
+    };
+
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [isSelecting]);
 
   // セル選択のダブルクリック（新規登録）
   const handleCellDoubleClick = useCallback((employeeId: number, slot: number) => {
@@ -1174,11 +1193,19 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                           return; // イベントバー上ではセル選択を無効化
                         }
                         
+                        e.preventDefault(); // テキスト選択を防ぐ
                         e.stopPropagation();
-                        handleCellMouseDown(employee.id, slot);
+                        handleCellMouseDown(employee.id, slot, e);
                       }}
-                      onMouseEnter={() => handleCellMouseEnter(employee.id, slot)}
+                      onMouseEnter={() => {
+                        if (isSelecting) {
+                          handleCellMouseEnter(employee.id, slot);
+                        }
+                      }}
                       onMouseUp={handleCellMouseUp}
+                      onDragStart={(e) => {
+                        e.preventDefault(); // ブラウザのドラッグ&ドロップを無効化
+                      }}
                       onDoubleClick={() => {
                         handleCellDoubleClick(employee.id, slot);
                       }}

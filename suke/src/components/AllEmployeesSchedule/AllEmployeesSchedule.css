@@ -204,7 +204,7 @@ body .app-main .grid-top-controls {
   animation: none;
   
   /* ユーザー操作設定 */
-  user-select: auto;
+  user-select: none; /* ドラッグ選択を有効化するため、テキスト選択を無効化 */
   pointer-events: auto;
   resize: none;
   
@@ -726,7 +726,7 @@ body .app-main .grid-top-controls {
   
   /* 超強力なWebkit拘束 */
   -webkit-appearance: none !important;
-  -webkit-user-select: auto !important;
+  -webkit-user-select: none !important; /* ドラッグ選択を有効化するため、テキスト選択を無効化 */
   -webkit-touch-callout: default !important;
   -webkit-tap-highlight-color: transparent !important;
   -webkit-text-size-adjust: auto !important;
@@ -735,7 +735,7 @@ body .app-main .grid-top-controls {
   
   /* 超強力なMozilla拘束 */
   -moz-appearance: none !important;
-  -moz-user-select: auto !important;
+  -moz-user-select: none !important; /* ドラッグ選択を有効化するため、テキスト選択を無効化 */
   -moz-user-focus: normal !important;
   -moz-user-modify: read-only !important;
   -moz-window-dragging: default !important;
@@ -773,7 +773,7 @@ body .app-main .grid-top-controls {
   -ms-text-overflow: clip !important;
   -ms-touch-action: auto !important;
   -ms-touch-select: grippers !important;
-  -ms-user-select: auto !important;
+  -ms-user-select: none !important; /* ドラッグ選択を有効化するため、テキスト選択を無効化 */
   -ms-wrap-flow: auto !important;
   -ms-wrap-margin: 0 !important;
   -ms-wrap-through: wrap !important;
@@ -1780,6 +1780,13 @@ html body .app-main .all-employees-schedule .date-cell-fixed,
 }
 
 /* セル選択スタイル（日別から移植） */
+.all-employees-schedule .excel-time-cell {
+  user-select: none !important; /* ドラッグ選択を有効化するため、テキスト選択を無効化 */
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
 .all-employees-schedule .excel-time-cell.selected {
   background-color: #e3f2fd !important;
   border: 2px solid #2196f3 !important;
