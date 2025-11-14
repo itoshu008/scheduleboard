@@ -1,6 +1,19 @@
-# 社員向けスケジュール管理アプリ
+# ScheduleBoard - 社員向けスケジュール管理アプリ
 
 PC、タブレット、スマートフォンに対応した社員向けスケジュール管理アプリケーションです。
+
+**リポジトリ**: [https://github.com/itoshu008/scheduleboard](https://github.com/itoshu008/scheduleboard)
+
+## 📋 目次
+
+- [機能概要](#機能概要)
+- [技術スタック](#技術スタック)
+- [プロジェクト構造](#プロジェクト構造)
+- [セットアップ](#セットアップ)
+- [API仕様](#api仕様)
+- [使用方法](#使用方法)
+- [デプロイ](#デプロイ)
+- [トラブルシューティング](#トラブルシューティング)
 
 ## 機能概要
 
@@ -37,59 +50,133 @@ PC、タブレット、スマートフォンに対応した社員向けスケジ
 - 社員登録・編集・削除・並び替え
 - 設備登録・編集・削除・並び替え
 
-## 技術仕様
+## 技術スタック
 
 ### フロントエンド
-- React 18
-- TypeScript
-- CSS3
-- レスポンシブデザイン
+- **React** 18.2.0
+- **TypeScript** 5.6.3
+- **Vite** 4.5.0 (ビルドツール)
+- **React Router** 6.28.0 (ルーティング)
+- **TanStack Query** 5.56.2 (データフェッチング)
+- **Axios** 1.13.2 (HTTPクライアント)
+- **Socket.IO Client** 4.7.5 (リアルタイム通信)
+- **Day.js** 1.11.19 (日付処理)
+- **CSS3** (レスポンシブデザイン)
 
 ### バックエンド
-- Node.js
-- Express.js
-- MySQL
+- **Node.js** (推奨: v20以上)
+- **Express.js** 4.19.2
+- **Socket.IO** 4.7.5 (WebSocket)
+- **MySQL2** 3.11.0 (データベースドライバ)
+- **Helmet** 7.1.0 (セキュリティ)
+- **Compression** 1.7.4 (gzip圧縮)
+- **Morgan** 1.10.0 (ロギング)
+- **CORS** 2.8.5 (CORS設定)
 
 ### データベース
-- MySQL 8.0
-- ホスト: 210.131.208.22
+- **MySQL** 8.0以上
+- **ホスト**: 210.131.208.22
+- **ポート**: 3306
+- **データベース名**: zat_sch_db
+
+### 開発ツール
+- **Concurrently** 8.2.2 (並列実行)
+- **ESLint** (コード品質)
+- **Prettier** (コードフォーマット)
+
+## プロジェクト構造
+
+```
+scheduleboard/
+├── server/                 # Node.js/Express バックエンド
+│   ├── server.js          # メインサーバーファイル
+│   ├── db.js              # データベース接続設定
+│   ├── package.json       # サーバー依存関係
+│   └── .env               # 環境変数（要作成）
+├── suke/                  # React/Vite フロントエンド
+│   ├── src/               # ソースコード
+│   │   ├── components/    # Reactコンポーネント
+│   │   ├── lib/           # ユーティリティ・APIクライアント
+│   │   └── App.tsx        # メインアプリケーション
+│   ├── public/            # 静的ファイル
+│   ├── vite.config.ts     # Vite設定
+│   └── package.json       # クライアント依存関係
+├── tools/                 # デプロイ・ユーティリティスクリプト
+├── deploy.sh              # デプロイスクリプト
+├── package.json           # ルートパッケージ（ワークスペース管理）
+└── README.md              # このファイル
+```
+
+## クイックスタート
+
+```bash
+# 1. リポジトリをクローン
+git clone https://github.com/itoshu008/scheduleboard.git
+cd scheduleboard
+
+# 2. 依存関係をインストール
+npm install
+
+# 3. 環境変数を設定
+cd server
+cp .env.example .env  # .envファイルを編集してDB接続情報を設定
+
+# 4. 開発サーバーを起動（ルートディレクトリから）
+npm run dev
+```
+
+開発サーバー起動後:
+- **フロントエンド**: http://localhost:5173
+- **バックエンドAPI**: http://localhost:3000
 
 ## セットアップ
 
 ### 前提条件
-- Node.js 16以上
-- MySQL 8.0以上
-- npm または yarn
+- **Node.js** 20以上（推奨）
+- **npm** 9以上
+- **MySQL** 8.0以上
+- **Git** (リポジトリクローン用)
 
-### インストール
+### インストール手順
 
-1. リポジトリをクローン
+#### 1. リポジトリのクローン
 ```bash
-git clone <repository-url>
+git clone https://github.com/itoshu008/scheduleboard.git
 cd scheduleboard
 ```
 
-2. サーバー側の依存関係をインストール
+#### 2. 依存関係のインストール
 ```bash
-cd server
+# ルートから全依存関係をインストール（server + suke）
 npm install
+
+# または個別にインストール
+npm --prefix server install
+npm --prefix suke install
 ```
 
-3. クライアント側の依存関係をインストール
-```bash
-cd client
-npm install
-```
-
-4. 環境変数の設定
+#### 3. 環境変数の設定
 ```bash
 # server/.env ファイルを作成
+cd server
+cp .env.example .env  # 存在する場合
+```
+
+`server/.env` ファイルに以下を設定：
+```env
+# データベース設定
 DB_HOST=210.131.208.22
 DB_USER=itoshu
 DB_PASS=zatint_6487
 DB_NAME=zat_sch_db
 DB_PORT=3306
+
+# サーバー設定
 PORT=3000
+NODE_ENV=development
+
+# オプション: モックAPIモード（DB接続なしでテスト）
+# MOCK_API=1
 ```
 
 ### 起動方法
@@ -231,16 +318,174 @@ http://localhost:3000
 - タブレット: タッチ操作対応
 - スマートフォン: モバイル最適化
 
+## API仕様
+
+### ベースURL
+- **開発環境**: `http://localhost:3000/api/scheduleboard`
+- **本番環境**: `https://zatint1991.com/api/scheduleboard`
+
+### エンドポイント一覧
+
+#### ヘルスチェック
+- `GET /api/scheduleboard/health` - サーバー・DB状態確認
+
+#### 部署管理（Groups）
+- `GET /api/scheduleboard/groups` - 全部署取得
+- `POST /api/scheduleboard/groups` - 部署作成
+  ```json
+  { "name": "部署名", "color": "#FF0000" }
+  ```
+
+#### 社員管理（Users）
+- `GET /api/scheduleboard/users` - 全社員取得
+- `POST /api/scheduleboard/users` - 社員作成
+  ```json
+  { "code": "社員番号", "name": "社員名", "email": "email@example.com", "group_id": 1 }
+  ```
+
+#### テンプレート管理
+- `GET /api/scheduleboard/templates` - 全テンプレート取得
+- `POST /api/scheduleboard/templates` - テンプレート作成
+  ```json
+  { "title": "タイトル", "description": "説明", "color": "#FF0000" }
+  ```
+
+#### イベント管理（Schedules）
+- `GET /api/scheduleboard/events` - イベント検索
+  - クエリパラメータ: `user_id`, `from`, `to`
+- `POST /api/scheduleboard/events` - イベント作成
+  ```json
+  {
+    "user_id": 1,
+    "template_id": 1,
+    "start_at": "2024-01-01 09:00:00",
+    "end_at": "2024-01-01 18:00:00",
+    "note": "備考"
+  }
+  ```
+
+#### 管理API（Admin）
+
+##### 部署管理
+- `GET /api/scheduleboard/admin/departments` - 全部署取得
+- `POST /api/scheduleboard/admin/departments` - 部署作成
+- `GET /api/scheduleboard/admin/departments/:id` - 部署取得
+- `PUT /api/scheduleboard/admin/departments/:id` - 部署更新
+- `DELETE /api/scheduleboard/admin/departments/:id` - 部署削除
+- `PUT /api/scheduleboard/admin/departments/:id/move` - 部署順序変更
+- `PUT /api/scheduleboard/admin/departments/order/update` - 部署順序一括更新
+
+##### 社員管理
+- `GET /api/scheduleboard/admin/employees` - 全社員取得（`department_id`でフィルタ可能）
+- `POST /api/scheduleboard/admin/employees` - 社員作成
+- `GET /api/scheduleboard/admin/employees/:id` - 社員取得
+- `GET /api/scheduleboard/admin/employees/number/:employeeNumber` - 社員番号で検索
+- `PUT /api/scheduleboard/admin/employees/:id` - 社員更新
+- `DELETE /api/scheduleboard/admin/employees/:id` - 社員削除
+- `PUT /api/scheduleboard/admin/employees/:id/move` - 社員順序変更
+- `PUT /api/scheduleboard/admin/employees/order/update` - 社員順序一括更新
+
+##### 設備管理
+- `GET /api/scheduleboard/admin/equipment` - 全設備取得
+- `POST /api/scheduleboard/admin/equipment` - 設備作成
+- `GET /api/scheduleboard/admin/equipment/:id` - 設備取得
+- `PUT /api/scheduleboard/admin/equipment/:id` - 設備更新
+- `DELETE /api/scheduleboard/admin/equipment/:id` - 設備削除
+- `PUT /api/scheduleboard/admin/equipment/:id/move` - 設備順序変更
+- `PUT /api/scheduleboard/admin/equipment/order/update` - 設備順序一括更新
+
+##### 設備予約管理
+- `GET /api/scheduleboard/admin/equipment-reservations` - 予約検索
+  - クエリパラメータ: `equipment_id`, `from`, `to`
+- `POST /api/scheduleboard/admin/equipment-reservations` - 予約作成
+- `GET /api/scheduleboard/admin/equipment-reservations/:id` - 予約取得
+- `PUT /api/scheduleboard/admin/equipment-reservations/:id` - 予約更新
+- `DELETE /api/scheduleboard/admin/equipment-reservations/:id` - 予約削除
+
+### WebSocket（Socket.IO）
+
+#### 接続
+- **パス**: `/socket.io`
+- **トランスポート**: WebSocket, Polling
+
+#### イベント
+- **クライアント → サーバー**:
+  - `request:refresh` - データ更新要求
+- **サーバー → クライアント**:
+  - `data:change` - データ変更通知
+    ```json
+    { "type": "department|employee|event|equipment", "data": {...}, "timestamp": "..." }
+    ```
+  - `data:refresh` - データ更新通知
+
+### レスポンス形式
+
+#### 成功レスポンス
+```json
+{
+  "ok": true,
+  "data": {...}
+}
+```
+
+#### エラーレスポンス
+```json
+{
+  "ok": false,
+  "error": "エラーメッセージ"
+}
+```
+
 ## データベース構造
 
-### テーブル
-- `departments`: 部署情報
-- `employees`: 社員情報
-- `schedules`: スケジュール情報
-- `equipment`: 設備情報
-- `equipment_reservations`: 設備予約情報
+### テーブル一覧
 
-## Deploy (nginx limited-sudo mode)
+#### `groups` (部署)
+- `id` (INT, PRIMARY KEY, AUTO_INCREMENT)
+- `name` (VARCHAR) - 部署名
+- `color` (VARCHAR) - 表示色
+- `created_at` (TIMESTAMP)
+
+#### `users` (社員)
+- `id` (INT, PRIMARY KEY, AUTO_INCREMENT)
+- `code` (VARCHAR) - 社員番号
+- `name` (VARCHAR) - 社員名
+- `email` (VARCHAR) - メールアドレス
+- `group_id` (INT, FOREIGN KEY → groups.id)
+- `created_at` (TIMESTAMP)
+
+#### `templates` (テンプレート)
+- `id` (INT, PRIMARY KEY, AUTO_INCREMENT)
+- `title` (VARCHAR) - タイトル
+- `description` (TEXT) - 説明
+- `color` (VARCHAR) - 表示色
+- `created_at` (TIMESTAMP)
+
+#### `events` (スケジュール)
+- `id` (INT, PRIMARY KEY, AUTO_INCREMENT)
+- `user_id` (INT, FOREIGN KEY → users.id)
+- `template_id` (INT, FOREIGN KEY → templates.id, NULL可)
+- `start_at` (DATETIME) - 開始日時
+- `end_at` (DATETIME) - 終了日時
+- `note` (TEXT) - 備考
+- `created_at` (TIMESTAMP)
+
+#### `equipment` (設備)
+- `id` (INT, PRIMARY KEY, AUTO_INCREMENT)
+- `name` (VARCHAR) - 設備名
+- `description` (TEXT) - 説明
+- `created_at` (TIMESTAMP)
+
+#### `equipment_reservations` (設備予約)
+- `id` (INT, PRIMARY KEY, AUTO_INCREMENT)
+- `equipment_id` (INT, FOREIGN KEY → equipment.id)
+- `user_id` (INT, FOREIGN KEY → users.id)
+- `start_at` (DATETIME) - 開始日時
+- `end_at` (DATETIME) - 終了日時
+- `note` (TEXT) - 備考
+- `created_at` (TIMESTAMP)
+
+## デプロイ
 
 ### Prerequisites (admin task)
 - Nginx location for `/scheduleboard/`:
@@ -286,48 +531,144 @@ This performs: build → rsync (no sudo) → `sudo nginx -t` → `sudo nginx -s 
 - `sudo: a password is required`: confirm sudoers entry is exactly:
   `itoshu2 ALL=(root) NOPASSWD: /usr/sbin/nginx`
 
-## Stability Hotfix Notes
+### サブパスデプロイ設定
+- **Vite base path**: `base: '/shuke-b/'` in `vite.config.ts` でサブパス配信に対応
+- **SPA fallback**: `/shuke-b/*` ルートは Express が `index.html` にフォールバック
 
-### Subpath Deploy Configuration
-- **Vite base path**: `base: '/shuke-b/'` in `vite.config.ts` ensures assets resolve correctly under subpath
-- **SPA fallback**: `/shuke-b/*` routes are handled by Express fallback to `index.html` for deep links
+### エラーハンドリング
+- **ErrorBoundary**: React コンポーネントがレンダリングエラーをキャッチし、黄色パネルで表示
+- **Status banner**: ページ上部にヘルス/API状態を表示
+- **API client**: `suke/src/lib/api.ts` で10秒タイムアウト、明確なエラーメッセージを提供
 
-### Error Handling & Visibility
-- **ErrorBoundary**: React component catches rendering errors and displays them in a yellow panel instead of blank screen
-- **Status banner**: Visible health/API status at top of page with clear error messages
-- **API client**: `suke/src/lib/api.ts` provides:
-  - 10-second timeout for all requests
-  - Clear error messages with status codes
-  - Proper JSON/error parsing
-
-### Backend Improvements
-- **Logging**: `morgan('combined')` logs all HTTP requests for debugging
-- **Security**: `helmet()` adds security headers (CSP disabled for compatibility)
-- **Compression**: `compression()` middleware enables gzip for responses
+### バックエンド改善
+- **Logging**: `morgan('combined')` で全HTTPリクエストをログ出力
+- **Security**: `helmet()` でセキュリティヘッダーを追加（CSPは互換性のため無効化）
+- **Compression**: `compression()` ミドルウェアでgzip圧縮を有効化
 - **Cache headers**: 
-  - Static assets (`/shuke-b/assets/*`): 30 days cache, immutable
-  - `index.html`: no-cache to ensure updates are visible
-- **API error handling**: 
-  - `/api/*` 404 returns JSON error response
-  - Global error handler catches unhandled exceptions
-  - All errors logged to console
+  - 静的アセット (`/shuke-b/assets/*`): 30日間キャッシュ、immutable
+  - `index.html`: no-cache で更新を確実に反映
 
-### Troubleshooting Checklist
-- **404 on assets**: Check `vite.config.ts` has `base: '/shuke-b/'` and files exist under `/var/www/html/scheduleboard/`
-- **500 API errors**: Check server logs (morgan) and `/api` 404 guard responses
-- **Blank page**: Check browser console for ErrorBoundary messages and API errors
-- **Deep link reload fails**: Verify `/shuke-b/*` fallback is working (check Express routes)
+## トラブルシューティング
 
-### Verification Steps
-1. Open `/shuke-b/` - Status banner should show JSON with health info
-2. Simulate error: Temporarily stop backend to see graceful error display
-3. Check network tab: API calls should have proper error messages
-4. Reload `/shuke-b/any-deep-path` - Should display correctly (SPA routing)
+### よくある問題と解決方法
+
+#### 1. アセット404エラー
+**症状**: CSS/JSファイルが読み込まれない
+
+**解決策**:
+- `suke/vite.config.ts` に `base: '/shuke-b/'` が設定されているか確認
+- `/var/www/html/scheduleboard/` 配下にファイルが存在するか確認
+- ビルドが正常に完了しているか確認: `npm run build`
+
+#### 2. API 500エラー
+**症状**: APIリクエストが500エラーを返す
+
+**解決策**:
+- サーバーログ（morgan）を確認
+- データベース接続を確認: `DB_HOST`, `DB_USER`, `DB_PASS` が正しいか
+- `/api/scheduleboard/health` エンドポイントでサーバー状態を確認
+
+#### 3. 空白ページ
+**症状**: ページが真っ白になる
+
+**解決策**:
+- ブラウザコンソールで ErrorBoundary メッセージを確認
+- Network タブで API エラーを確認
+- サーバーが起動しているか確認: `npm start` (server)
+
+#### 4. ディープリンクが機能しない
+**症状**: `/shuke-b/some-path` を直接開くと404になる
+
+**解決策**:
+- Express の SPA fallback が正しく設定されているか確認
+- `server/server.js` で `app.get('*', ...)` が `index.html` を返すか確認
+
+#### 5. WebSocket接続エラー
+**症状**: リアルタイム更新が機能しない
+
+**解決策**:
+- Socket.IO のパス設定を確認: `/socket.io`
+- Nginx の WebSocket プロキシ設定を確認
+- ファイアウォールで WebSocket が許可されているか確認
+
+#### 6. CORS エラー
+**症状**: ブラウザコンソールに CORS エラーが表示される
+
+**解決策**:
+- サーバー側の CORS 設定を確認: `server/server.js` の `cors()` 設定
+- 開発環境では `origin: '*'` を設定
+- 本番環境では適切なオリジンを指定
+
+#### 7. データベース接続エラー
+**症状**: DB接続に失敗する
+
+**解決策**:
+- `.env` ファイルの設定を確認
+- MySQL サーバーが起動しているか確認
+- ネットワーク接続を確認（ファイアウォール、VPN等）
+- データベースユーザーの権限を確認
+
+### デバッグ方法
+
+#### サーバーログの確認
+```bash
+# サーバーを起動してログを確認
+cd server
+npm start
+
+# または開発モードで詳細ログを確認
+NODE_ENV=development npm start
+```
+
+#### API接続テスト
+```bash
+# ヘルスチェック
+curl http://localhost:3000/api/scheduleboard/health
+
+# 部署一覧取得
+curl http://localhost:3000/api/scheduleboard/groups
+```
+
+#### ブラウザ開発者ツール
+- **Network タブ**: リクエスト/レスポンスを確認
+- **Console タブ**: JavaScript エラーを確認
+- **Application タブ**: ローカルストレージ、セッションストレージを確認
+
+### 検証手順
+1. `/shuke-b/` を開く - ステータスバナーにヘルス情報が表示される
+2. エラーシミュレーション: 一時的にバックエンドを停止してエラー表示を確認
+3. Network タブを確認: API 呼び出しに適切なエラーメッセージがあるか
+4. `/shuke-b/any-deep-path` をリロード - 正しく表示されるか（SPA ルーティング）
 
 ## ライセンス
 
 このプロジェクトはMITライセンスの下で公開されています。
 
+## 開発情報
+
+### 主要な技術選択理由
+- **React + TypeScript**: 型安全性と開発効率の向上
+- **Vite**: 高速な開発サーバーとビルド
+- **TanStack Query**: 効率的なデータフェッチングとキャッシング
+- **Socket.IO**: リアルタイム更新機能
+- **Express.js**: シンプルで柔軟なバックエンドフレームワーク
+- **MySQL**: リレーショナルデータベースでスケジュールデータを管理
+
+### パフォーマンス最適化
+- 静的アセットのキャッシング（30日間）
+- gzip圧縮による転送量削減
+- React Queryによる自動キャッシング
+- コード分割と遅延読み込み
+
+### セキュリティ
+- Helmet.jsによるセキュリティヘッダー
+- CORS設定による適切なアクセス制御
+- SQLインジェクション対策（パラメータ化クエリ）
+- 環境変数による機密情報の管理
+
 ## サポート
 
-技術的な問題や機能要望については、開発チームまでお問い合わせください。 
+技術的な問題や機能要望については、GitHubのIssuesまでお問い合わせください。
+
+- **リポジトリ**: [https://github.com/itoshu008/scheduleboard](https://github.com/itoshu008/scheduleboard)
+- **Issues**: [https://github.com/itoshu008/scheduleboard/issues](https://github.com/itoshu008/scheduleboard/issues) 
