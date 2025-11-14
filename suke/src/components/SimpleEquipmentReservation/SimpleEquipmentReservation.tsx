@@ -10,6 +10,7 @@ import { useScheduleCellSelection } from '../../hooks/useScheduleCellSelection';
 import { useMonthlyEventBarHandlers } from '../../hooks/useMonthlyEventBarHandlers';
 import { safeHexColor, lightenColor, toApiColor } from '../../utils/color';
 import { equipmentReservationApi } from '../../utils/api';
+import ContextMenu, { ContextMenuItem } from '../ContextMenu/ContextMenu';
 import './SimpleEquipmentReservation.css';
 
 interface SimpleEquipmentReservationProps {
@@ -42,6 +43,9 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<Reservation | null>(null);
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<number | null>(null);
+  const [clipboard, setClipboard] = useState<Reservation | null>(null);
+  const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenuTarget, setContextMenuTarget] = useState<Reservation | null>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
@@ -390,6 +394,110 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       console.error('予約保存後の処理エラー:', error);
     }
   };
+
+  // 予約削除
+  const handleReservationDelete = useCallback(async (reservationId: number) => {
+    try {
+      await equipmentReservationApi.delete(reservationId);
+      
+      // WebSocketの更新を待つ
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      await loadReservations();
+      setSelectedSchedule(null);
+      setContextMenuPosition(null);
+      setContextMenuTarget(null);
+    } catch (error: any) {
+      console.error('予約削除エラー:', error);
+      alert('予約の削除に失敗しました: ' + (error?.message || 'Unknown error'));
+    }
+  }, [loadReservations]);
+
+  // 予約コピー
+  const handleReservationCopy = useCallback((reservation: Reservation) => {
+    setClipboard({ ...reservation });
+    setContextMenuPosition(null);
+    setContextMenuTarget(null);
+  }, []);
+
+  // 予約ペースト
+  const handleReservationPaste = useCallback(async () => {
+    if (!clipboard) return;
+    
+    const targetDate = selectedDate;
+    let targetEquipmentId = clipboard.equipment_id;
+    
+    // セルが選択されている場合は、その位置にペースト
+    if (selectedCells.size > 0) {
+      const firstCellId = Array.from(selectedCells)[0];
+      const parts = firstCellId.split('-');
+      // 形式: equipment-{equipmentId}-{slot} または YYYY-MM-DD-equipment-{equipmentId}-{slot}
+      if (parts.length >= 3) {
+        const equipmentIdStr = parts[parts.length - 2];
+        targetEquipmentId = parseInt(equipmentIdStr);
+      }
+    }
+    
+    const duration = new Date(clipboard.end_datetime).getTime() - new Date(clipboard.start_datetime).getTime();
+    const startTime = new Date(targetDate);
+    startTime.setHours(9, 0, 0, 0); // デフォルト開始時間
+    const endTime = new Date(startTime.getTime() + duration);
+    
+    try {
+      const newReservation = {
+        equipment_id: targetEquipmentId,
+        employee_id: clipboard.employee_id,
+        title: clipboard.title,
+        start_datetime: toLocalISODateTime(startTime),
+        end_datetime: toLocalISODateTime(endTime),
+        color: clipboard.color || '#3174ad',
+        note: clipboard.note || null
+      };
+      
+      await equipmentReservationApi.create(newReservation);
+      
+      // WebSocketの更新を待つ
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      await loadReservations();
+      setContextMenuPosition(null);
+      setContextMenuTarget(null);
+    } catch (error: any) {
+      console.error('予約ペーストエラー:', error);
+      alert('予約のペーストに失敗しました: ' + (error?.message || 'Unknown error'));
+    }
+  }, [clipboard, selectedDate, selectedCells, loadReservations]);
+
+  // コンテキストメニューを閉じる
+  const handleContextMenuClose = useCallback(() => {
+    setContextMenuPosition(null);
+    setContextMenuTarget(null);
+  }, []);
+
+  // キーボードショートカット
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' && selectedSchedule) {
+        handleReservationDelete(selectedSchedule.id);
+      } else if (e.ctrlKey && e.key === 'c' && selectedSchedule) {
+        handleReservationCopy(selectedSchedule);
+      } else if (e.ctrlKey && e.key === 'v' && clipboard) {
+        handleReservationPaste();
+      } else if (e.key === 'Escape' && (interactionState.dragData || interactionState.resizeData)) {
+        // ESCキーでドラッグ・リサイズ操作をキャンセル
+        setInteractionState({
+          ...interactionState,
+          dragData: null,
+          dragGhost: null,
+          resizeData: null,
+          resizeGhost: null
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedSchedule, clipboard, interactionState, handleReservationDelete, handleReservationCopy, handleReservationPaste, setInteractionState]);
 
   // 予約をSchedule型に変換（月別ビューのロジックと互換性を保つため）
   const reservationToSchedule = useCallback((reservation: Reservation): any => {
@@ -936,15 +1044,31 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                       return (
                         <div
                           key={reservation.id}
-                          className="equipment-reservation-bar"
+                          className={`equipment-reservation-bar ${isSelected ? 'selected' : ''}`}
                           data-reservation-id={reservation.id}
-                          style={style}
-                          onMouseDown={(e) => handleScheduleMouseDown(schedule, e)}
+                          style={{
+                            ...style,
+                            border: isSelected ? '2px solid #2196f3' : style.border,
+                            boxShadow: isSelected ? '0 0 8px rgba(33, 150, 243, 0.5)' : style.boxShadow
+                          }}
+                          onMouseDown={(e) => {
+                            if (e.button === 0) { // 左クリック
+                              handleScheduleMouseDown(schedule, e);
+                              setSelectedSchedule(reservation);
+                            }
+                          }}
                           onDoubleClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             setSelectedSchedule(reservation);
                             setShowRegistrationModal(true);
+                          }}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setSelectedSchedule(reservation);
+                            setContextMenuTarget(reservation);
+                            setContextMenuPosition({ x: e.clientX, y: e.clientY });
                           }}
                           title={`${reservation.title} (${String(startHour).padStart(2, '0')}:${String(startMinute).padStart(2, '0')}-${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}) ${reservation.employee_name || ''}`}
                         >
@@ -1072,6 +1196,42 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
             scheduleId: selectedSchedule.id
           } : undefined}
           onCreated={handleReservationSave}
+        />
+      )}
+
+      {/* コンテキストメニュー */}
+      {contextMenuPosition && contextMenuTarget && (
+        <ContextMenu
+          position={contextMenuPosition}
+          items={[
+            {
+              id: 'copy',
+              label: 'コピー',
+              icon: '📋',
+              shortcut: 'Ctrl+C',
+              action: () => handleReservationCopy(contextMenuTarget)
+            },
+            {
+              id: 'paste',
+              label: '貼り付け',
+              icon: '📌',
+              shortcut: 'Ctrl+V',
+              action: handleReservationPaste,
+              disabled: !clipboard
+            },
+            {
+              id: 'separator1',
+              separator: true
+            },
+            {
+              id: 'delete',
+              label: '削除',
+              icon: '🗑️',
+              shortcut: 'Del',
+              action: () => handleReservationDelete(contextMenuTarget.id)
+            }
+          ]}
+          onClose={handleContextMenuClose}
         />
       )}
     </div>
