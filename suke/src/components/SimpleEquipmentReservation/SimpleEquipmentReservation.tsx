@@ -384,11 +384,11 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
             backgroundColor: '#f0f0f0',
             borderBottom: '2px solid #ccc',
             display: 'flex',
-            minWidth: `${80 + 96 * 20}px`
+            minWidth: `${500 + 96 * 20}px`
           }}>
             {/* 左上の空白セル */}
             <div style={{
-              width: '80px',
+              width: '500px',
               height: '40px',
               backgroundColor: '#e0e0e0',
               border: '1px solid #ccc',
@@ -432,7 +432,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
             className="schedule-content-area" 
             style={{
               position: 'relative',
-              minWidth: `${80 + 96 * 20}px`
+              minWidth: `${500 + 96 * 20}px`
             }}
           >
             {/* 設備行とスケジュールセル */}
@@ -473,7 +473,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                     position: 'sticky',
                     left: 0,
                     zIndex: 50,
-                    width: '80px',
+                    width: '500px',
                     backgroundColor: '#f8f9fa',
                     border: '1px solid #ccc',
                     display: 'flex',
