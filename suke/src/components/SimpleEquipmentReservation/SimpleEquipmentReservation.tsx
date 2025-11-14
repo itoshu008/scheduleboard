@@ -161,8 +161,8 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
             color: toApiColor(state.dragData.schedule.color),
             employee_id: state.dragData.schedule.employee_id,
             equipment_id: state.dragData.schedule.equipment_id || (state.dragData.schedule as any).equipment_id,
-            start_datetime: toLocalISODateTime(newStart),
-            end_datetime: toLocalISODateTime(newEnd)
+            start_datetime: newStart, // Dateオブジェクトを直接渡す（equipmentReservationApi.updateが変換する）
+            end_datetime: newEnd // Dateオブジェクトを直接渡す（equipmentReservationApi.updateが変換する）
           };
           
           console.log(`🔄 Update payload:`, updateData);
@@ -197,8 +197,8 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
             color: toApiColor(state.resizeData.schedule.color),
             employee_id: state.resizeData.schedule.employee_id,
             equipment_id: state.resizeData.schedule.equipment_id || (state.resizeData.schedule as any).equipment_id,
-            start_datetime: toLocalISODateTime(state.resizeGhost.newStart),
-            end_datetime: toLocalISODateTime(state.resizeGhost.newEnd)
+            start_datetime: state.resizeGhost.newStart, // Dateオブジェクトを直接渡す（equipmentReservationApi.updateが変換する）
+            end_datetime: state.resizeGhost.newEnd // Dateオブジェクトを直接渡す（equipmentReservationApi.updateが変換する）
           };
           
           console.log(`🔄 Update payload:`, updateData);
