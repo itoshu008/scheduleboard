@@ -125,13 +125,21 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
   });
 
   // 設備予約用のドラッグ＆リサイズ処理（equipmentReservationApiを使用）
+  // interactionStateの最新値を保持するref
+  const interactionStateRef = useRef(interactionState);
+  useEffect(() => {
+    interactionStateRef.current = interactionState;
+  }, [interactionState]);
+
   useEffect(() => {
     const handleMouseUp = async (e: MouseEvent) => {
-      const state = interactionState;
+      const state = interactionStateRef.current;
       
       // 設備予約ページでは独自の処理を行う（useMonthlyEventBarHandlersのグローバルmouseupは無効化済み）
       const hasActiveOperation = state.dragData || state.resizeData;
       if (!hasActiveOperation) return;
+      
+      console.log('🎯 設備予約mouseup:', { dragData: !!state.dragData, resizeData: !!state.resizeData });
       
       // ドラッグ終了処理
       if (state.dragData && state.dragGhost) {
@@ -176,10 +184,14 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
           
           console.log(`✅ Update API call completed`);
           
-          // WebSocketの更新を待つ
+          // WebSocketの更新を待つ（サーバーがブロードキャストするまで少し待つ）
+          console.log('📡 Waiting for WebSocket update after drag...');
           await new Promise(resolve => setTimeout(resolve, 300));
           
+          // WebSocketでデータが更新されるが、念のため手動でリロード
           await loadReservations();
+          
+          console.log('✅ Drag update completed successfully');
           
         } catch (error) {
           console.error('設備予約ドラッグ更新エラー:', error);
@@ -212,10 +224,14 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
           
           console.log(`✅ Update API call completed`);
           
-          // WebSocketの更新を待つ
+          // WebSocketの更新を待つ（サーバーがブロードキャストするまで少し待つ）
+          console.log('📡 Waiting for WebSocket update after resize...');
           await new Promise(resolve => setTimeout(resolve, 300));
           
+          // WebSocketでデータが更新されるが、念のため手動でリロード
           await loadReservations();
+          
+          console.log('✅ Resize update completed successfully');
           
         } catch (error) {
           console.error('設備予約リサイズ更新エラー:', error);
@@ -242,7 +258,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     return () => {
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [!!interactionState.dragData, !!interactionState.resizeData, interactionState.showEditModal, interactionState, loadReservations, setInteractionState]);
+  }, [!!interactionState.dragData, !!interactionState.resizeData, interactionState.showEditModal, loadReservations, setInteractionState]);
 
   // 月別ビューのロジックと互換性を保つため、既存の変数名をエイリアス
   const dragData = interactionState.dragData;
