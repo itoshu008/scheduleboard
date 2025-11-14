@@ -87,7 +87,10 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       setLoading(true);
       const dateStr = formatDate(selectedDate);
       const response = await api.get(`/equipment-reservations?date=${dateStr}`);
-      setReservations(response.data || []);
+      const reservationsData = response.data || [];
+      console.log('Loaded reservations:', reservationsData.length, 'for date:', dateStr);
+      console.log('Sample reservation:', reservationsData[0]);
+      setReservations(reservationsData);
     } catch (error) {
       console.error('予約データの読み込みに失敗:', error);
       setError('予約データの読み込みに失敗しました');
@@ -326,37 +329,55 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     const startTimeStr = reservation.start_datetime;
     const endTimeStr = reservation.end_datetime;
     
+    if (!startTimeStr || !endTimeStr) {
+      console.warn('Reservation missing datetime:', reservation.id);
+      return { display: 'none' };
+    }
+    
     // ISO形式（Z付きまたはタイムゾーン付き）の場合は、ローカル時間として解釈
     let startDate: Date;
     let endDate: Date;
     
-    if (startTimeStr.includes('T') && (startTimeStr.includes('Z') || startTimeStr.includes('+') || startTimeStr.includes('-'))) {
-      // ISO形式（UTC）の場合、ローカル時間として解釈するため、タイムゾーン情報を除去
-      const localStartStr = startTimeStr.replace(/[Z+-].*$/, '').replace('T', ' ');
-      const localEndStr = endTimeStr.replace(/[Z+-].*$/, '').replace('T', ' ');
-      startDate = parseLocalDateTimeString(localStartStr);
-      endDate = parseLocalDateTimeString(localEndStr);
-    } else {
-      // 既にローカル時間形式の場合
-      startDate = parseLocalDateTimeString(startTimeStr);
-      endDate = parseLocalDateTimeString(endTimeStr);
-    }
-    
-    const startSlot = getTimeSlot(startDate);
-    const endSlot = getEndTimeSlot(endDate);
-    
-    // 固定設備セルの幅は300px、時間セルは20px幅
-    const left = 300 + startSlot * 20;
-    const width = (endSlot - startSlot) * 20;
-    // 親要素（行）内での相対位置なので、行の高さ40pxに対して中央寄せ（2px下げる）
-    const top = 2;
-    
-    return {
-      position: 'absolute' as const,
-      left: `${left}px`,
-      top: `${top}px`,
-      width: `${width}px`,
-      height: '36px',
+    try {
+      if (startTimeStr.includes('T') && (startTimeStr.includes('Z') || startTimeStr.match(/[+-]\d{2}:\d{2}$/))) {
+        // ISO形式（UTC）の場合、ローカル時間として解釈するため、タイムゾーン情報を除去
+        const localStartStr = startTimeStr.replace(/[Z+-].*$/, '').replace('T', ' ');
+        const localEndStr = endTimeStr.replace(/[Z+-].*$/, '').replace('T', ' ');
+        startDate = parseLocalDateTimeString(localStartStr);
+        endDate = parseLocalDateTimeString(localEndStr);
+      } else {
+        // 既にローカル時間形式の場合
+        startDate = parseLocalDateTimeString(startTimeStr);
+        endDate = parseLocalDateTimeString(endTimeStr);
+      }
+      
+      // 日付が無効な場合は非表示
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        console.warn('Invalid date for reservation:', reservation.id, startTimeStr, endTimeStr);
+        return { display: 'none' };
+      }
+      
+      const startSlot = getTimeSlot(startDate);
+      const endSlot = getEndTimeSlot(endDate);
+      
+      // スロットが無効な場合は非表示
+      if (startSlot < 0 || startSlot >= 96 || endSlot <= startSlot || endSlot > 96) {
+        console.warn('Invalid slot range for reservation:', reservation.id, startSlot, endSlot);
+        return { display: 'none' };
+      }
+      
+      // 固定設備セルの幅は300px、時間セルは20px幅
+      const left = 300 + startSlot * 20;
+      const width = (endSlot - startSlot) * 20;
+      // 親要素（行）内での相対位置なので、行の高さ40pxに対して中央寄せ（2px下げる）
+      const top = 2;
+      
+      return {
+        position: 'absolute' as const,
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${width}px`,
+        height: '36px',
       background: `linear-gradient(180deg, ${lightenColor(safeHexColor(reservation.color || '#dc3545'), 0.15)} 0%, ${safeHexColor(reservation.color || '#dc3545')} 100%)`,
       border: `1px solid ${lightenColor(safeHexColor(reservation.color || '#dc3545'), -0.10)}`,
       borderRadius: '4px',
@@ -370,7 +391,11 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       justifyContent: 'center',
       cursor: 'pointer',
       boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-    };
+      };
+    } catch (error) {
+      console.error('Error calculating reservation style:', reservation.id, error, { startTimeStr, endTimeStr });
+      return { display: 'none' };
+    }
   };
 
   if (loading) {
@@ -710,22 +735,39 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                       // 設備IDが一致するか
                       if (reservation.equipment_id !== equipment.id) return false;
                       
-                      // 選択した日付と一致するか確認
-                      const startTimeStr = reservation.start_datetime;
-                      let startDate: Date;
-                      
-                      if (startTimeStr.includes('T') && (startTimeStr.includes('Z') || startTimeStr.includes('+') || startTimeStr.includes('-'))) {
-                        const localStartStr = startTimeStr.replace(/[Z+-].*$/, '').replace('T', ' ');
-                        startDate = parseLocalDateTimeString(localStartStr);
-                      } else {
-                        startDate = parseLocalDateTimeString(startTimeStr);
+                      // APIから取得したデータは既に選択した日付でフィルタリングされているため、
+                      // フロントエンドでの追加フィルタリングは不要
+                      // ただし、念のため日付の整合性を確認
+                      try {
+                        const startTimeStr = reservation.start_datetime;
+                        if (!startTimeStr) {
+                          console.warn('Reservation missing start_datetime:', reservation.id);
+                          return false;
+                        }
+                        
+                        // 日付の形式を確認（エラーが発生しないように）
+                        let startDate: Date;
+                        
+                        if (startTimeStr.includes('T') && (startTimeStr.includes('Z') || startTimeStr.match(/[+-]\d{2}:\d{2}$/))) {
+                          // ISO形式（UTC）の場合、ローカル時間として解釈するため、タイムゾーン情報を除去
+                          const localStartStr = startTimeStr.replace(/[Z+-].*$/, '').replace('T', ' ');
+                          startDate = parseLocalDateTimeString(localStartStr);
+                        } else {
+                          // 既にローカル時間形式の場合
+                          startDate = parseLocalDateTimeString(startTimeStr);
+                        }
+                        
+                        // 日付が無効な場合は表示しない
+                        if (isNaN(startDate.getTime())) {
+                          console.warn('Invalid date for reservation:', reservation.id, startTimeStr);
+                          return false;
+                        }
+                        
+                        return true; // APIで既にフィルタリングされているため、常にtrueを返す
+                      } catch (error) {
+                        console.error('Error processing reservation:', reservation.id, error, reservation);
+                        return false;
                       }
-                      
-                      // 選択した日付と一致するか確認
-                      const reservationDateStr = formatDate(startDate);
-                      const selectedDateStr = formatDate(selectedDate);
-                      
-                      return reservationDateStr === selectedDateStr;
                     })
                     .map(reservation => {
                       const schedule = reservationToSchedule(reservation);
