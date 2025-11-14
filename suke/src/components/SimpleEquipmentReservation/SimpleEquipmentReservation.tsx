@@ -463,8 +463,6 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
 
   // 予約の表示位置を計算（設備予約ページ専用）
   const getReservationStyle = (reservation: Reservation, equipmentIndex: number) => {
-    // ISO形式の文字列をローカル時間として解釈
-    // dayjsはUTCとして解釈する可能性があるため、parseLocalDateTimeStringを使用
     const startTimeStr = reservation.start_datetime;
     const endTimeStr = reservation.end_datetime;
     
@@ -475,23 +473,24 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       return { display: 'none' };
     }
     
-    // ISO形式（Z付きまたはタイムゾーン付き）の場合は、UTCとして解釈してからローカル時間に変換
     let startDate: Date;
     let endDate: Date;
     
     try {
+      // ISO形式（Z付きまたはタイムゾーン付き）の場合は、UTCとして解釈してからローカル時間に変換
       if (startTimeStr.includes('T') && (startTimeStr.includes('Z') || startTimeStr.match(/[+-]\d{2}:\d{2}$/))) {
         // ISO形式（UTC）の場合、new Date()で自動的にローカル時間に変換される
-        // サーバー側でJST→UTCに変換されているため、new Date()で解釈すれば自動的にローカル時間になる
         startDate = new Date(startTimeStr);
         endDate = new Date(endTimeStr);
         
-        console.log('🔍 [getReservationStyle] ISO format detected. UTC:', startTimeStr, '→ Local:', startDate.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }));
+        const localStartStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')} ${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}:${String(startDate.getSeconds()).padStart(2, '0')}`;
+        console.log('🔍 [getReservationStyle] ISO format detected. UTC:', startTimeStr, '→ Local:', localStartStr);
       } else {
         // 既にローカル時間形式の場合
         startDate = parseLocalDateTimeString(startTimeStr);
         endDate = parseLocalDateTimeString(endTimeStr);
-        console.log('🔍 [getReservationStyle] Local format detected. Parsed:', startDate.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }));
+        const localStartStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')} ${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}:${String(startDate.getSeconds()).padStart(2, '0')}`;
+        console.log('🔍 [getReservationStyle] Local format detected. Parsed:', localStartStr);
       }
       
       // 日付が無効な場合は非表示
@@ -500,41 +499,88 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
         return { display: 'none' };
       }
       
-      // 選択されている日付と予約の日付が一致するか確認
-      const reservationDateStr = formatDate(startDate);
+      // ローカル時間ベースで日付文字列を取得
+      const reservationStartDateStr = formatDate(startDate);
+      const reservationEndDateStr = formatDate(endDate);
       const selectedDateStr = formatDate(selectedDate);
-      const endDateStr = formatDate(endDate);
       
-      // 開始日または終了日が選択日と一致する場合は表示
-      // サーバー側で既にフィルタリングされているため、ここでは表示する
-      if (reservationDateStr !== selectedDateStr && endDateStr !== selectedDateStr) {
-        console.log('🔍 [getReservationStyle] Reservation date mismatch:', reservation.id, 'reservation start:', reservationDateStr, 'reservation end:', endDateStr, 'selected:', selectedDateStr);
+      console.log('🔍 [getReservationStyle] Date comparison:', {
+        reservationId: reservation.id,
+        reservationStartDate: reservationStartDateStr,
+        reservationEndDate: reservationEndDateStr,
+        selectedDate: selectedDateStr,
+        startDateLocal: `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')} ${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`,
+        endDateLocal: `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')} ${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`
+      });
+      
+      // 予約が選択日と重なるか確認（開始日または終了日が選択日の範囲内、または予約が選択日をまたぐ場合）
+      // 選択日の00:00:00から23:59:59の範囲と予約の時間範囲が重なるかを確認
+      const selectedDateStart = new Date(selectedDate);
+      selectedDateStart.setHours(0, 0, 0, 0);
+      const selectedDateEnd = new Date(selectedDate);
+      selectedDateEnd.setHours(23, 59, 59, 999);
+      
+      // 予約が選択日の範囲と重なるか確認
+      const overlaps = startDate <= selectedDateEnd && endDate >= selectedDateStart;
+      
+      if (!overlaps) {
+        console.log('🔍 [getReservationStyle] Reservation does not overlap with selected date:', reservation.id, {
+          reservationStart: startDate.toISOString(),
+          reservationEnd: endDate.toISOString(),
+          selectedDateStart: selectedDateStart.toISOString(),
+          selectedDateEnd: selectedDateEnd.toISOString()
+        });
         return { display: 'none' };
       }
       
-      let startSlot = getTimeSlot(startDate);
-      let endSlot = getEndTimeSlot(endDate);
+      // スロット計算（選択日を基準に）
+      let startSlot: number;
+      let endSlot: number;
       
-      // 日をまたぐ場合の処理
-      if (reservationDateStr !== selectedDateStr) {
-        // 開始日が選択日と異なる場合（前日から続く予約）、開始スロットを0に
+      if (reservationStartDateStr === selectedDateStr) {
+        // 開始日が選択日と同じ場合、通常のスロット計算
+        startSlot = getTimeSlot(startDate);
+      } else {
+        // 開始日が選択日より前の場合（前日から続く予約）、開始スロットを0に
         startSlot = 0;
       }
       
-      if (endDateStr !== selectedDateStr) {
-        // 終了日が選択日と異なる場合（翌日に続く予約）、終了スロットを96に
-        endSlot = 96; // その日の終わりまで表示
-      } else if (endDateStr === selectedDateStr && endDate.getHours() === 0 && endDate.getMinutes() === 0) {
-        // 終了日が選択日と同じで、かつ00:00の場合（日をまたいでいるが、終了日が選択日の00:00）
-        // これは前日の予約が選択日の00:00で終了する場合
-        // 終了スロットは0のまま（00:00 = スロット0）
-        // ただし、開始スロットが0で終了スロットが0の場合は、最小幅を確保する
-        if (startSlot === 0 && endSlot === 0) {
-          endSlot = 1; // 最小1スロット分の幅を確保（00:00-00:15を表示）
+      if (reservationEndDateStr === selectedDateStr) {
+        // 終了日が選択日と同じ場合、通常のスロット計算
+        endSlot = getEndTimeSlot(endDate);
+      } else {
+        // 終了日が選択日より後の場合（翌日に続く予約）、終了スロットを96に
+        endSlot = 96;
+      }
+      
+      // 開始日が選択日より前で、終了日が選択日の00:00の場合の特別処理
+      if (reservationStartDateStr !== selectedDateStr && reservationEndDateStr === selectedDateStr && endDate.getHours() === 0 && endDate.getMinutes() === 0) {
+        // 前日の予約が選択日の00:00で終了する場合
+        endSlot = 0;
+      }
+      
+      // startSlot === endSlot の場合は最小1スロット分の高さを確保
+      if (startSlot === endSlot) {
+        if (startSlot < 96) {
+          endSlot = startSlot + 1;
+        } else {
+          // startSlotが96の場合（終日の予約）、最小幅を確保
+          startSlot = 95;
+          endSlot = 96;
         }
       }
       
-      console.log('🔍 [getReservationStyle] Slots calculated:', { startSlot, endSlot, startHour: startDate.getHours(), startMinute: startDate.getMinutes(), reservationDate: reservationDateStr, selectedDate: selectedDateStr });
+      console.log('🔍 [getReservationStyle] Slots calculated:', { 
+        startSlot, 
+        endSlot, 
+        startHour: startDate.getHours(), 
+        startMinute: startDate.getMinutes(),
+        endHour: endDate.getHours(),
+        endMinute: endDate.getMinutes(),
+        reservationStartDate: reservationStartDateStr, 
+        reservationEndDate: reservationEndDateStr,
+        selectedDate: selectedDateStr 
+      });
       
       // スロットが無効な場合は非表示
       if (startSlot < 0 || startSlot >= 96 || endSlot <= startSlot || endSlot > 96) {
