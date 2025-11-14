@@ -6,6 +6,10 @@
   flex-direction: column;
   background: var(--background, #f5f5f5);
   overflow: visible;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
 }
 
 /* ヘッダー */
@@ -148,6 +152,10 @@
   position: relative;
   box-sizing: border-box;
   margin: 0;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
 }
 
 .time-header-fixed {
@@ -197,6 +205,10 @@
   background: white;
   cursor: pointer;
   transition: background-color 0.2s ease;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
 }
 
 .time-cell-15min:hover {
@@ -204,8 +216,11 @@
 }
 
 .time-cell-15min.selected {
-  background: #007bff;
-  opacity: 0.7;
+  background: #e3f2fd !important;
+  border: 2px solid #2196f3 !important;
+  box-shadow: 0 0 8px rgba(33, 150, 243, 0.3) !important;
+  opacity: 1 !important;
+  z-index: 5 !important;
 }
 
 .time-cell-15min.hour-border {
@@ -242,6 +257,32 @@
   border: 1px solid #f5c6cb;
   border-radius: 4px;
   margin: 16px;
+}
+
+/* テキスト選択を防ぐ（全社員ページと同様） */
+.equipment-schedule table,
+.equipment-schedule tbody,
+.equipment-schedule tr,
+.equipment-schedule td {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+.equipment-schedule ::selection,
+.equipment-schedule ::-moz-selection {
+  background: transparent !important;
+  color: inherit !important;
+}
+
+.equipment-schedule input,
+.equipment-schedule textarea,
+.equipment-schedule [contenteditable="true"] {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
 }
 
 

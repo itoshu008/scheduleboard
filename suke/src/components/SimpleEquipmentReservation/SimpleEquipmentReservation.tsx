@@ -124,19 +124,106 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
   const resizeData = interactionState.resizeData;
   const resizeGhost = interactionState.resizeGhost;
 
-  // セルクリック処理（セル選択フックを使用）
-  const handleCellClick = (equipmentId: number, slot: number) => {
-    const cellId = `equipment-${equipmentId}-${slot}`;
-    const newSelectedCells = new Set(selectedCells);
+  // セル選択状態（直接管理 - 全社員ページと同様）
+  const [localSelectedCells, setLocalSelectedCells] = useState<Set<string>>(new Set());
+  const [localIsSelecting, setLocalIsSelecting] = useState(false);
+  const [localSelectionAnchor, setLocalSelectionAnchor] = useState<{ equipmentId: number; slot: number } | null>(null);
+
+  // 設備予約ページ用のセル選択ハンドラー（全社員ページと同様）
+  const handleEquipmentCellMouseDown = useCallback((equipmentId: number, slot: number, e?: React.MouseEvent) => {
+    // 右クリック時はセル選択を無効化（右クリックドラッグスクロール用）
+    if (e && e.button === 2) return;
+    if (e && e.button !== 0) return; // 左クリック以外はセル選択無効化
     
-    if (selectedCells.has(cellId)) {
-      newSelectedCells.delete(cellId);
-    } else {
-      newSelectedCells.add(cellId);
+    // セルIDに日付情報を含める（全社員ページと統一）
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(selectedDate.getDate()).padStart(2, '0');
+    const cellId = `${year}-${month}-${day}-equipment-${equipmentId}-${slot}`;
+    
+    // スケジュール選択をクリア
+    setSelectedSchedule(null);
+    
+    // セル選択開始
+    setLocalSelectedCells(new Set([cellId]));
+    setLocalIsSelecting(true);
+    setLocalSelectionAnchor({ equipmentId, slot });
+  }, [selectedDate]);
+
+  const handleEquipmentCellMouseEnter = useCallback((equipmentId: number, slot: number) => {
+    if (!localIsSelecting || !localSelectionAnchor) return;
+    
+    const newSelectedCells = new Set<string>();
+    const startEquipment = Math.min(localSelectionAnchor.equipmentId, equipmentId);
+    const endEquipment = Math.max(localSelectionAnchor.equipmentId, equipmentId);
+    const startSlot = Math.min(localSelectionAnchor.slot, slot);
+    const endSlot = Math.max(localSelectionAnchor.slot, slot);
+
+    // セルIDに日付情報を含める
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(selectedDate.getDate()).padStart(2, '0');
+    
+    // 設備リストから実際のequipmentIdを取得
+    const equipmentList = equipments;
+    
+    for (let eqIndex = 0; eqIndex < equipmentList.length; eqIndex++) {
+      const eq = equipmentList[eqIndex];
+      if (eq.id >= startEquipment && eq.id <= endEquipment) {
+        for (let s = startSlot; s <= endSlot; s++) {
+          newSelectedCells.add(`${year}-${month}-${day}-equipment-${eq.id}-${s}`);
+        }
+      }
     }
     
-    setSelectedCells(newSelectedCells);
-  };
+    setLocalSelectedCells(newSelectedCells);
+  }, [localIsSelecting, localSelectionAnchor, equipments, selectedDate]);
+
+  const handleEquipmentCellMouseUp = useCallback(() => {
+    setLocalIsSelecting(false);
+    setLocalSelectionAnchor(null);
+    
+    // 選択されたセルをuseScheduleCellSelectionの形式に変換
+    const convertedCells = new Set<string>();
+    localSelectedCells.forEach(cellId => {
+      // 形式: YYYY-MM-DD-equipment-equipmentId-slot
+      // これをequipment-equipmentId-slot形式に変換（既存のコードとの互換性のため）
+      const parts = cellId.split('-');
+      if (parts.length >= 6 && parts[3] === 'equipment') {
+        const equipmentId = parts[4];
+        const slot = parts[5];
+        convertedCells.add(`equipment-${equipmentId}-${slot}`);
+      }
+    });
+    setSelectedCells(convertedCells);
+  }, [localSelectedCells, setSelectedCells]);
+
+  // グローバルなmouseupイベントリスナーでドラッグ終了を検知
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (localIsSelecting) {
+        setLocalIsSelecting(false);
+        setLocalSelectionAnchor(null);
+        
+        // 選択されたセルをuseScheduleCellSelectionの形式に変換
+        const convertedCells = new Set<string>();
+        localSelectedCells.forEach(cellId => {
+          const parts = cellId.split('-');
+          if (parts.length >= 6 && parts[3] === 'equipment') {
+            const equipmentId = parts[4];
+            const slot = parts[5];
+            convertedCells.add(`equipment-${equipmentId}-${slot}`);
+          }
+        });
+        setSelectedCells(convertedCells);
+      }
+    };
+
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [localIsSelecting, localSelectedCells, setSelectedCells]);
 
   // 予約保存
   const handleReservationSave = async (scheduleData: any) => {
@@ -493,8 +580,13 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                   {Array.from({ length: 96 }, (_, slot) => {
                     const hour = Math.floor(slot / 4);
                     const minute = (slot % 4) * 15;
-                    const cellId = `equipment-${equipment.id}-${slot}`;
-                    const isSelected = selectedCells.has(cellId);
+                    // ローカル選択状態と既存の選択状態の両方をチェック
+                    const year = selectedDate.getFullYear();
+                    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                    const day = String(selectedDate.getDate()).padStart(2, '0');
+                    const localCellId = `${year}-${month}-${day}-equipment-${equipment.id}-${slot}`;
+                    const legacyCellId = `equipment-${equipment.id}-${slot}`;
+                    const isSelected = localSelectedCells.has(localCellId) || selectedCells.has(legacyCellId);
                     const isHourBorder = minute === 0;
 
                     return (
@@ -504,14 +596,44 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                         style={{
                           width: '20px',
                           height: '40px',
-                          border: '1px solid #eee',
+                          border: isSelected ? '2px solid #2196f3' : (isHourBorder ? '2px solid #999' : '1px solid #ccc'),
                           borderLeft: isHourBorder ? '2px solid #999' : '1px solid #ccc',
-                          backgroundColor: isSelected ? '#007bff' : 'white',
+                          backgroundColor: isSelected ? '#e3f2fd' : 'white',
                           cursor: 'pointer',
-                          opacity: isSelected ? 0.7 : 1,
-                          transition: 'background-color 0.2s ease'
+                          opacity: isSelected ? 1 : 1,
+                          transition: 'background-color 0.2s ease',
+                          boxShadow: isSelected ? '0 0 8px rgba(33, 150, 243, 0.3)' : 'none',
+                          zIndex: isSelected ? 5 : 1
                         }}
-                        onClick={() => handleCellClick(equipment.id, slot)}
+                        data-equipment-id={equipment.id}
+                        data-slot={slot}
+                        data-time={`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`}
+                        draggable={false}
+                        onMouseDown={(e) => {
+                          if (e.button !== 0) return; // 左クリック以外はセル選択無効化
+                          
+                          // 予約バーとの干渉チェック
+                          const target = e.target as HTMLElement;
+                          if (target.closest('.schedule-item') || target.closest('.resize-handle')) {
+                            return; // 予約バー上ではセル選択を無効化
+                          }
+                          
+                          e.preventDefault(); // テキスト選択を防ぐ
+                          e.stopPropagation();
+                          handleEquipmentCellMouseDown(equipment.id, slot, e);
+                        }}
+                        onMouseEnter={() => {
+                          if (localIsSelecting) {
+                            handleEquipmentCellMouseEnter(equipment.id, slot);
+                          }
+                        }}
+                        onMouseUp={handleEquipmentCellMouseUp}
+                        onDragStart={(e) => {
+                          e.preventDefault(); // ブラウザのドラッグ&ドロップを無効化
+                        }}
+                        onSelectStart={(e) => {
+                          e.preventDefault(); // テキスト選択開始を防ぐ
+                        }}
                         title={`${equipment.name} ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`}
                       />
                     );
