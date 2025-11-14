@@ -587,17 +587,16 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                     const localCellId = `${year}-${month}-${day}-equipment-${equipment.id}-${slot}`;
                     const legacyCellId = `equipment-${equipment.id}-${slot}`;
                     const isSelected = localSelectedCells.has(localCellId) || selectedCells.has(legacyCellId);
-                    const isHourBorder = minute === 0;
 
                     return (
                       <div
                         key={slot}
-                        className={`time-cell-15min ${isSelected ? 'selected' : ''} ${isHourBorder ? 'hour-border' : ''}`}
+                        className={`time-cell-15min ${isSelected ? 'selected' : ''}`}
                         style={{
                           width: '20px',
                           height: '40px',
-                          border: isSelected ? '2px solid #2196f3' : (isHourBorder ? '2px solid #999' : '1px solid #ccc'),
-                          borderLeft: isHourBorder ? '2px solid #999' : '1px solid #ccc',
+                          border: isSelected ? '2px solid #2196f3' : '1px solid #ccc',
+                          borderLeft: '1px solid #ccc',
                           backgroundColor: isSelected ? '#e3f2fd' : 'white',
                           cursor: 'pointer',
                           opacity: isSelected ? 1 : 1,
