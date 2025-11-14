@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Equipment, Employee } from '../../types';
+import { Equipment, Employee, SCHEDULE_COLORS } from '../../types';
 import { api } from '../../api';
 import dayjs from 'dayjs';
 import { formatDate, getTimeSlot, getTimeFromSlot, getEndTimeSlot, parseLocalDateTimeString, toLocalISODateTime } from '../../utils/dateUtils';
@@ -11,6 +11,10 @@ import { useMonthlyEventBarHandlers } from '../../hooks/useMonthlyEventBarHandle
 import { safeHexColor, lightenColor, toApiColor } from '../../utils/color';
 import { equipmentReservationApi } from '../../utils/api';
 import ContextMenu, { ContextMenuItem } from '../ContextMenu/ContextMenu';
+import ManagementTabs from '../ManagementTabs/ManagementTabs';
+import DepartmentRegistration from '../DepartmentRegistration/DepartmentRegistration';
+import EmployeeRegistration from '../EmployeeRegistration/EmployeeRegistration';
+import EquipmentRegistration from '../EquipmentRegistration/EquipmentRegistration';
 import './SimpleEquipmentReservation.css';
 
 interface SimpleEquipmentReservationProps {
@@ -46,6 +50,8 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
   const [clipboard, setClipboard] = useState<Reservation | null>(null);
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [contextMenuTarget, setContextMenuTarget] = useState<Reservation | null>(null);
+  const [showManagementTabs, setShowManagementTabs] = useState(false);
+  const [currentRegistrationView, setCurrentRegistrationView] = useState<string | null>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
@@ -709,6 +715,15 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
               <button className="nav-btn active" onClick={() => (window.location.href = '/scheduleboard/equipment')}>設備</button>
             </div>
           </div>
+          <div className="nav-btn-right">
+            <button 
+              className="nav-btn management-btn" 
+              onClick={() => setShowManagementTabs(true)}
+              style={{ backgroundColor: 'red', color: 'white' }}
+            >
+              管理
+            </button>
+          </div>
         </div>
         <div className="grid-controls-row-second">
           <div className="date-section">
@@ -1358,6 +1373,40 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
             }
           ]}
           onClose={handleContextMenuClose}
+        />
+      )}
+
+      {/* 管理タブ */}
+      <ManagementTabs
+        isVisible={showManagementTabs}
+        onClose={() => setShowManagementTabs(false)}
+        onNavigate={(path) => {
+          setShowManagementTabs(false);
+          setCurrentRegistrationView(path);
+        }}
+        onScheduleRegister={() => {
+          setShowManagementTabs(false);
+          // 設備予約ページではスケジュール登録は別のモーダルを使用
+        }}
+        colors={SCHEDULE_COLORS}
+      />
+
+      {/* 登録画面 */}
+      {currentRegistrationView === '/management/departments' && (
+        <DepartmentRegistration
+          onClose={() => setCurrentRegistrationView(null)}
+        />
+      )}
+
+      {currentRegistrationView === '/management/employees' && (
+        <EmployeeRegistration
+          onClose={() => setCurrentRegistrationView(null)}
+        />
+      )}
+
+      {currentRegistrationView === '/management/equipment' && (
+        <EquipmentRegistration
+          onClose={() => setCurrentRegistrationView(null)}
         />
       )}
     </div>
