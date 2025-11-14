@@ -127,6 +127,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       // ドラッグ終了処理
       if (state.dragData && state.dragGhost) {
         try {
+          console.log(`🔄 Drag ended for reservation ID=${state.dragData.schedule.id}`);
           
           // 新しい開始・終了時刻を計算
           const originalStart = new Date(state.dragData.schedule.start_datetime);
@@ -143,6 +144,14 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
           );
           const newEnd = new Date(newStart.getTime() + originalDuration);
           
+          console.log(`🔄 Updating reservation:`, {
+            id: state.dragData.schedule.id,
+            oldStart: originalStart.toLocaleString('ja-JP'),
+            oldEnd: originalEnd.toLocaleString('ja-JP'),
+            newStart: newStart.toLocaleString('ja-JP'),
+            newEnd: newEnd.toLocaleString('ja-JP')
+          });
+          
           const updateData = {
             title: state.dragData.schedule.title || '予約',
             color: toApiColor(state.dragData.schedule.color),
@@ -152,7 +161,11 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
             end_datetime: newEnd
           };
           
+          console.log(`🔄 Update payload:`, updateData);
+          
           await equipmentReservationApi.update(state.dragData.schedule.id, updateData);
+          
+          console.log(`✅ Update API call completed`);
           
           // WebSocketの更新を待つ
           await new Promise(resolve => setTimeout(resolve, 300));
@@ -168,6 +181,12 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       // リサイズ終了処理
       if (state.resizeData && state.resizeGhost) {
         try {
+          console.log(`🔄 Resize ended for reservation ID=${state.resizeData.schedule.id}`);
+          console.log(`🔄 Updating reservation:`, {
+            id: state.resizeData.schedule.id,
+            newStart: state.resizeGhost.newStart.toLocaleString('ja-JP'),
+            newEnd: state.resizeGhost.newEnd.toLocaleString('ja-JP')
+          });
           
           const updateData = {
             title: state.resizeData.schedule.title || '予約',
@@ -178,7 +197,11 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
             end_datetime: state.resizeGhost.newEnd
           };
           
+          console.log(`🔄 Update payload:`, updateData);
+          
           await equipmentReservationApi.update(state.resizeData.schedule.id, updateData);
+          
+          console.log(`✅ Update API call completed`);
           
           // WebSocketの更新を待つ
           await new Promise(resolve => setTimeout(resolve, 300));
@@ -425,21 +448,11 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       );
       
       // 予約が選択日の範囲と重なるか確認（すべてローカル時間で比較）
-      // 予約の終了時刻が選択日の開始時刻より後、かつ予約の開始時刻が選択日の終了時刻より前
       const overlaps = startDate < selectedDateEnd && endDate > selectedDateStart;
       
       if (!overlaps) {
         return { display: 'none' };
       }
-      
-      // スロット計算（選択日を基準に）
-      // 選択日の00:00:00を基準にしたDateオブジェクトを作成
-      const selectedDateBase = new Date(
-        selectedDate.getFullYear(),
-        selectedDate.getMonth(),
-        selectedDate.getDate(),
-        0, 0, 0, 0
-      );
       
       // 予約の開始・終了時刻を選択日のローカル時間として再計算
       let startSlot: number;
@@ -447,29 +460,25 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       
       // 予約の開始時刻が選択日の範囲内にある場合
       if (startDate >= selectedDateStart && startDate <= selectedDateEnd) {
-        // 選択日の00:00:00からの経過時間（ミリ秒）を計算
         const diffMs = startDate.getTime() - selectedDateStart.getTime();
         const diffMinutes = Math.floor(diffMs / (1000 * 60));
         startSlot = Math.floor(diffMinutes / 15);
       } else if (startDate < selectedDateStart) {
-        // 予約の開始時刻が選択日より前の場合（前日から続く予約）
+        // 前日から続く予約
         startSlot = 0;
       } else {
-        // 予約の開始時刻が選択日より後の場合（この場合は重複しないはずだが、念のため）
         return { display: 'none' };
       }
       
       // 予約の終了時刻が選択日の範囲内にある場合
       if (endDate >= selectedDateStart && endDate <= selectedDateEnd) {
-        // 選択日の00:00:00からの経過時間（ミリ秒）を計算
         const diffMs = endDate.getTime() - selectedDateStart.getTime();
         const diffMinutes = Math.ceil(diffMs / (1000 * 60));
         endSlot = Math.ceil(diffMinutes / 15);
       } else if (endDate > selectedDateEnd) {
-        // 予約の終了時刻が選択日より後の場合（翌日に続く予約）
+        // 翌日に続く予約
         endSlot = 96;
       } else {
-        // 予約の終了時刻が選択日より前の場合（この場合は重複しないはずだが、念のため）
         return { display: 'none' };
       }
       
@@ -484,7 +493,6 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
         if (startSlot < 96) {
           endSlot = startSlot + 1;
         } else {
-          // startSlotが96の場合（終日の予約）、最小幅を確保
           startSlot = 95;
           endSlot = 96;
         }
@@ -498,7 +506,6 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       // 固定設備セルの幅は300px、時間セルは20px幅
       const left = 300 + startSlot * 20;
       const width = (endSlot - startSlot) * 20;
-      // 親要素（行）内での相対位置なので、行の高さ40pxに対して中央寄せ（2px下げる）
       const top = 2;
       
       return {
@@ -507,21 +514,22 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
         top: `${top}px`,
         width: `${width}px`,
         height: '36px',
-      background: `linear-gradient(180deg, ${lightenColor(safeHexColor(reservation.color || '#dc3545'), 0.15)} 0%, ${safeHexColor(reservation.color || '#dc3545')} 100%)`,
-      border: `1px solid ${lightenColor(safeHexColor(reservation.color || '#dc3545'), -0.10)}`,
-      borderRadius: '4px',
-      padding: '2px 4px',
-      fontSize: '11px',
-      color: 'white',
-      overflow: 'hidden',
-      zIndex: 10,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      cursor: 'pointer',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+        background: `linear-gradient(180deg, ${lightenColor(safeHexColor(reservation.color || '#dc3545'), 0.15)} 0%, ${safeHexColor(reservation.color || '#dc3545')} 100%)`,
+        border: `1px solid ${lightenColor(safeHexColor(reservation.color || '#dc3545'), -0.10)}`,
+        borderRadius: '4px',
+        padding: '2px 4px',
+        fontSize: '11px',
+        color: 'white',
+        overflow: 'hidden',
+        zIndex: 10,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
       };
     } catch (error) {
+      console.error(`Error calculating reservation style (ID=${reservation.id}):`, error);
       return { display: 'none' };
     }
   };

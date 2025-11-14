@@ -917,7 +917,9 @@ app.get('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) => 
       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
       ORDER BY er.start_datetime;
     `;
+    console.log(`[API] Equipment reservations query - date: ${req.query.date}, WHERE: ${where.join(' AND ')}, params:`, params);
     const [rows] = await getPool().query(sql, params);
+    console.log(`[API] Equipment reservations found: ${rows.length} rows`);
     
     // DATETIMEをISO形式に変換
     const formattedRows = rows.map((row) => {
@@ -1046,7 +1048,6 @@ app.post('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) =>
     color: color || '#3174ad'
   };
   
-  console.log(`[API] ✅ Equipment reservation created: ID=${r.insertId}, equipment_id=${equipment_id}`);
   broadcastDataChange('equipment_reservation', result);
   res.json(result);
 }));
