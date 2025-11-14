@@ -319,7 +319,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     };
   }, []);
 
-  // 予約の表示位置を計算（月別ビューのロジックと統一）
+  // 予約の表示位置を計算（設備予約ページ専用）
   const getReservationStyle = (reservation: Reservation, equipmentIndex: number) => {
     const startTime = dayjs(reservation.start_datetime);
     const endTime = dayjs(reservation.end_datetime);
@@ -327,9 +327,11 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     const startSlot = getTimeSlot(startTime.toDate());
     const endSlot = getEndTimeSlot(endTime.toDate());
     
-    const left = 80 + startSlot * 20;
+    // 固定設備セルの幅は300px、時間セルは20px幅
+    const left = 300 + startSlot * 20;
     const width = (endSlot - startSlot) * 20;
-    const top = 40 + equipmentIndex * 40;
+    // 親要素（行）内での相対位置なので、行の高さ40pxに対して中央寄せ（2px下げる）
+    const top = 2;
     
     return {
       position: 'absolute' as const,
