@@ -1780,8 +1780,9 @@ html body .app-main .all-employees-schedule .date-cell-fixed,
 }
 
 /* セル選択スタイル（日別から移植） */
+/* ドラッグ時に「新規スケジュール」などの文字が選択されないようにする（勤怠アプリに影響を与えないよう、名前空間で限定） */
 .all-employees-schedule .excel-time-cell {
-  user-select: none !important; /* ドラッグ選択を有効化するため、テキスト選択を無効化 */
+  user-select: none !important;
   -webkit-user-select: none !important;
   -moz-user-select: none !important;
   -ms-user-select: none !important;

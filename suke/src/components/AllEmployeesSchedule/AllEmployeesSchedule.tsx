@@ -1184,6 +1184,7 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                       data-slot={slot}
                       data-time={`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`}
                       title={`${employee.name} ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`}
+                      draggable={false}
                       onMouseDown={(e) => {
                         if (e.button !== 0) return; // 左クリック以外はセル選択無効化（右・中）
                         
@@ -1205,6 +1206,9 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                       onMouseUp={handleCellMouseUp}
                       onDragStart={(e) => {
                         e.preventDefault(); // ブラウザのドラッグ&ドロップを無効化
+                      }}
+                      onSelectStart={(e) => {
+                        e.preventDefault(); // テキスト選択開始を防ぐ（「新規スケジュール」などの文字選択を防ぐ）
                       }}
                       onDoubleClick={() => {
                         handleCellDoubleClick(employee.id, slot);
