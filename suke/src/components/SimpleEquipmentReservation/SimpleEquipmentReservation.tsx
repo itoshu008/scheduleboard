@@ -543,11 +543,20 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       }
       
       // スロット計算（選択日を基準に）
+      // 予約の開始・終了時刻を選択日のローカル時間として再計算
       let startSlot: number;
       let endSlot: number;
       
+      // 選択日の00:00:00を基準にしたDateオブジェクトを作成
+      const selectedDateBase = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate(),
+        0, 0, 0, 0
+      );
+      
       if (reservationStartDateStr === selectedDateStr) {
-        // 開始日が選択日と同じ場合、通常のスロット計算
+        // 開始日が選択日と同じ場合、予約の開始時刻からスロットを計算
         startSlot = getTimeSlot(startDate);
       } else {
         // 開始日が選択日より前の場合（前日から続く予約）、開始スロットを0に
@@ -555,7 +564,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       }
       
       if (reservationEndDateStr === selectedDateStr) {
-        // 終了日が選択日と同じ場合、通常のスロット計算
+        // 終了日が選択日と同じ場合、予約の終了時刻からスロットを計算
         endSlot = getEndTimeSlot(endDate);
       } else {
         // 終了日が選択日より後の場合（翌日に続く予約）、終了スロットを96に
@@ -567,6 +576,12 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
         // 前日の予約が選択日の00:00で終了する場合
         endSlot = 0;
       }
+      
+      // スロットの範囲チェック（0-96の範囲内に収める）
+      if (startSlot < 0) startSlot = 0;
+      if (startSlot > 96) startSlot = 96;
+      if (endSlot < 0) endSlot = 0;
+      if (endSlot > 96) endSlot = 96;
       
       // startSlot === endSlot の場合は最小1スロット分の高さを確保
       if (startSlot === endSlot) {
