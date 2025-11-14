@@ -1788,6 +1788,46 @@ html body .app-main .all-employees-schedule .date-cell-fixed,
   -ms-user-select: none !important;
 }
 
+/* 全社員ページ全体でテキスト選択を無効化（勤怠アプリに影響を与えないよう、名前空間で限定） */
+.all-employees-schedule {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+/* テキスト選択の視覚的フィードバックも無効化 */
+.all-employees-schedule ::selection {
+  background: transparent !important;
+  color: inherit !important;
+}
+
+.all-employees-schedule ::-moz-selection {
+  background: transparent !important;
+  color: inherit !important;
+}
+
+/* テーブル全体でもテキスト選択を無効化 */
+.all-employees-schedule table,
+.all-employees-schedule tbody,
+.all-employees-schedule tr,
+.all-employees-schedule td {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+/* ただし、入力フィールドは選択可能にする */
+.all-employees-schedule input,
+.all-employees-schedule textarea,
+.all-employees-schedule [contenteditable="true"] {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+}
+
 .all-employees-schedule .excel-time-cell.selected {
   background-color: #e3f2fd !important;
   border: 2px solid #2196f3 !important;

@@ -426,6 +426,23 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
     };
   }, [isSelecting]);
 
+  // グローバルなselectstartイベントリスナーでテキスト選択を防ぐ（全社員ページ専用）
+  useEffect(() => {
+    const handleGlobalSelectStart = (e: Event) => {
+      const target = e.target as HTMLElement;
+      // 全社員ページ内の要素のみテキスト選択を防ぐ（勤怠アプリに影響を与えないよう、名前空間で限定）
+      if (target.closest('.all-employees-schedule')) {
+        e.preventDefault();
+        return false;
+      }
+    };
+
+    document.addEventListener('selectstart', handleGlobalSelectStart, { passive: false });
+    return () => {
+      document.removeEventListener('selectstart', handleGlobalSelectStart);
+    };
+  }, []);
+
   // セル選択のダブルクリック（新規登録）
   const handleCellDoubleClick = useCallback((employeeId: number, slot: number) => {
     // 新形式のセルIDを使用: YYYY-MM-DD-employeeId-slot
