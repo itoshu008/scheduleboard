@@ -907,7 +907,10 @@ app.get('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) => 
     
     const sql = `
       SELECT 
-        er.*,
+        er.id, er.equipment_id, er.employee_id, er.title, er.note, er.color,
+        DATE_FORMAT(er.start_datetime, '%Y-%m-%d %H:%i:%s') as start_datetime,
+        DATE_FORMAT(er.end_datetime, '%Y-%m-%d %H:%i:%s') as end_datetime,
+        er.created_at, er.updated_at,
         e.name AS equipment_name,
         u.name AS employee_name,
         u.code AS employee_code
@@ -973,6 +976,7 @@ app.post('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) =>
   // タイムゾーン情報がないため、ローカル時間（JST）として解釈する
   const toMySQLDateTime = (isoString) => {
     if (!isoString) return null;
+    console.log(`[toMySQLDateTime] Input: "${isoString}"`);
     // タイムゾーン情報がない場合（Zや+09:00や-09:00がない場合）、ローカル時間として解釈
     // 末尾にZ、+HH:MM、-HH:MMのいずれもない場合
     if (!isoString.endsWith('Z') && !/[\+\-]\d{2}:\d{2}$/.test(isoString)) {
@@ -981,10 +985,12 @@ app.post('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) =>
       if (match) {
         const [, year, month, day, hour, minute, second] = match;
         const result = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+        console.log(`[toMySQLDateTime] No timezone, direct conversion: "${result}"`);
         return result;
       }
     }
     // タイムゾーン情報がある場合は、UTCとして解釈してJSTに変換
+    console.log(`[toMySQLDateTime] Has timezone, converting UTC to JST`);
     const utcDate = new Date(isoString);
     const jstTime = utcDate.getTime() + (9 * 60 * 60 * 1000);
     const jstDate = new Date(jstTime);
@@ -995,11 +1001,13 @@ app.post('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) =>
     const minute = String(jstDate.getUTCMinutes()).padStart(2, '0');
     const second = String(jstDate.getUTCSeconds()).padStart(2, '0');
     const result = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+    console.log(`[toMySQLDateTime] UTC to JST result: "${result}"`);
     return result;
   };
   
   const startAt = toMySQLDateTime(start_datetime);
   const endAt = toMySQLDateTime(end_datetime);
+  console.log(`[POST equipment-reservations] MySQL values: start="${startAt}", end="${endAt}"`);
   
   const [r] = await getPool().query(
     'INSERT INTO equipment_reservations(equipment_id, employee_id, title, start_datetime, end_datetime, note, color) VALUES (?, ?, ?, ?, ?, ?, ?);',
@@ -1009,33 +1017,52 @@ app.post('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) =>
   // データベースから取得した値をISO形式に変換
   const formatDateTime = (dt) => {
     if (!dt) return null;
+    console.log(`[formatDateTime] Input:`, dt, `Type: ${typeof dt}`);
     if (dt instanceof Date) {
       const jstTime = dt.getTime() - (9 * 60 * 60 * 1000);
-      return new Date(jstTime).toISOString();
+      const result = new Date(jstTime).toISOString();
+      console.log(`[formatDateTime] Date object -> UTC ISO: "${result}"`);
+      return result;
     }
     if (typeof dt === 'string') {
       const match = dt.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
       if (match) {
         const [, year, month, day, hour, minute, second] = match;
         const jstDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}+09:00`);
-        return jstDate.toISOString();
+        const result = jstDate.toISOString();
+        console.log(`[formatDateTime] String "${dt}" -> JST date -> UTC ISO: "${result}"`);
+        return result;
       }
       const date = new Date(dt + '+09:00');
-      return date.toISOString();
+      const result = date.toISOString();
+      console.log(`[formatDateTime] String (fallback) "${dt}" -> UTC ISO: "${result}"`);
+      return result;
     }
     return dt;
   };
   
   // 作成した予約を取得してISO形式に変換
+  // DATE_FORMATを使って文字列として取得し、タイムゾーン問題を回避
   const [created] = await getPool().query(
-    'SELECT * FROM equipment_reservations WHERE id = ?',
+    `SELECT 
+      id, equipment_id, employee_id, title, note, color,
+      DATE_FORMAT(start_datetime, '%Y-%m-%d %H:%i:%s') as start_datetime,
+      DATE_FORMAT(end_datetime, '%Y-%m-%d %H:%i:%s') as end_datetime,
+      created_at, updated_at
+    FROM equipment_reservations WHERE id = ?`,
     [r.insertId]
   );
   
   const createdReservation = created[0];
+  console.log(`[POST equipment-reservations] DB returned (as string):`, {
+    id: createdReservation.id,
+    start_datetime: createdReservation.start_datetime,
+    end_datetime: createdReservation.end_datetime
+  });
   
   const formattedStart = formatDateTime(createdReservation.start_datetime);
   const formattedEnd = formatDateTime(createdReservation.end_datetime);
+  console.log(`[POST equipment-reservations] Formatted values: start="${formattedStart}", end="${formattedEnd}"`);
   
   const result = { 
     id: r.insertId, 
@@ -1125,9 +1152,14 @@ app.put('/api/scheduleboard/equipment-reservations/:id', asyncH(async (req, res)
     [merged.equipment_id, merged.employee_id || null, merged.title, startAt, endAt, merged.note || null, merged.color, id]
   );
   
-  // 更新後のデータを取得
+  // 更新後のデータを取得（DATE_FORMATで文字列として取得）
   const [updated] = await getPool().query(
-    'SELECT * FROM equipment_reservations WHERE id = ?',
+    `SELECT 
+      id, equipment_id, employee_id, title, note, color,
+      DATE_FORMAT(start_datetime, '%Y-%m-%d %H:%i:%s') as start_datetime,
+      DATE_FORMAT(end_datetime, '%Y-%m-%d %H:%i:%s') as end_datetime,
+      created_at, updated_at
+    FROM equipment_reservations WHERE id = ?`,
     [id]
   );
   
