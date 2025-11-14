@@ -27,11 +27,13 @@ interface Reservation {
   id: number;
   title: string;
   vehicle_id: number;
+  equipment_id?: number; // フロントエンドとの互換性のため
   employee_id: number;
   start_datetime: string;
   end_datetime: string;
   color?: string;
   vehicle_name?: string;
+  equipment_name?: string; // フロントエンドとの互換性のため
   employee_name?: string;
 }
 
@@ -183,7 +185,7 @@ const SimpleVehicleReservation: React.FC<SimpleVehicleReservationProps> = ({
             title: state.dragData.schedule.title || '予約',
             color: toApiColor(state.dragData.schedule.color),
             employee_id: state.dragData.schedule.employee_id,
-            vehicle_id: state.dragData.schedule.vehicle_id || (state.dragData.schedule as any).vehicle_id,
+            vehicle_id: state.dragData.schedule.vehicle_id || (state.dragData.schedule as any).vehicle_id || (state.dragData.schedule as any).equipment_id,
             start_datetime: newStart, // Dateオブジェクトを直接渡す（vehicleReservationApi.updateが変換する）
             end_datetime: newEnd // Dateオブジェクトを直接渡す（vehicleReservationApi.updateが変換する）
           };
@@ -223,7 +225,7 @@ const SimpleVehicleReservation: React.FC<SimpleVehicleReservationProps> = ({
             title: state.resizeData.schedule.title || '予約',
             color: toApiColor(state.resizeData.schedule.color),
             employee_id: state.resizeData.schedule.employee_id,
-            vehicle_id: state.resizeData.schedule.vehicle_id || (state.resizeData.schedule as any).vehicle_id,
+            vehicle_id: state.resizeData.schedule.vehicle_id || (state.resizeData.schedule as any).vehicle_id || (state.resizeData.schedule as any).equipment_id,
             start_datetime: state.resizeGhost.newStart, // Dateオブジェクトを直接渡す（vehicleReservationApi.updateが変換する）
             end_datetime: state.resizeGhost.newEnd // Dateオブジェクトを直接渡す（vehicleReservationApi.updateが変換する）
           };
@@ -461,7 +463,7 @@ const SimpleVehicleReservation: React.FC<SimpleVehicleReservationProps> = ({
     if (!clipboard) return;
     
     const targetDate = selectedDate;
-    let targetVehicleId = clipboard.vehicle_id;
+    let targetVehicleId = clipboard.vehicle_id || clipboard.equipment_id;
     
     // セルが選択されている場合は、その位置にペースト
     if (selectedCells.size > 0) {
@@ -482,6 +484,7 @@ const SimpleVehicleReservation: React.FC<SimpleVehicleReservationProps> = ({
     try {
       const newReservation = {
         vehicle_id: targetVehicleId,
+        equipment_id: targetVehicleId, // 互換性のため
         employee_id: clipboard.employee_id,
         title: clipboard.title,
         start_datetime: toLocalISODateTime(startTime),
@@ -541,7 +544,8 @@ const SimpleVehicleReservation: React.FC<SimpleVehicleReservationProps> = ({
       id: reservation.id,
       title: reservation.title,
       employee_id: reservation.employee_id,
-      vehicle_id: reservation.vehicle_id, // 車両予約用にvehicle_idを追加
+      vehicle_id: reservation.vehicle_id || reservation.equipment_id, // 車両予約用にvehicle_idを追加（equipment_idもサポート）
+      equipment_id: reservation.vehicle_id || reservation.equipment_id, // 互換性のため
       start_datetime: reservation.start_datetime,
       end_datetime: reservation.end_datetime,
       color: reservation.color || '#dc3545'
@@ -1022,8 +1026,9 @@ const SimpleVehicleReservation: React.FC<SimpleVehicleReservationProps> = ({
                   {/* 予約バー（月別ビューのロジックと統一） */}
                   {reservations
                     .filter(reservation => {
-                      // 設備IDが一致するか
-                      if (reservation.vehicle_id !== vehicle.id) {
+                      // 車両IDが一致するか（equipment_idもチェック - 互換性のため）
+                      const reservationVehicleId = reservation.vehicle_id || reservation.equipment_id;
+                      if (reservationVehicleId !== vehicle.id) {
                         return false;
                       }
                       
@@ -1192,7 +1197,7 @@ const SimpleVehicleReservation: React.FC<SimpleVehicleReservationProps> = ({
                     })}
 
                   {/* ドラッグゴースト表示 */}
-                  {dragGhost && dragData && dragData.schedule.vehicle_id === vehicle.id && (
+                  {dragGhost && dragData && (dragData.schedule.vehicle_id === vehicle.id || dragData.schedule.equipment_id === vehicle.id) && (
                     (() => {
                       // 新しい開始時刻を計算
                       const { hour, minute } = getTimeFromSlot(dragGhost.newSlot);
@@ -1243,7 +1248,7 @@ const SimpleVehicleReservation: React.FC<SimpleVehicleReservationProps> = ({
                   )}
 
                   {/* リサイズゴースト表示 */}
-                  {resizeGhost && resizeData && resizeData.schedule.vehicle_id === vehicle.id && (
+                  {resizeGhost && resizeData && (resizeData.schedule.vehicle_id === vehicle.id || resizeData.schedule.equipment_id === vehicle.id) && (
                     (() => {
                       const ghostStyle = getReservationStyle({
                         ...reservationToSchedule(resizeData.schedule),

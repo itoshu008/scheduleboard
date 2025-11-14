@@ -109,6 +109,27 @@ CREATE TABLE IF NOT EXISTS equipment_reservations (
   INDEX idx_equipment_datetime (equipment_id, start_datetime, end_datetime),
   INDEX idx_datetime_range (start_datetime, end_datetime)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS vehicle_reservations (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  vehicle_id INT NOT NULL,
+  employee_id INT NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  start_datetime DATETIME NOT NULL,
+  end_datetime DATETIME NOT NULL,
+  color VARCHAR(7) NOT NULL DEFAULT '#3174ad',
+  note TEXT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_vehicle_reservations_vehicle
+    FOREIGN KEY (vehicle_id) REFERENCES equipment(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_vehicle_reservations_employee
+    FOREIGN KEY (employee_id) REFERENCES users(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  INDEX idx_vehicle_datetime (vehicle_id, start_datetime, end_datetime),
+  INDEX idx_datetime_range (start_datetime, end_datetime)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 `;
 
   // Run multiple statements safely

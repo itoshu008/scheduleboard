@@ -1231,6 +1231,377 @@ app.delete('/api/scheduleboard/equipment-reservations/:id', asyncH(async (req, r
   res.json({ id, deleted: true });
 }));
 
+// Vehicle Reservations (車両予約 - 設備予約と同じ構造)
+app.get('/api/scheduleboard/vehicle-reservations', asyncH(async (req, res) => {
+  try {
+    const { vehicle_id, start_date, end_date, date } = req.query;
+    const where = [];
+    const params = [];
+    
+    if (vehicle_id) { 
+      where.push('vr.vehicle_id = ?'); 
+      params.push(Number(vehicle_id)); 
+    }
+    
+    // dateパラメータがある場合（日付指定）
+    // JSTの日付で判定するため、JST文字列で直接比較
+    // 開始日または終了日が指定日の範囲内にある予約を取得
+    if (date) {
+      // JST 00:00:00 から JST 23:59:59.999 の範囲をJST文字列として指定
+      // DATETIMEはJST（ローカル時間）として保存されているため、JST文字列で比較
+      const startJstStr = `${date} 00:00:00`;
+      const endJstStr = `${date} 23:59:59`;
+      // 予約の開始日時が指定日の終了時刻以前、かつ予約の終了日時が指定日の開始時刻以降
+      where.push('(vr.start_datetime <= ? AND vr.end_datetime >= ?)');
+      params.push(endJstStr, startJstStr);
+    } else {
+      // start_date/end_dateパラメータがある場合（範囲指定）
+      if (start_date) { 
+        where.push('vr.end_datetime >= ?'); 
+        params.push(start_date); 
+      }
+      if (end_date) { 
+        where.push('vr.start_datetime <= ?'); 
+        params.push(end_date); 
+      }
+    }
+    
+    const sql = `
+      SELECT 
+        vr.id, vr.vehicle_id, vr.employee_id, vr.title, vr.note, vr.color,
+        DATE_FORMAT(vr.start_datetime, '%Y-%m-%d %H:%i:%s') as start_datetime,
+        DATE_FORMAT(vr.end_datetime, '%Y-%m-%d %H:%i:%s') as end_datetime,
+        vr.created_at, vr.updated_at,
+        e.name AS vehicle_name,
+        u.name AS employee_name,
+        u.code AS employee_code
+      FROM vehicle_reservations vr
+      LEFT JOIN equipment e ON e.id = vr.vehicle_id
+      LEFT JOIN users u ON u.id = vr.employee_id
+      ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+      ORDER BY vr.start_datetime;
+    `;
+    console.log(`[API] Vehicle reservations query - date: ${req.query.date}, WHERE: ${where.join(' AND ')}, params:`, params);
+    const [rows] = await getPool().query(sql, params);
+    console.log(`[API] Vehicle reservations found: ${rows.length} rows`);
+    
+    // DATETIMEをISO形式に変換
+    const formattedRows = rows.map((row) => {
+      const formatDateTime = (dt) => {
+        if (!dt) return null;
+        if (dt instanceof Date) {
+          // Dateオブジェクトの場合、JSTとして解釈してISO形式に変換
+          const jstTime = dt.getTime() - (9 * 60 * 60 * 1000); // UTCに変換
+          return new Date(jstTime).toISOString();
+        }
+        if (typeof dt === 'string') {
+          // 'YYYY-MM-DD HH:mm:ss'形式をISO形式に変換
+          // MySQLのDATETIMEはJST（ローカル時間）として解釈される
+          // '2025-11-14 09:00:00' → JST 09:00 → UTC 00:00
+          const match = dt.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+          if (match) {
+            const [, year, month, day, hour, minute, second] = match;
+            // JSTとして解釈してUTCに変換
+            const jstDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}+09:00`);
+            return jstDate.toISOString();
+          }
+          // フォールバック: 既存のロジック
+          const date = new Date(dt + '+09:00');
+          return date.toISOString();
+        }
+        return dt;
+      };
+      
+      return {
+        ...row,
+        equipment_id: row.vehicle_id, // フロントエンドとの互換性のため
+        vehicle_id: row.vehicle_id,
+        equipment_name: row.vehicle_name, // フロントエンドとの互換性のため
+        vehicle_name: row.vehicle_name,
+        start_datetime: formatDateTime(row.start_datetime),
+        end_datetime: formatDateTime(row.end_datetime),
+      };
+    });
+    
+    res.json(formattedRows);
+  } catch (e) {
+    console.error('[API] Vehicle reservations fetch error:', e);
+    res.json([]);
+  }
+}));
+
+app.post('/api/scheduleboard/vehicle-reservations', asyncH(async (req, res) => {
+  const { vehicle_id, equipment_id, employee_id, start_datetime, end_datetime, title, note, color } = req.body || {};
+  // vehicle_idまたはequipment_idのいずれかを受け入れる（互換性のため）
+  const finalVehicleId = vehicle_id || equipment_id;
+  if (!finalVehicleId || !start_datetime || !end_datetime) {
+    return res.status(400).json({ error: 'vehicle_id (or equipment_id), start_datetime, end_datetime required' });
+  }
+  
+  // ISO 8601をMySQL DATETIME形式に変換（ローカル時間として解釈）
+  // フロントエンドから送られてくるISO文字列（例: "2025-11-14T09:00:00"）は
+  // タイムゾーン情報がないため、ローカル時間（JST）として解釈する
+  const toMySQLDateTime = (isoString) => {
+    if (!isoString) return null;
+    console.log(`[toMySQLDateTime] Input: "${isoString}"`);
+    // タイムゾーン情報がない場合（Zや+09:00や-09:00がない場合）、ローカル時間として解釈
+    // 末尾にZ、+HH:MM、-HH:MMのいずれもない場合
+    if (!isoString.endsWith('Z') && !/[\+\-]\d{2}:\d{2}$/.test(isoString)) {
+      // "YYYY-MM-DDTHH:mm:ss" 形式をパースしてローカル時間として扱う
+      const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+      if (match) {
+        const [, year, month, day, hour, minute, second] = match;
+        const result = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+        console.log(`[toMySQLDateTime] No timezone, direct conversion: "${result}"`);
+        return result;
+      }
+    }
+    // タイムゾーン情報がある場合は、UTCとして解釈してJSTに変換
+    console.log(`[toMySQLDateTime] Has timezone, converting UTC to JST`);
+    const utcDate = new Date(isoString);
+    const jstTime = utcDate.getTime() + (9 * 60 * 60 * 1000);
+    const jstDate = new Date(jstTime);
+    const year = jstDate.getUTCFullYear();
+    const month = String(jstDate.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(jstDate.getUTCDate()).padStart(2, '0');
+    const hour = String(jstDate.getUTCHours()).padStart(2, '0');
+    const minute = String(jstDate.getUTCMinutes()).padStart(2, '0');
+    const second = String(jstDate.getUTCSeconds()).padStart(2, '0');
+    const result = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+    console.log(`[toMySQLDateTime] UTC to JST result: "${result}"`);
+    return result;
+  };
+  
+  const startAt = toMySQLDateTime(start_datetime);
+  const endAt = toMySQLDateTime(end_datetime);
+  console.log(`[POST vehicle-reservations] MySQL values: start="${startAt}", end="${endAt}"`);
+  
+  const [r] = await getPool().query(
+    'INSERT INTO vehicle_reservations(vehicle_id, employee_id, title, start_datetime, end_datetime, note, color) VALUES (?, ?, ?, ?, ?, ?, ?);',
+    [finalVehicleId, employee_id || null, title || note || '予約', startAt, endAt, note || null, color || '#3174ad']
+  );
+  
+  // データベースから取得した値をISO形式に変換
+  const formatDateTime = (dt) => {
+    if (!dt) return null;
+    console.log(`[formatDateTime] Input:`, dt, `Type: ${typeof dt}`);
+    if (dt instanceof Date) {
+      const jstTime = dt.getTime() - (9 * 60 * 60 * 1000);
+      const result = new Date(jstTime).toISOString();
+      console.log(`[formatDateTime] Date object -> UTC ISO: "${result}"`);
+      return result;
+    }
+    if (typeof dt === 'string') {
+      const match = dt.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+      if (match) {
+        const [, year, month, day, hour, minute, second] = match;
+        const jstDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}+09:00`);
+        const result = jstDate.toISOString();
+        console.log(`[formatDateTime] String "${dt}" -> JST date -> UTC ISO: "${result}"`);
+        return result;
+      }
+      const date = new Date(dt + '+09:00');
+      const result = date.toISOString();
+      console.log(`[formatDateTime] String (fallback) "${dt}" -> UTC ISO: "${result}"`);
+      return result;
+    }
+    return dt;
+  };
+  
+  // 作成した予約を取得してISO形式に変換
+  // DATE_FORMATを使って文字列として取得し、タイムゾーン問題を回避
+  const [created] = await getPool().query(
+    `SELECT 
+      id, vehicle_id, employee_id, title, note, color,
+      DATE_FORMAT(start_datetime, '%Y-%m-%d %H:%i:%s') as start_datetime,
+      DATE_FORMAT(end_datetime, '%Y-%m-%d %H:%i:%s') as end_datetime,
+      created_at, updated_at
+    FROM vehicle_reservations WHERE id = ?`,
+    [r.insertId]
+  );
+  
+  const createdReservation = created[0];
+  console.log(`[POST vehicle-reservations] DB returned (as string):`, {
+    id: createdReservation.id,
+    start_datetime: createdReservation.start_datetime,
+    end_datetime: createdReservation.end_datetime
+  });
+  
+  const formattedStart = formatDateTime(createdReservation.start_datetime);
+  const formattedEnd = formatDateTime(createdReservation.end_datetime);
+  console.log(`[POST vehicle-reservations] Formatted values: start="${formattedStart}", end="${formattedEnd}"`);
+  
+  const result = { 
+    id: r.insertId, 
+    vehicle_id: finalVehicleId,
+    equipment_id: finalVehicleId, // フロントエンドとの互換性のため
+    employee_id, 
+    title: title || note || '予約',
+    start_datetime: formattedStart, 
+    end_datetime: formattedEnd, 
+    note,
+    color: color || '#3174ad'
+  };
+  
+  broadcastDataChange('vehicle_reservation', result);
+  res.json(result);
+}));
+
+app.put('/api/scheduleboard/vehicle-reservations/:id', asyncH(async (req, res) => {
+  const id = Number(req.params.id);
+  const { vehicle_id, equipment_id, employee_id, start_datetime, end_datetime, title, note, color } = req.body || {};
+  // vehicle_idまたはequipment_idのいずれかを受け入れる（互換性のため）
+  const finalVehicleId = vehicle_id || equipment_id;
+  
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ error: 'Invalid id' });
+  }
+  
+  // 既存予約の確認
+  const [existing] = await getPool().query(
+    'SELECT * FROM vehicle_reservations WHERE id = ?',
+    [id]
+  );
+  
+  if (!existing || existing.length === 0) {
+    return res.status(404).json({ error: 'Reservation not found' });
+  }
+  
+  const reservation = existing[0];
+  
+  // 部分更新対応：既存データとマージ
+  const merged = {
+    vehicle_id: finalVehicleId ?? reservation.vehicle_id,
+    employee_id: employee_id ?? reservation.employee_id,
+    title: title ?? note ?? reservation.title ?? reservation.note ?? '予約',
+    start_datetime: start_datetime ?? reservation.start_datetime,
+    end_datetime: end_datetime ?? reservation.end_datetime,
+    note: note ?? reservation.note,
+    color: color ?? reservation.color ?? '#3174ad'
+  };
+  
+  // ISO 8601をMySQL DATETIME形式に変換（ローカル時間として解釈）
+  // フロントエンドから送られてくるISO文字列（例: "2025-11-14T09:00:00"）は
+  // タイムゾーン情報がないため、ローカル時間（JST）として解釈する
+  const toMySQLDateTime = (isoString) => {
+    if (!isoString) return null;
+    // タイムゾーン情報がない場合（Zや+09:00や-09:00がない場合）、ローカル時間として解釈
+    // 末尾にZ、+HH:MM、-HH:MMのいずれもない場合
+    if (!isoString.endsWith('Z') && !/[\+\-]\d{2}:\d{2}$/.test(isoString)) {
+      // "YYYY-MM-DDTHH:mm:ss" 形式をパースしてローカル時間として扱う
+      const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+      if (match) {
+        const [, year, month, day, hour, minute, second] = match;
+        const result = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+        return result;
+      }
+    }
+    // タイムゾーン情報がある場合は、UTCとして解釈してJSTに変換
+    const utcDate = new Date(isoString);
+    const jstTime = utcDate.getTime() + (9 * 60 * 60 * 1000);
+    const jstDate = new Date(jstTime);
+    const year = jstDate.getUTCFullYear();
+    const month = String(jstDate.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(jstDate.getUTCDate()).padStart(2, '0');
+    const hour = String(jstDate.getUTCHours()).padStart(2, '0');
+    const minute = String(jstDate.getUTCMinutes()).padStart(2, '0');
+    const second = String(jstDate.getUTCSeconds()).padStart(2, '0');
+    const result = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+    return result;
+  };
+  
+  const startAt = toMySQLDateTime(merged.start_datetime);
+  const endAt = toMySQLDateTime(merged.end_datetime);
+  
+  if (!startAt || !endAt) {
+    return res.status(400).json({ error: 'start_datetime and end_datetime required' });
+  }
+  
+  await getPool().query(
+    'UPDATE vehicle_reservations SET vehicle_id = ?, employee_id = ?, title = ?, start_datetime = ?, end_datetime = ?, note = ?, color = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [merged.vehicle_id, merged.employee_id || null, merged.title, startAt, endAt, merged.note || null, merged.color, id]
+  );
+  
+  // 更新後のデータを取得（DATE_FORMATで文字列として取得）
+  const [updated] = await getPool().query(
+    `SELECT 
+      id, vehicle_id, employee_id, title, note, color,
+      DATE_FORMAT(start_datetime, '%Y-%m-%d %H:%i:%s') as start_datetime,
+      DATE_FORMAT(end_datetime, '%Y-%m-%d %H:%i:%s') as end_datetime,
+      created_at, updated_at
+    FROM vehicle_reservations WHERE id = ?`,
+    [id]
+  );
+  
+  if (!updated || updated.length === 0) {
+    return res.status(404).json({ error: 'Reservation not found after update' });
+  }
+  
+  const updatedReservation = updated[0];
+  
+  // DATETIMEをISO形式に変換
+  const formatDateTime = (dt) => {
+    if (!dt) return null;
+    if (dt instanceof Date) {
+      const jstTime = dt.getTime() - (9 * 60 * 60 * 1000);
+      return new Date(jstTime).toISOString();
+    }
+    if (typeof dt === 'string') {
+      // 'YYYY-MM-DD HH:mm:ss'形式をISO形式に変換
+      // MySQLのDATETIMEはJST（ローカル時間）として解釈される
+      const match = dt.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+      if (match) {
+        const [, year, month, day, hour, minute, second] = match;
+        // JSTとして解釈してUTCに変換
+        const jstDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}+09:00`);
+        return jstDate.toISOString();
+      }
+      // フォールバック: 既存のロジック
+      const date = new Date(dt + '+09:00');
+      return date.toISOString();
+    }
+    return dt;
+  };
+  
+  const result = {
+    ...updatedReservation,
+    equipment_id: updatedReservation.vehicle_id, // フロントエンドとの互換性のため
+    start_datetime: formatDateTime(updatedReservation.start_datetime),
+    end_datetime: formatDateTime(updatedReservation.end_datetime),
+  };
+  
+  console.log(`[API] ✅ Vehicle reservation updated: ID=${id}`);
+  broadcastDataChange('vehicle_reservation', result);
+  res.json(result);
+}));
+
+app.delete('/api/scheduleboard/vehicle-reservations/:id', asyncH(async (req, res) => {
+  const id = Number(req.params.id);
+  
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ error: 'Invalid id' });
+  }
+  
+  // 既存予約の確認
+  const [existing] = await getPool().query(
+    'SELECT * FROM vehicle_reservations WHERE id = ?',
+    [id]
+  );
+  
+  if (!existing || existing.length === 0) {
+    return res.status(404).json({ error: 'Reservation not found' });
+  }
+  
+  await getPool().query(
+    'DELETE FROM vehicle_reservations WHERE id = ?',
+    [id]
+  );
+  
+  console.log(`[API] ✅ Vehicle reservation deleted: ID=${id}`);
+  broadcastDataChange('vehicle_reservation', { id, deleted: true });
+  res.json({ id, deleted: true });
+}));
+
 // Holidays API
 app.get('/api/scheduleboard/holidays/:year', asyncH(async (req, res) => {
   const { year } = req.params;

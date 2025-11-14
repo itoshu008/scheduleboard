@@ -354,11 +354,14 @@ const ScheduleRegistrationModal: React.FC<ScheduleRegistrationModalProps> = ({
         onCreated(updatedWithFlag);
       } else {
         // 新規登録モード: 作成API呼び出し
-        // equipment_idが設定されている場合は設備予約APIを使用
+        // equipment_idが設定されている場合は設備予約APIまたは車両予約APIを使用
         if (equipmentId && equipmentId > 0) {
-          const response = await api.post('/equipment-reservations', payload);
+          // 現在のパスに基づいて設備予約APIまたは車両予約APIを選択
+          const isVehiclePage = window.location.pathname.includes('/vehicle');
+          const apiEndpoint = isVehiclePage ? '/vehicle-reservations' : '/equipment-reservations';
+          const response = await api.post(apiEndpoint, payload);
           const created = response.data;
-          console.log('✨ ScheduleRegistrationModal: Equipment reservation created:', created);
+          console.log(`✨ ScheduleRegistrationModal: ${isVehiclePage ? 'Vehicle' : 'Equipment'} reservation created:`, created);
           onCreated(created);
         } else {
           const response = await api.post('/admin/schedules', payload);
