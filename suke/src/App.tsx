@@ -13,6 +13,7 @@ import DailySchedule from './components/DailySchedule/DailySchedule';
 import AllEmployeesSchedule from './components/AllEmployeesSchedule/AllEmployeesSchedule';
 // import EquipmentReservation from './components/EquipmentReservation/EquipmentReservation';
 import SimpleEquipmentReservation from './components/SimpleEquipmentReservation/SimpleEquipmentReservation';
+import SimpleVehicleReservation from './components/SimpleVehicleReservation/SimpleVehicleReservation';
 import UserManagement from './components/UserManagement/UserManagement';
 import Health from './pages/Health';
 
@@ -452,6 +453,16 @@ const AppContent: React.FC = () => {
                   selectedDate={selectedDate}
                   onDateChange={setSelectedDate}
                   equipments={equipment}
+                />
+              } 
+            />
+            <Route 
+              path="/vehicle" 
+              element={
+                <SimpleVehicleReservation
+                  selectedDate={selectedDate}
+                  onDateChange={setSelectedDate}
+                  vehicles={equipment}
                 />
               } 
             />

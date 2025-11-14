@@ -9,36 +9,36 @@ import { useScheduleCellSelection } from '../../hooks/useScheduleCellSelection';
 // 月別ビューのイベントバー処理ロジックを使用（勤怠アプリに影響を与えないよう、ScheduleBoard専用APIのみ使用）
 import { useMonthlyEventBarHandlers } from '../../hooks/useMonthlyEventBarHandlers';
 import { safeHexColor, lightenColor, toApiColor } from '../../utils/color';
-import { equipmentReservationApi } from '../../utils/api';
+import { vehicleReservationApi } from '../../utils/api';
 import ContextMenu, { ContextMenuItem } from '../ContextMenu/ContextMenu';
 import ManagementTabs from '../ManagementTabs/ManagementTabs';
 import DepartmentRegistration from '../DepartmentRegistration/DepartmentRegistration';
 import EmployeeRegistration from '../EmployeeRegistration/EmployeeRegistration';
 import EquipmentRegistration from '../EquipmentRegistration/EquipmentRegistration';
-import './SimpleEquipmentReservation.css';
+import './SimpleVehicleReservation.css';
 
-interface SimpleEquipmentReservationProps {
+interface SimpleVehicleReservationProps {
   selectedDate: Date;
   onDateChange: (date: Date) => void;
-  equipments: Equipment[];
+  vehicles: Equipment[];
 }
 
 interface Reservation {
   id: number;
   title: string;
-  equipment_id: number;
+  vehicle_id: number;
   employee_id: number;
   start_datetime: string;
   end_datetime: string;
   color?: string;
-  equipment_name?: string;
+  vehicle_name?: string;
   employee_name?: string;
 }
 
-const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
+const SimpleVehicleReservation: React.FC<SimpleVehicleReservationProps> = ({
   selectedDate,
   onDateChange,
-  equipments
+  vehicles
 }) => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -46,7 +46,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<Reservation | null>(null);
-  const [selectedEquipmentId, setSelectedEquipmentId] = useState<number | null>(null);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(null);
   const [clipboard, setClipboard] = useState<Reservation | null>(null);
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [contextMenuTarget, setContextMenuTarget] = useState<Reservation | null>(null);
@@ -76,7 +76,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
 
   // 月別ビューのイベントバー処理ロジックを使用（勤怠アプリに影響を与えないよう、ScheduleBoard専用APIのみ使用）
   // 注意: loadReservationsを先に定義してからreloadSchedulesを定義する必要がある
-  const scheduleScale = 1; // 設備ビューは固定スケール（セル幅は20px）
+  const scheduleScale = 1; // 車両ビューは固定スケール（セル幅は20px）
 
   // 初期データ読み込み
   useEffect(() => {
@@ -97,12 +97,12 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     try {
       setLoading(true);
       const dateStr = formatDate(selectedDate);
-      console.log(`🔄 [設備予約] loadReservations called for date: ${dateStr}`);
-      const response = await api.get(`/equipment-reservations?date=${dateStr}`);
+      console.log(`🔄 [車両予約] loadReservations called for date: ${dateStr}`);
+      const response = await api.get(`/vehicle-reservations?date=${dateStr}`);
       const reservationsData = response.data || [];
-      console.log(`🔄 [設備予約] Loaded ${reservationsData.length} reservations:`, reservationsData);
+      console.log(`🔄 [車両予約] Loaded ${reservationsData.length} reservations:`, reservationsData);
       setReservations(reservationsData);
-      console.log(`✅ [設備予約] setReservations called with ${reservationsData.length} items`);
+      console.log(`✅ [車両予約] setReservations called with ${reservationsData.length} items`);
     } catch (error) {
       console.error('予約データの読み込みに失敗:', error);
       setError('予約データの読み込みに失敗しました');
@@ -116,7 +116,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     await loadReservations();
   }, [loadReservations]);
 
-  // 月別ビューのイベントバー処理ロジックを使用（設備予約用にカスタマイズ）
+  // 月別ビューのイベントバー処理ロジックを使用（車両予約用にカスタマイズ）
   const {
     interactionState,
     setInteractionState,
@@ -131,10 +131,10 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     reloadSchedules,
     setSelectedSchedule: (schedule: any) => setSelectedSchedule(schedule),
     setSelectedCells,
-    disableGlobalMouseup: true // 設備予約ページでは独自のmouseupハンドラーを使用
+    disableGlobalMouseup: true // 車両予約ページでは独自のmouseupハンドラーを使用
   });
 
-  // 設備予約用のドラッグ＆リサイズ処理（equipmentReservationApiを使用）
+  // 車両予約用のドラッグ＆リサイズ処理（vehicleReservationApiを使用）
   // interactionStateの最新値を保持するref
   const interactionStateRef = useRef(interactionState);
   useEffect(() => {
@@ -145,11 +145,11 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     const handleMouseUp = async (e: MouseEvent) => {
       const state = interactionStateRef.current;
       
-      // 設備予約ページでは独自の処理を行う（useMonthlyEventBarHandlersのグローバルmouseupは無効化済み）
+      // 車両予約ページでは独自の処理を行う（useMonthlyEventBarHandlersのグローバルmouseupは無効化済み）
       const hasActiveOperation = state.dragData || state.resizeData;
       if (!hasActiveOperation) return;
       
-      console.log('🎯 設備予約mouseup:', { dragData: !!state.dragData, resizeData: !!state.resizeData });
+      console.log('🎯 車両予約mouseup:', { dragData: !!state.dragData, resizeData: !!state.resizeData });
       
       // ドラッグ終了処理
       if (state.dragData && state.dragGhost) {
@@ -183,14 +183,14 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
             title: state.dragData.schedule.title || '予約',
             color: toApiColor(state.dragData.schedule.color),
             employee_id: state.dragData.schedule.employee_id,
-            equipment_id: state.dragData.schedule.equipment_id || (state.dragData.schedule as any).equipment_id,
-            start_datetime: newStart, // Dateオブジェクトを直接渡す（equipmentReservationApi.updateが変換する）
-            end_datetime: newEnd // Dateオブジェクトを直接渡す（equipmentReservationApi.updateが変換する）
+            vehicle_id: state.dragData.schedule.vehicle_id || (state.dragData.schedule as any).vehicle_id,
+            start_datetime: newStart, // Dateオブジェクトを直接渡す（vehicleReservationApi.updateが変換する）
+            end_datetime: newEnd // Dateオブジェクトを直接渡す（vehicleReservationApi.updateが変換する）
           };
           
           console.log(`🔄 Update payload:`, updateData);
           
-          await equipmentReservationApi.update(state.dragData.schedule.id, updateData);
+          await vehicleReservationApi.update(state.dragData.schedule.id, updateData);
           
           console.log(`✅ Update API call completed`);
           
@@ -204,7 +204,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
           console.log('✅ Drag update completed successfully');
           
         } catch (error) {
-          console.error('設備予約ドラッグ更新エラー:', error);
+          console.error('車両予約ドラッグ更新エラー:', error);
           alert('予約の移動に失敗しました: ' + (error as any)?.message);
         }
       }
@@ -223,14 +223,14 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
             title: state.resizeData.schedule.title || '予約',
             color: toApiColor(state.resizeData.schedule.color),
             employee_id: state.resizeData.schedule.employee_id,
-            equipment_id: state.resizeData.schedule.equipment_id || (state.resizeData.schedule as any).equipment_id,
-            start_datetime: state.resizeGhost.newStart, // Dateオブジェクトを直接渡す（equipmentReservationApi.updateが変換する）
-            end_datetime: state.resizeGhost.newEnd // Dateオブジェクトを直接渡す（equipmentReservationApi.updateが変換する）
+            vehicle_id: state.resizeData.schedule.vehicle_id || (state.resizeData.schedule as any).vehicle_id,
+            start_datetime: state.resizeGhost.newStart, // Dateオブジェクトを直接渡す（vehicleReservationApi.updateが変換する）
+            end_datetime: state.resizeGhost.newEnd // Dateオブジェクトを直接渡す（vehicleReservationApi.updateが変換する）
           };
           
           console.log(`🔄 Update payload:`, updateData);
           
-          await equipmentReservationApi.update(state.resizeData.schedule.id, updateData);
+          await vehicleReservationApi.update(state.resizeData.schedule.id, updateData);
           
           console.log(`✅ Update API call completed`);
           
@@ -244,7 +244,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
           console.log('✅ Resize update completed successfully');
           
         } catch (error) {
-          console.error('設備予約リサイズ更新エラー:', error);
+          console.error('車両予約リサイズ更新エラー:', error);
           alert('予約のリサイズに失敗しました: ' + (error as any)?.message);
         }
       }
@@ -284,10 +284,10 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
   // セル選択状態（直接管理 - 全社員ページと同様）
   const [localSelectedCells, setLocalSelectedCells] = useState<Set<string>>(new Set());
   const [localIsSelecting, setLocalIsSelecting] = useState(false);
-  const [localSelectionAnchor, setLocalSelectionAnchor] = useState<{ equipmentId: number; slot: number } | null>(null);
+  const [localSelectionAnchor, setLocalSelectionAnchor] = useState<{ vehicleId: number; slot: number } | null>(null);
 
-  // 設備予約ページ用のセル選択ハンドラー（全社員ページと同様）
-  const handleEquipmentCellMouseDown = useCallback((equipmentId: number, slot: number, e?: React.MouseEvent) => {
+  // 車両予約ページ用のセル選択ハンドラー（全社員ページと同様）
+  const handleVehicleCellMouseDown = useCallback((vehicleId: number, slot: number, e?: React.MouseEvent) => {
     // 右クリック時はセル選択を無効化（右クリックドラッグスクロール用）
     if (e && e.button === 2) return;
     if (e && e.button !== 0) return; // 左クリック以外はセル選択無効化
@@ -296,7 +296,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     const year = selectedDate.getFullYear();
     const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
     const day = String(selectedDate.getDate()).padStart(2, '0');
-    const cellId = `${year}-${month}-${day}-equipment-${equipmentId}-${slot}`;
+    const cellId = `${year}-${month}-${day}-vehicle-${vehicleId}-${slot}`;
     
     // スケジュール選択をクリア
     setSelectedSchedule(null);
@@ -304,15 +304,15 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     // セル選択開始
     setLocalSelectedCells(new Set([cellId]));
     setLocalIsSelecting(true);
-    setLocalSelectionAnchor({ equipmentId, slot });
+    setLocalSelectionAnchor({ vehicleId, slot });
   }, [selectedDate]);
 
-  const handleEquipmentCellMouseEnter = useCallback((equipmentId: number, slot: number) => {
+  const handleVehicleCellMouseEnter = useCallback((vehicleId: number, slot: number) => {
     if (!localIsSelecting || !localSelectionAnchor) return;
     
     const newSelectedCells = new Set<string>();
-    const startEquipment = Math.min(localSelectionAnchor.equipmentId, equipmentId);
-    const endEquipment = Math.max(localSelectionAnchor.equipmentId, equipmentId);
+    const startVehicle = Math.min(localSelectionAnchor.vehicleId, vehicleId);
+    const endVehicle = Math.max(localSelectionAnchor.vehicleId, vehicleId);
     const startSlot = Math.min(localSelectionAnchor.slot, slot);
     const endSlot = Math.max(localSelectionAnchor.slot, slot);
 
@@ -321,35 +321,35 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
     const day = String(selectedDate.getDate()).padStart(2, '0');
     
-    // 設備リストから実際のequipmentIdを取得
-    const equipmentList = equipments;
+    // 設備リストから実際のvehicleIdを取得
+    const vehicleList = vehicles;
     
-    for (let eqIndex = 0; eqIndex < equipmentList.length; eqIndex++) {
-      const eq = equipmentList[eqIndex];
-      if (eq.id >= startEquipment && eq.id <= endEquipment) {
+    for (let vehIndex = 0; vehIndex < vehicleList.length; vehIndex++) {
+      const veh = vehicleList[vehIndex];
+      if (veh.id >= startVehicle && veh.id <= endVehicle) {
         for (let s = startSlot; s <= endSlot; s++) {
-          newSelectedCells.add(`${year}-${month}-${day}-equipment-${eq.id}-${s}`);
+          newSelectedCells.add(`${year}-${month}-${day}-vehicle-${veh.id}-${s}`);
         }
       }
     }
     
     setLocalSelectedCells(newSelectedCells);
-  }, [localIsSelecting, localSelectionAnchor, equipments, selectedDate]);
+  }, [localIsSelecting, localSelectionAnchor, vehicles, selectedDate]);
 
-  const handleEquipmentCellMouseUp = useCallback(() => {
+  const handleVehicleCellMouseUp = useCallback(() => {
     setLocalIsSelecting(false);
     setLocalSelectionAnchor(null);
     
     // 選択されたセルをuseScheduleCellSelectionの形式に変換
     const convertedCells = new Set<string>();
     localSelectedCells.forEach(cellId => {
-      // 形式: YYYY-MM-DD-equipment-equipmentId-slot
-      // これをequipment-equipmentId-slot形式に変換（既存のコードとの互換性のため）
+      // 形式: YYYY-MM-DD-vehicle-vehicleId-slot
+      // これをvehicle-vehicleId-slot形式に変換（既存のコードとの互換性のため）
       const parts = cellId.split('-');
       if (parts.length >= 6 && parts[3] === 'equipment') {
-        const equipmentId = parts[4];
+        const vehicleId = parts[4];
         const slot = parts[5];
-        convertedCells.add(`equipment-${equipmentId}-${slot}`);
+        convertedCells.add(`vehicle-${vehicleId}-${slot}`);
       }
     });
     setSelectedCells(convertedCells);
@@ -360,8 +360,8 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       const firstCellId = Array.from(convertedCells)[0];
       const parts = firstCellId.split('-');
       if (parts.length >= 3 && parts[0] === 'equipment') {
-        const equipmentId = parseInt(parts[1]);
-        setSelectedEquipmentId(equipmentId);
+        const vehicleId = parseInt(parts[1]);
+        setSelectedVehicleId(vehicleId);
       }
       setSelectedSchedule(null);
       setShowRegistrationModal(true);
@@ -380,9 +380,9 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
         localSelectedCells.forEach(cellId => {
           const parts = cellId.split('-');
           if (parts.length >= 6 && parts[3] === 'equipment') {
-            const equipmentId = parts[4];
+            const vehicleId = parts[4];
             const slot = parts[5];
-            convertedCells.add(`equipment-${equipmentId}-${slot}`);
+            convertedCells.add(`vehicle-${vehicleId}-${slot}`);
           }
         });
         setSelectedCells(convertedCells);
@@ -393,8 +393,8 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
           const firstCellId = Array.from(convertedCells)[0];
           const parts = firstCellId.split('-');
           if (parts.length >= 3 && parts[0] === 'equipment') {
-            const equipmentId = parseInt(parts[1]);
-            setSelectedEquipmentId(equipmentId);
+            const vehicleId = parseInt(parts[1]);
+            setSelectedVehicleId(vehicleId);
           }
           setSelectedSchedule(null);
           setShowRegistrationModal(true);
@@ -409,7 +409,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
   }, [localIsSelecting, localSelectedCells, setSelectedCells]);
 
   // 予約保存（ScheduleRegistrationModalから呼ばれる）
-  // ScheduleRegistrationModalが既に/equipment-reservationsを呼び出しているので、
+  // ScheduleRegistrationModalが既に/vehicle-reservationsを呼び出しているので、
   // ここでは予約リストの再読み込みと状態のクリアのみを行う
   const handleReservationSave = async (createdData: any) => {
     try {
@@ -425,7 +425,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       setLocalIsSelecting(false);
       setLocalSelectionAnchor(null);
       setSelectedSchedule(null);
-      setSelectedEquipmentId(null);
+      setSelectedVehicleId(null);
     } catch (error: any) {
       console.error('予約保存後の処理エラー:', error);
     }
@@ -434,7 +434,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
   // 予約削除
   const handleReservationDelete = useCallback(async (reservationId: number) => {
     try {
-      await equipmentReservationApi.delete(reservationId);
+      await vehicleReservationApi.delete(reservationId);
       
       // WebSocketの更新を待つ
       await new Promise(resolve => setTimeout(resolve, 300));
@@ -461,16 +461,16 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     if (!clipboard) return;
     
     const targetDate = selectedDate;
-    let targetEquipmentId = clipboard.equipment_id;
+    let targetVehicleId = clipboard.vehicle_id;
     
     // セルが選択されている場合は、その位置にペースト
     if (selectedCells.size > 0) {
       const firstCellId = Array.from(selectedCells)[0];
       const parts = firstCellId.split('-');
-      // 形式: equipment-{equipmentId}-{slot} または YYYY-MM-DD-equipment-{equipmentId}-{slot}
+      // 形式: vehicle-{vehicleId}-{slot} または YYYY-MM-DD-vehicle-{vehicleId}-{slot}
       if (parts.length >= 3) {
-        const equipmentIdStr = parts[parts.length - 2];
-        targetEquipmentId = parseInt(equipmentIdStr);
+        const vehicleIdStr = parts[parts.length - 2];
+        targetVehicleId = parseInt(vehicleIdStr);
       }
     }
     
@@ -481,7 +481,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     
     try {
       const newReservation = {
-        equipment_id: targetEquipmentId,
+        vehicle_id: targetVehicleId,
         employee_id: clipboard.employee_id,
         title: clipboard.title,
         start_datetime: toLocalISODateTime(startTime),
@@ -490,7 +490,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
         note: clipboard.note || null
       };
       
-      await equipmentReservationApi.create(newReservation);
+      await vehicleReservationApi.create(newReservation);
       
       // WebSocketの更新を待つ
       await new Promise(resolve => setTimeout(resolve, 300));
@@ -541,15 +541,15 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       id: reservation.id,
       title: reservation.title,
       employee_id: reservation.employee_id,
-      equipment_id: reservation.equipment_id, // 設備予約用にequipment_idを追加
+      vehicle_id: reservation.vehicle_id, // 車両予約用にvehicle_idを追加
       start_datetime: reservation.start_datetime,
       end_datetime: reservation.end_datetime,
       color: reservation.color || '#dc3545'
     };
   }, []);
 
-  // 予約の表示位置を計算（設備予約ページ専用）
-  const getReservationStyle = (reservation: Reservation, equipmentIndex: number) => {
+  // 予約の表示位置を計算（車両予約ページ専用）
+  const getReservationStyle = (reservation: Reservation, vehicleIndex: number) => {
     const startTimeStr = reservation.start_datetime;
     const endTimeStr = reservation.end_datetime;
     
@@ -649,29 +649,29 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       
       // 固定設備セルの幅は300px、時間セルは20px幅
       const left = 300 + startSlot * 20;
-    const width = (endSlot - startSlot) * 20;
+      const width = (endSlot - startSlot) * 20;
       const top = 2;
-    
-    return {
-      position: 'absolute' as const,
-      left: `${left}px`,
-      top: `${top}px`,
-      width: `${width}px`,
-      height: '36px',
-      background: `linear-gradient(180deg, ${lightenColor(safeHexColor(reservation.color || '#dc3545'), 0.15)} 0%, ${safeHexColor(reservation.color || '#dc3545')} 100%)`,
-      border: `1px solid ${lightenColor(safeHexColor(reservation.color || '#dc3545'), -0.10)}`,
-      borderRadius: '4px',
-      padding: '2px 4px',
-      fontSize: '11px',
-      color: 'white',
-      overflow: 'hidden',
-      zIndex: 10,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      cursor: 'pointer',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-    };
+      
+      return {
+        position: 'absolute' as const,
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${width}px`,
+        height: '36px',
+        background: `linear-gradient(180deg, ${lightenColor(safeHexColor(reservation.color || '#dc3545'), 0.15)} 0%, ${safeHexColor(reservation.color || '#dc3545')} 100%)`,
+        border: `1px solid ${lightenColor(safeHexColor(reservation.color || '#dc3545'), -0.10)}`,
+        borderRadius: '4px',
+        padding: '2px 4px',
+        fontSize: '11px',
+        color: 'white',
+        overflow: 'hidden',
+        zIndex: 10,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+      };
     } catch (error) {
       console.error(`Error calculating reservation style (ID=${reservation.id}):`, error);
       return { display: 'none' };
@@ -688,12 +688,12 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
   }
 
   return (
-    <div className="equipment-schedule">
+    <div className="vehicle-schedule">
       {/* ヘッダー */}
       <div className="schedule-header" ref={headerRef}>
         <h2 style={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px', margin: 0 }}>
           <span style={{ fontSize: '18px', fontWeight: 'normal', color: '#666' }}>
-            設備予約 - {selectedDate.toLocaleDateString('ja-JP', { 
+            車両予約 - {selectedDate.toLocaleDateString('ja-JP', { 
               year: 'numeric', 
               month: 'long', 
               day: 'numeric',
@@ -712,8 +712,8 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
               <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/monthly')}>月別</button>
               <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/daily')}>日別</button>
               <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/all-employees')}>全社員</button>
-              <button className="nav-btn active" onClick={() => (window.location.href = '/scheduleboard/equipment')}>設備</button>
-              <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/vehicle')}>車両予約</button>
+              <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/equipment')}>設備</button>
+              <button className="nav-btn active" onClick={() => (window.location.href = '/scheduleboard/vehicle')}>車両予約</button>
             </div>
           </div>
           <div className="nav-btn-right">
@@ -768,8 +768,8 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                   }
                   // 選択されたセルから設備IDを取得
                   const cellIds = Array.from(selectedCells);
-                  const equipmentId = parseInt(cellIds[0].split('-')[1]);
-                  setSelectedEquipmentId(equipmentId);
+                  const vehicleId = parseInt(cellIds[0].split('-')[1]);
+                  setSelectedVehicleId(vehicleId);
                   setShowRegistrationModal(true);
                 }}
                 style={{ 
@@ -853,7 +853,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
               zIndex: 101,
               flexShrink: 0
             }}>
-              設備/時間
+              車両/時間
             </div>
             
             {/* 時間ヘッダー（0:00～23:00の24マス） */}
@@ -887,7 +887,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
             }}
           >
             {/* 設備行とスケジュールセル */}
-            {equipments.length === 0 ? (
+            {vehicles.length === 0 ? (
               <div style={{
                 display: 'flex',
                 justifyContent: 'center',
@@ -904,15 +904,15 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                   fontSize: '18px'
                 }}>
                   <div style={{ marginBottom: '10px', fontSize: '24px' }}>📋</div>
-                  <div>設備が登録されていません</div>
+                  <div>車両が登録されていません</div>
                   <div style={{ fontSize: '14px', marginTop: '8px', opacity: 0.7 }}>
-                    管理画面から設備を登録してください
+                    管理画面から車両を登録してください
                   </div>
                 </div>
               </div>
             ) : (
-              equipments.map((equipment, equipmentIndex) => (
-                <div key={equipment.id} className="excel-date-row" style={{
+              vehicles.map((vehicle, vehicleIndex) => (
+                <div key={vehicle.id} className="excel-date-row" style={{
                   display: 'flex',
                   borderBottom: '1px solid #ccc',
                   minHeight: '40px',
@@ -937,7 +937,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                     lineHeight: '1.1',
                     borderRight: '2px solid #999'
                   }}>
-                    <div style={{ margin: 0 }}>{equipment.name}</div>
+                    <div style={{ margin: 0 }}>{vehicle.name}</div>
                   </div>
 
                   {/* 時間セル（96マス：15分間隔） */}
@@ -948,8 +948,8 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                     const year = selectedDate.getFullYear();
                     const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
                     const day = String(selectedDate.getDate()).padStart(2, '0');
-                    const localCellId = `${year}-${month}-${day}-equipment-${equipment.id}-${slot}`;
-                    const legacyCellId = `equipment-${equipment.id}-${slot}`;
+                    const localCellId = `${year}-${month}-${day}-vehicle-${vehicle.id}-${slot}`;
+                    const legacyCellId = `vehicle-${vehicle.id}-${slot}`;
                     const isSelected = localSelectedCells.has(localCellId) || selectedCells.has(legacyCellId);
 
                     return (
@@ -968,7 +968,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                           boxShadow: isSelected ? '0 0 8px rgba(33, 150, 243, 0.3)' : 'none',
                           zIndex: isSelected ? 5 : 1
                         }}
-                        data-equipment-id={equipment.id}
+                        data-vehicle-id={vehicle.id}
                         data-slot={slot}
                         data-time={`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`}
                         draggable={false}
@@ -983,14 +983,14 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                           
                           e.preventDefault(); // テキスト選択を防ぐ
                           e.stopPropagation();
-                          handleEquipmentCellMouseDown(equipment.id, slot, e);
+                          handleVehicleCellMouseDown(vehicle.id, slot, e);
                         }}
                         onMouseEnter={() => {
                           if (localIsSelecting) {
-                            handleEquipmentCellMouseEnter(equipment.id, slot);
+                            handleVehicleCellMouseEnter(vehicle.id, slot);
                           }
                         }}
-                        onMouseUp={handleEquipmentCellMouseUp}
+                        onMouseUp={handleVehicleCellMouseUp}
                         onDoubleClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -999,12 +999,12 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                           const year = selectedDate.getFullYear();
                           const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
                           const day = String(selectedDate.getDate()).padStart(2, '0');
-                          const cellId = `${year}-${month}-${day}-equipment-${equipment.id}-${slot}`;
+                          const cellId = `${year}-${month}-${day}-vehicle-${vehicle.id}-${slot}`;
                           
                           // このセルだけを選択状態にする
-                          const singleCellId = `equipment-${equipment.id}-${slot}`;
+                          const singleCellId = `vehicle-${vehicle.id}-${slot}`;
                           setSelectedCells(new Set([singleCellId]));
-                          setSelectedEquipmentId(equipment.id);
+                          setSelectedVehicleId(vehicle.id);
                           setSelectedSchedule(null);
                           setShowRegistrationModal(true);
                         }}
@@ -1014,7 +1014,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                         onSelectStart={(e) => {
                           e.preventDefault(); // テキスト選択開始を防ぐ
                         }}
-                        title={`${equipment.name} ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`}
+                        title={`${vehicle.name} ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`}
                       />
                     );
                   })}
@@ -1023,7 +1023,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                   {reservations
                     .filter(reservation => {
                       // 設備IDが一致するか
-                      if (reservation.equipment_id !== equipment.id) {
+                      if (reservation.vehicle_id !== vehicle.id) {
                         return false;
                       }
                       
@@ -1063,7 +1063,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                       const isSelected = selectedSchedule?.id === reservation.id;
                       const isDragging = dragData?.schedule.id === reservation.id;
                       const isResizing = resizeData?.schedule.id === reservation.id;
-                      const style = getReservationStyle(reservation, equipmentIndex);
+                      const style = getReservationStyle(reservation, vehicleIndex);
                       
                       // 予約バーが非表示の場合はレンダリングしない
                       if (style.display === 'none') {
@@ -1092,7 +1092,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                       return (
                         <div
                           key={reservation.id}
-                          className={`equipment-reservation-bar ${isSelected ? 'selected' : ''}`}
+                          className={`vehicle-reservation-bar ${isSelected ? 'selected' : ''}`}
                           data-reservation-id={reservation.id}
                           style={{
                             ...style,
@@ -1192,7 +1192,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                     })}
 
                   {/* ドラッグゴースト表示 */}
-                  {dragGhost && dragData && dragData.schedule.equipment_id === equipment.id && (
+                  {dragGhost && dragData && dragData.schedule.vehicle_id === vehicle.id && (
                     (() => {
                       // 新しい開始時刻を計算
                       const { hour, minute } = getTimeFromSlot(dragGhost.newSlot);
@@ -1212,11 +1212,11 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                         ...reservationToSchedule(dragData.schedule),
                         start_datetime: newStart.toISOString(),
                         end_datetime: newEnd.toISOString()
-                      } as Reservation, equipmentIndex);
+                      } as Reservation, vehicleIndex);
                       if (ghostStyle.display === 'none') return null;
                       return (
                         <div
-                          className="equipment-reservation-bar drag-ghost"
+                          className="vehicle-reservation-bar drag-ghost"
                           style={{
                             ...ghostStyle,
                             opacity: 0.5,
@@ -1243,17 +1243,17 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                   )}
 
                   {/* リサイズゴースト表示 */}
-                  {resizeGhost && resizeData && resizeData.schedule.equipment_id === equipment.id && (
+                  {resizeGhost && resizeData && resizeData.schedule.vehicle_id === vehicle.id && (
                     (() => {
                       const ghostStyle = getReservationStyle({
                         ...reservationToSchedule(resizeData.schedule),
                         start_datetime: resizeGhost.newStart.toISOString(),
                         end_datetime: resizeGhost.newEnd.toISOString()
-                      } as Reservation, equipmentIndex);
+                      } as Reservation, vehicleIndex);
                       if (ghostStyle.display === 'none') return null;
                       return (
                         <div
-                          className="equipment-reservation-bar resize-ghost"
+                          className="vehicle-reservation-bar resize-ghost"
                           style={{
                             ...ghostStyle,
                             opacity: 0.5,
@@ -1296,7 +1296,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
             setLocalSelectedCells(new Set());
             setLocalIsSelecting(false);
             setLocalSelectionAnchor(null);
-            setSelectedEquipmentId(null);
+            setSelectedVehicleId(null);
           }}
           defaultStart={(() => {
             if (selectedCells.size > 0) {
@@ -1331,8 +1331,8 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
           selectedDepartmentId={0}
           defaultEmployeeId={employees[0]?.id}
           employees={employees}
-          equipments={equipments}
-          defaultEquipmentId={selectedEquipmentId || equipments[0]?.id}
+          equipments={vehicles}
+          defaultEquipmentId={selectedVehicleId || vehicles[0]?.id}
           initialValues={selectedSchedule ? {
             title: selectedSchedule.title,
             scheduleId: selectedSchedule.id
@@ -1387,7 +1387,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
         }}
         onScheduleRegister={() => {
           setShowManagementTabs(false);
-          // 設備予約ページではスケジュール登録は別のモーダルを使用
+          // 車両予約ページではスケジュール登録は別のモーダルを使用
         }}
         colors={SCHEDULE_COLORS}
       />
@@ -1414,4 +1414,4 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
   );
 };
 
-export default SimpleEquipmentReservation;
+export default SimpleVehicleReservation;

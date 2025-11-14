@@ -844,6 +844,7 @@ const DailySchedule: React.FC<DailyScheduleProps> = ({
               <button className="nav-btn active" onClick={() => (window.location.href = '/scheduleboard/daily')}>日別</button>
               <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/all-employees')}>全社員</button>
               <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/equipment')}>設備</button>
+              <button className="nav-btn" onClick={() => (window.location.href = '/scheduleboard/vehicle')}>車両予約</button>
             </div>
           </div>
           <div className="nav-btn-right">

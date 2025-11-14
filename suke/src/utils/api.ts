@@ -241,4 +241,63 @@ export const equipmentReservationApi = {
   },
 };
 
+// 車両予約API（設備予約APIと同じ構造）
+export const vehicleReservationApi = {
+  getAll: async (params?: {
+    vehicle_id?: number;
+    employee_id?: number;
+    start_date?: string;
+    end_date?: string;
+  }): Promise<import('axios').AxiosResponse<EquipmentReservation[]>> => {
+    return await api.get<EquipmentReservation[]>('/vehicle-reservations', { params });
+  },
+  getById: async (id: number): Promise<import('axios').AxiosResponse<EquipmentReservation>> => {
+    return await api.get<EquipmentReservation>(`/vehicle-reservations/${id}`);
+  },
+  getMonthly: async (vehicleId: number, year: number, month: number): Promise<import('axios').AxiosResponse<EquipmentReservation[]>> => {
+    return await api.get<EquipmentReservation[]>(`/vehicle-reservations/monthly/${vehicleId}/${year}/${month}`);
+  },
+  create: async (data: CreateEquipmentReservationForm): Promise<import('axios').AxiosResponse<EquipmentReservation>> => {
+    const payload = {
+      ...data,
+      start_datetime: toLocalISOString(data.start_datetime),
+      end_datetime: toLocalISOString(data.end_datetime),
+    };
+    return await api.post<EquipmentReservation>('/vehicle-reservations', payload);
+  },
+  update: async (id: number, data: Partial<CreateEquipmentReservationForm>): Promise<import('axios').AxiosResponse<EquipmentReservation>> => {
+    const payload = {
+      ...data,
+      start_datetime: data.start_datetime ? toLocalISOString(data.start_datetime) : undefined,
+      end_datetime: data.end_datetime ? toLocalISOString(data.end_datetime) : undefined,
+    };
+    return await api.put<EquipmentReservation>(`/vehicle-reservations/${id}`, payload);
+  },
+  delete: async (id: number): Promise<import('axios').AxiosResponse<any>> => {
+    return await api.delete(`/vehicle-reservations/${id}`);
+  },
+  copy: async (sourceId: number, targetVehicleId: number, targetStartTime: Date): Promise<import('axios').AxiosResponse<EquipmentReservation>> => {
+    return await api.post<EquipmentReservation>(`/vehicle-reservations/${sourceId}/copy`, {
+      target_vehicle_id: targetVehicleId,
+      target_start_datetime: toLocalISOString(targetStartTime),
+    });
+  },
+  checkConflict: async (data: {
+    vehicle_id: number;
+    start_datetime: Date;
+    end_datetime: Date;
+    exclude_id?: number;
+  }): Promise<import('axios').AxiosResponse<{ hasConflict: boolean; conflicts: EquipmentReservation[] }>> => {
+    const payload = {
+      ...data,
+      start_datetime: toLocalISOString(data.start_datetime),
+      end_datetime: toLocalISOString(data.end_datetime),
+    };
+    return await api.post<{ hasConflict: boolean; conflicts: EquipmentReservation[] }>(
+      '/vehicle-reservations/check-conflict',
+      payload
+    );
+  },
+};
+
 export { api };
