@@ -1403,9 +1403,13 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                       })}
                       
                       {/* 複数セル選択時のプレビュー（スケジュールがない場合） */}
+                      {/* ドラッグ選択中（isSelecting=true）は「新規スケジュール」テキストを表示せず、背景色と枠線のみで選択状態を表現 */}
                       {(() => {
                         const currentCellId = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}-${employee.id}-${slot}`;
                         const isCurrentCellSelected = selectedCells.has(currentCellId);
+                        
+                        // ドラッグ選択中はプレビューを表示しない（セルの背景色と枠線で選択状態を表現）
+                        if (isSelecting) return null;
                         
                         if (isCurrentCellSelected && selectedCells.size > 1 && cellSchedules.length === 0) {
                           // 同じ社員の選択されたセルの範囲を計算
@@ -1567,13 +1571,31 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                   })()}
                   
                   {/* 複数セル選択時の新規スケジュールプレビュー */}
+                  {/* ドラッグ選択中（isSelecting=true）は「新規スケジュール」テキストを表示せず、背景色と枠線のみで選択状態を表現 */}
                   {(() => {
+                    // ドラッグ選択中はプレビューを表示しない（セルの背景色と枠線で選択状態を表現）
+                    if (isSelecting) return null;
+                    
                     if (selectedCells.size <= 1) return null;
                     
                     // この社員の選択されたセルを取得
                     const employeeSelectedCells = Array.from(selectedCells)
-                      .filter(cellId => cellId.startsWith(`${employee.id}-`))
+                      .filter(cellId => {
+                        const parts = cellId.split('-');
+                        // 新形式: YYYY-MM-DD-employeeId-slot
+                        if (parts.length === 5) {
+                          return parseInt(parts[3]) === employee.id;
+                        }
+                        // 旧形式: employeeId-slot
+                        return cellId.startsWith(`${employee.id}-`);
+                      })
                       .map(cellId => {
+                        const parts = cellId.split('-');
+                        // 新形式: YYYY-MM-DD-employeeId-slot
+                        if (parts.length === 5) {
+                          return parseInt(parts[4]);
+                        }
+                        // 旧形式: employeeId-slot
                         const [, slotStr] = cellId.split('-');
                         return parseInt(slotStr);
                       })
