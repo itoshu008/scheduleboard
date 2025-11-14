@@ -478,22 +478,26 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       // 選択されている日付と予約の日付が一致するか確認
       const reservationDateStr = formatDate(startDate);
       const selectedDateStr = formatDate(selectedDate);
+      const endDateStr = formatDate(endDate);
       
-      // 日付が一致しない場合は非表示（ただし、日をまたぐ予約の場合は開始日が一致すれば表示）
-      if (reservationDateStr !== selectedDateStr) {
-        // 終了日も確認（日をまたぐ予約の場合）
-        const endDateStr = formatDate(endDate);
-        if (endDateStr !== selectedDateStr) {
-          console.log('🔍 [getReservationStyle] Reservation date mismatch:', reservation.id, 'reservation:', reservationDateStr, 'selected:', selectedDateStr);
-          return { display: 'none' };
-        }
+      // 開始日または終了日が選択日と一致する場合は表示
+      // サーバー側で既にフィルタリングされているため、ここでは表示する
+      if (reservationDateStr !== selectedDateStr && endDateStr !== selectedDateStr) {
+        console.log('🔍 [getReservationStyle] Reservation date mismatch:', reservation.id, 'reservation start:', reservationDateStr, 'reservation end:', endDateStr, 'selected:', selectedDateStr);
+        return { display: 'none' };
       }
       
-      const startSlot = getTimeSlot(startDate);
+      let startSlot = getTimeSlot(startDate);
       let endSlot = getEndTimeSlot(endDate);
       
-      // 日をまたぐ場合の処理：終了日が選択日と異なる場合は、その日の終わり（96）まで表示
-      if (formatDate(endDate) !== selectedDateStr) {
+      // 日をまたぐ場合の処理
+      if (reservationDateStr !== selectedDateStr) {
+        // 開始日が選択日と異なる場合（前日から続く予約）、開始スロットを0に
+        startSlot = 0;
+      }
+      
+      if (endDateStr !== selectedDateStr) {
+        // 終了日が選択日と異なる場合（翌日に続く予約）、終了スロットを96に
         endSlot = 96; // その日の終わりまで表示
       }
       

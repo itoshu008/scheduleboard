@@ -886,11 +886,13 @@ app.get('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) => 
     // JSTの日付で判定するため、UTCの日付範囲でフィルタリング
     // 開始日または終了日が指定日の範囲内にある予約を取得
     if (date) {
-      // JST 00:00:00 から JST 23:59:59 の範囲をUTCに変換
+      // JST 00:00:00 から JST 23:59:59.999 の範囲をUTCに変換
       const startJst = new Date(`${date}T00:00:00+09:00`);
-      const endJst = new Date(`${date}T23:59:59+09:00`);
+      const endJst = new Date(`${date}T23:59:59.999+09:00`);
+      // 予約の開始日時が指定日の終了時刻以前、かつ予約の終了日時が指定日の開始時刻以降
       where.push('(er.start_datetime <= ? AND er.end_datetime >= ?)');
       params.push(endJst.toISOString(), startJst.toISOString());
+      console.log(`[API] Equipment reservations date filter: ${date}, JST range: ${startJst.toISOString()} to ${endJst.toISOString()}`);
     } else {
       // start_date/end_dateパラメータがある場合（範囲指定）
       if (start_date) { 
