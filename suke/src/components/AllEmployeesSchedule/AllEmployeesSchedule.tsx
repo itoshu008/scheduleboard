@@ -1790,7 +1790,13 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
       {showRegistrationTab && (
         <ScheduleRegistrationModal
           isOpen={showRegistrationTab}
-          onClose={() => setShowRegistrationTab(false)}
+          onClose={() => {
+            // キャンセル時にセル選択を解除（勤怠アプリに影響を与えないよう、全社員ページ専用）
+            setSelectedCells(new Set());
+            setIsSelecting(false);
+            setSelectionAnchor(null);
+            setShowRegistrationTab(false);
+          }}
           defaultStart={getSelectedCellDateTime()?.startDateTime ?? new Date()}
           defaultEnd={getSelectedCellDateTime()?.endDateTime ?? new Date()}
           selectedDepartmentId={0}
@@ -1808,6 +1814,8 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
             setSchedules((prev) => [...prev, created]);
             }
             setSelectedCells(new Set());
+            setIsSelecting(false);
+            setSelectionAnchor(null);
             setShowRegistrationTab(false);
           }}
         />
