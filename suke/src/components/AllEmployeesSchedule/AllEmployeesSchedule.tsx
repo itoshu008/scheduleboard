@@ -1624,7 +1624,7 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                         <React.Fragment key={schedule.id}>
                           <UniversalEventBar
                             schedule={schedule}
-                            isSelected={selectedSchedule?.id === schedule.id}
+                            isSelected={selectedSchedule?.id === schedule.id && !(isResizing && resizeData?.schedule.id === schedule.id)}
                             isResizing={isResizing}
                             resizeData={resizeData}
                             scaledCellWidth={CELL_WIDTH_PX * scheduleScale}
