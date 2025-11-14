@@ -124,32 +124,53 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
   });
 
   // 設備予約用のドラッグ＆リサイズ処理（equipmentReservationApiを使用）
+  // useMonthlyEventBarHandlersのグローバルmouseupハンドラーより先に実行されるように、より高い優先度で登録
   useEffect(() => {
-    const handleMouseUp = async () => {
+    const handleMouseUp = async (e: MouseEvent) => {
       const state = interactionState;
       
+      // 設備予約ページでは独自の処理を行うため、useMonthlyEventBarHandlersのグローバルmouseupを無効化
+      // 状態を即座にクリアして、useMonthlyEventBarHandlersのハンドラーが実行されないようにする
+      const hasActiveOperation = state.dragData || state.resizeData;
+      if (!hasActiveOperation) return;
+      
+      // 状態を先にクリア（useMonthlyEventBarHandlersのグローバルmouseupが実行されないように）
+      const dragDataCopy = state.dragData;
+      const dragGhostCopy = state.dragGhost;
+      const resizeDataCopy = state.resizeData;
+      const resizeGhostCopy = state.resizeGhost;
+      
+      // 即座に状態をクリア
+      setInteractionState((prev: any) => ({
+        ...prev,
+        dragData: null,
+        dragGhost: null,
+        resizeData: null,
+        resizeGhost: null
+      }));
+      
       // ドラッグ終了処理
-      if (state.dragData && state.dragGhost) {
+      if (dragDataCopy && dragGhostCopy) {
         try {
-          console.log(`🔄 Drag ended for reservation ID=${state.dragData.schedule.id}`);
+          console.log(`🔄 Drag ended for reservation ID=${dragDataCopy.schedule.id}`);
           
           // 新しい開始・終了時刻を計算
-          const originalStart = new Date(state.dragData.schedule.start_datetime);
-          const originalEnd = new Date(state.dragData.schedule.end_datetime);
+          const originalStart = new Date(dragDataCopy.schedule.start_datetime);
+          const originalEnd = new Date(dragDataCopy.schedule.end_datetime);
           const originalDuration = originalEnd.getTime() - originalStart.getTime();
           
-          const { hour, minute } = getTimeFromSlot(state.dragGhost.newSlot);
+          const { hour, minute } = getTimeFromSlot(dragGhostCopy.newSlot);
           const newStart = new Date(
-            state.dragGhost.newDate.getFullYear(),
-            state.dragGhost.newDate.getMonth(),
-            state.dragGhost.newDate.getDate(),
+            dragGhostCopy.newDate.getFullYear(),
+            dragGhostCopy.newDate.getMonth(),
+            dragGhostCopy.newDate.getDate(),
             hour,
             minute
           );
           const newEnd = new Date(newStart.getTime() + originalDuration);
           
           console.log(`🔄 Updating reservation:`, {
-            id: state.dragData.schedule.id,
+            id: dragDataCopy.schedule.id,
             oldStart: originalStart.toLocaleString('ja-JP'),
             oldEnd: originalEnd.toLocaleString('ja-JP'),
             newStart: newStart.toLocaleString('ja-JP'),
@@ -157,17 +178,17 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
           });
           
           const updateData = {
-            title: state.dragData.schedule.title || '予約',
-            color: toApiColor(state.dragData.schedule.color),
-            employee_id: state.dragData.schedule.employee_id,
-            equipment_id: state.dragData.schedule.equipment_id || (state.dragData.schedule as any).equipment_id,
+            title: dragDataCopy.schedule.title || '予約',
+            color: toApiColor(dragDataCopy.schedule.color),
+            employee_id: dragDataCopy.schedule.employee_id,
+            equipment_id: dragDataCopy.schedule.equipment_id || (dragDataCopy.schedule as any).equipment_id,
             start_datetime: newStart, // Dateオブジェクトを直接渡す（equipmentReservationApi.updateが変換する）
             end_datetime: newEnd // Dateオブジェクトを直接渡す（equipmentReservationApi.updateが変換する）
           };
           
           console.log(`🔄 Update payload:`, updateData);
           
-          await equipmentReservationApi.update(state.dragData.schedule.id, updateData);
+          await equipmentReservationApi.update(dragDataCopy.schedule.id, updateData);
           
           console.log(`✅ Update API call completed`);
           
@@ -183,27 +204,27 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       }
       
       // リサイズ終了処理
-      if (state.resizeData && state.resizeGhost) {
+      if (resizeDataCopy && resizeGhostCopy) {
         try {
-          console.log(`🔄 Resize ended for reservation ID=${state.resizeData.schedule.id}`);
+          console.log(`🔄 Resize ended for reservation ID=${resizeDataCopy.schedule.id}`);
           console.log(`🔄 Updating reservation:`, {
-            id: state.resizeData.schedule.id,
-            newStart: state.resizeGhost.newStart.toLocaleString('ja-JP'),
-            newEnd: state.resizeGhost.newEnd.toLocaleString('ja-JP')
+            id: resizeDataCopy.schedule.id,
+            newStart: resizeGhostCopy.newStart.toLocaleString('ja-JP'),
+            newEnd: resizeGhostCopy.newEnd.toLocaleString('ja-JP')
           });
           
           const updateData = {
-            title: state.resizeData.schedule.title || '予約',
-            color: toApiColor(state.resizeData.schedule.color),
-            employee_id: state.resizeData.schedule.employee_id,
-            equipment_id: state.resizeData.schedule.equipment_id || (state.resizeData.schedule as any).equipment_id,
-            start_datetime: state.resizeGhost.newStart, // Dateオブジェクトを直接渡す（equipmentReservationApi.updateが変換する）
-            end_datetime: state.resizeGhost.newEnd // Dateオブジェクトを直接渡す（equipmentReservationApi.updateが変換する）
+            title: resizeDataCopy.schedule.title || '予約',
+            color: toApiColor(resizeDataCopy.schedule.color),
+            employee_id: resizeDataCopy.schedule.employee_id,
+            equipment_id: resizeDataCopy.schedule.equipment_id || (resizeDataCopy.schedule as any).equipment_id,
+            start_datetime: resizeGhostCopy.newStart, // Dateオブジェクトを直接渡す（equipmentReservationApi.updateが変換する）
+            end_datetime: resizeGhostCopy.newEnd // Dateオブジェクトを直接渡す（equipmentReservationApi.updateが変換する）
           };
           
           console.log(`🔄 Update payload:`, updateData);
           
-          await equipmentReservationApi.update(state.resizeData.schedule.id, updateData);
+          await equipmentReservationApi.update(resizeDataCopy.schedule.id, updateData);
           
           console.log(`✅ Update API call completed`);
           
@@ -217,25 +238,17 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
           alert('予約のリサイズに失敗しました: ' + (error as any)?.message);
         }
       }
-      
-      // 状態をクリア
-      setInteractionState((prev: any) => ({
-        ...prev,
-        dragData: null,
-        dragGhost: null,
-        resizeData: null,
-        resizeGhost: null
-      }));
     };
 
     // イベントリスナー登録（ドラッグまたはリサイズ中のみ）
+    // capture phaseで登録して、useMonthlyEventBarHandlersのハンドラーより先に実行されるようにする
     const hasActiveOperation = interactionState.dragData || interactionState.resizeData;
     if (hasActiveOperation && !interactionState.showEditModal) {
-      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('mouseup', handleMouseUp, { capture: true });
     }
     
     return () => {
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mouseup', handleMouseUp, { capture: true });
     };
   }, [!!interactionState.dragData, !!interactionState.resizeData, interactionState.showEditModal, interactionState, loadReservations, setInteractionState]);
 
