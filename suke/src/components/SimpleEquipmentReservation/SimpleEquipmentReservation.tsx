@@ -595,6 +595,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       }
       
       console.log('🔍 [getReservationStyle] Slots calculated:', { 
+        reservationId: reservation.id,
         startSlot, 
         endSlot, 
         startHour: startDate.getHours(), 
@@ -603,7 +604,11 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
         endMinute: endDate.getMinutes(),
         reservationStartDate: reservationStartDateStr, 
         reservationEndDate: reservationEndDateStr,
-        selectedDate: selectedDateStr 
+        selectedDate: selectedDateStr,
+        startDateLocal: `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')} ${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`,
+        endDateLocal: `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')} ${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`,
+        calculatedLeft: 300 + startSlot * 20,
+        calculatedWidth: (endSlot - startSlot) * 20
       });
       
       // スロットが無効な場合は非表示
