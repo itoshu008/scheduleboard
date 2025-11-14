@@ -1333,14 +1333,46 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                               )}
                             </div>
                             
-                            {/* リサイズハンドル（開始時刻=赤、終了時刻=緑） */}
+                            {/* リサイズハンドル（開始時刻=赤、終了時刻=緑） - 月別ビューと統一 */}
                             <div
                               className="resize-handle resize-start"
                               onMouseDown={(e) => {
-                                console.log('🔧 左リサイズハンドル クリック:', schedule.id);
+                                // 編集モーダルが開いている場合はリサイズを無効化
+                                if (interactionState.showEditModal || interactionState.isModalClosing) {
+                                  console.log('🚫 AllEmployees: Resize disabled - edit modal is open or closing', {
+                                    showEditModal: interactionState.showEditModal,
+                                    isModalClosing: interactionState.isModalClosing,
+                                    scheduleId: schedule.id,
+                                    edge: 'start'
+                                  });
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  return;
+                                }
+                                
+                                // ダブルクリックイベントの伝播を防ぐ
                                 e.preventDefault();
                                 e.stopPropagation();
+                                console.log('🔧 左リサイズハンドル クリック:', schedule.id);
                                 handleResizeMouseDown(schedule, 'start', e);
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!interactionState.showEditModal && !interactionState.isModalClosing) {
+                                  e.currentTarget.style.backgroundColor = '#d32f2f'; // ホバー時は少し明るい赤
+                                  e.currentTarget.style.opacity = '1';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!interactionState.showEditModal && !interactionState.isModalClosing) {
+                                  e.currentTarget.style.backgroundColor = '#c62828';
+                                  e.currentTarget.style.opacity = selectedSchedule?.id === schedule.id ? '0.9' : '0';
+                                }
+                              }}
+                              onDoubleClick={(e) => {
+                                // リサイズハンドルのダブルクリックは無効化
+                                console.log('🚫 AllEmployees: Resize handle double-click disabled');
+                                e.preventDefault();
+                                e.stopPropagation();
                               }}
                               style={{ 
                                 position: 'absolute', 
@@ -1348,31 +1380,63 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                                 top: 0, 
                                 width: 8, 
                                 height: '100%', 
-                                cursor: 'ew-resize', 
+                                cursor: (interactionState.showEditModal || interactionState.isModalClosing) ? 'not-allowed' : 'ew-resize', 
                                 zIndex: 10001, // イベントバーより前面
                                 pointerEvents: 'auto', // 明示的にマウスイベントを受け取る
-                                backgroundColor: '#c62828', // 開始時刻ハンドル=赤
-                                border: '1px solid rgba(255, 255, 255, 0.8)',
+                                backgroundColor: (interactionState.showEditModal || interactionState.isModalClosing) ? 'rgba(255, 0, 0, 0.3)' : '#c62828', // 開始時刻ハンドル=赤
+                                border: (interactionState.showEditModal || interactionState.isModalClosing) ? '1px solid rgba(255, 0, 0, 0.6)' : '1px solid rgba(255, 255, 255, 0.8)',
                                 borderRadius: '2px 0 0 2px',
                                 transition: 'all 0.2s ease',
-                                opacity: selectedSchedule?.id === schedule.id ? 0.9 : 0
+                                opacity: (interactionState.showEditModal || interactionState.isModalClosing) ? 0.5 : (selectedSchedule?.id === schedule.id ? 0.9 : 0),
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '8px',
+                                color: 'white',
+                                fontWeight: 'bold'
                               }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#d32f2f'; // ホバー時は少し明るい赤
-                                e.currentTarget.style.opacity = '1';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '#c62828';
-                                e.currentTarget.style.opacity = selectedSchedule?.id === schedule.id ? '0.9' : '0';
-                              }}
-                            />
+                            >
+                              ◀
+                            </div>
                             <div
                               className="resize-handle resize-end"
                               onMouseDown={(e) => {
-                                console.log('🔧 右リサイズハンドル クリック:', schedule.id);
+                                // 編集モーダルが開いている場合はリサイズを無効化
+                                if (interactionState.showEditModal || interactionState.isModalClosing) {
+                                  console.log('🚫 AllEmployees: Resize disabled - edit modal is open or closing', {
+                                    showEditModal: interactionState.showEditModal,
+                                    isModalClosing: interactionState.isModalClosing,
+                                    scheduleId: schedule.id,
+                                    edge: 'end'
+                                  });
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  return;
+                                }
+                                
+                                // ダブルクリックイベントの伝播を防ぐ
                                 e.preventDefault();
                                 e.stopPropagation();
+                                console.log('🔧 右リサイズハンドル クリック:', schedule.id);
                                 handleResizeMouseDown(schedule, 'end', e);
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!interactionState.showEditModal && !interactionState.isModalClosing) {
+                                  e.currentTarget.style.backgroundColor = '#388e3c'; // ホバー時は少し明るい緑
+                                  e.currentTarget.style.opacity = '1';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!interactionState.showEditModal && !interactionState.isModalClosing) {
+                                  e.currentTarget.style.backgroundColor = '#2e7d32';
+                                  e.currentTarget.style.opacity = selectedSchedule?.id === schedule.id ? '0.9' : '0';
+                                }
+                              }}
+                              onDoubleClick={(e) => {
+                                // リサイズハンドルのダブルクリックは無効化
+                                console.log('🚫 AllEmployees: Resize handle double-click disabled');
+                                e.preventDefault();
+                                e.stopPropagation();
                               }}
                               style={{ 
                                 position: 'absolute', 
@@ -1380,24 +1444,24 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                                 top: 0, 
                                 width: 8, 
                                 height: '100%', 
-                                cursor: 'ew-resize', 
+                                cursor: (interactionState.showEditModal || interactionState.isModalClosing) ? 'not-allowed' : 'ew-resize', 
                                 zIndex: 10001, // イベントバーより前面
                                 pointerEvents: 'auto', // 明示的にマウスイベントを受け取る
-                                backgroundColor: '#2e7d32', // 終了時刻ハンドル=緑
-                                border: '1px solid rgba(255, 255, 255, 0.8)',
+                                backgroundColor: (interactionState.showEditModal || interactionState.isModalClosing) ? 'rgba(255, 0, 0, 0.3)' : '#2e7d32', // 終了時刻ハンドル=緑
+                                border: (interactionState.showEditModal || interactionState.isModalClosing) ? '1px solid rgba(255, 0, 0, 0.6)' : '1px solid rgba(255, 255, 255, 0.8)',
                                 borderRadius: '0 2px 2px 0',
                                 transition: 'all 0.2s ease',
-                                opacity: selectedSchedule?.id === schedule.id ? 0.9 : 0
+                                opacity: (interactionState.showEditModal || interactionState.isModalClosing) ? 0.5 : (selectedSchedule?.id === schedule.id ? 0.9 : 0),
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '8px',
+                                color: 'white',
+                                fontWeight: 'bold'
                               }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#388e3c'; // ホバー時は少し明るい緑
-                                e.currentTarget.style.opacity = '1';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '#2e7d32';
-                                e.currentTarget.style.opacity = selectedSchedule?.id === schedule.id ? '0.9' : '0';
-                              }}
-                            />
+                            >
+                              ▶
+                            </div>
                           </div>
                         );
                       })}
