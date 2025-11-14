@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Equipment, Employee } from '../../types';
 import { api } from '../../api';
 import dayjs from 'dayjs';
-import { formatDate, getTimeSlot, getTimeFromSlot, getEndTimeSlot } from '../../utils/dateUtils';
+import { formatDate, getTimeSlot, getTimeFromSlot, getEndTimeSlot, parseLocalDateTimeString } from '../../utils/dateUtils';
 import { CELL_WIDTH_PX } from '../../utils/uiConstants';
 import ScheduleRegistrationModal from '../ScheduleRegistrationModal/ScheduleRegistrationModal';
 import { useScheduleCellSelection } from '../../hooks/useScheduleCellSelection';
@@ -321,11 +321,29 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
 
   // 予約の表示位置を計算（設備予約ページ専用）
   const getReservationStyle = (reservation: Reservation, equipmentIndex: number) => {
-    const startTime = dayjs(reservation.start_datetime);
-    const endTime = dayjs(reservation.end_datetime);
+    // ISO形式の文字列をローカル時間として解釈
+    // dayjsはUTCとして解釈する可能性があるため、parseLocalDateTimeStringを使用
+    const startTimeStr = reservation.start_datetime;
+    const endTimeStr = reservation.end_datetime;
     
-    const startSlot = getTimeSlot(startTime.toDate());
-    const endSlot = getEndTimeSlot(endTime.toDate());
+    // ISO形式（Z付きまたはタイムゾーン付き）の場合は、ローカル時間として解釈
+    let startDate: Date;
+    let endDate: Date;
+    
+    if (startTimeStr.includes('T') && (startTimeStr.includes('Z') || startTimeStr.includes('+') || startTimeStr.includes('-'))) {
+      // ISO形式（UTC）の場合、ローカル時間として解釈するため、タイムゾーン情報を除去
+      const localStartStr = startTimeStr.replace(/[Z+-].*$/, '').replace('T', ' ');
+      const localEndStr = endTimeStr.replace(/[Z+-].*$/, '').replace('T', ' ');
+      startDate = parseLocalDateTimeString(localStartStr);
+      endDate = parseLocalDateTimeString(localEndStr);
+    } else {
+      // 既にローカル時間形式の場合
+      startDate = parseLocalDateTimeString(startTimeStr);
+      endDate = parseLocalDateTimeString(endTimeStr);
+    }
+    
+    const startSlot = getTimeSlot(startDate);
+    const endSlot = getEndTimeSlot(endDate);
     
     // 固定設備セルの幅は300px、時間セルは20px幅
     const left = 300 + startSlot * 20;
@@ -688,7 +706,27 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
 
                   {/* 予約バー（月別ビューのロジックと統一） */}
                   {reservations
-                    .filter(reservation => reservation.equipment_id === equipment.id)
+                    .filter(reservation => {
+                      // 設備IDが一致するか
+                      if (reservation.equipment_id !== equipment.id) return false;
+                      
+                      // 選択した日付と一致するか確認
+                      const startTimeStr = reservation.start_datetime;
+                      let startDate: Date;
+                      
+                      if (startTimeStr.includes('T') && (startTimeStr.includes('Z') || startTimeStr.includes('+') || startTimeStr.includes('-'))) {
+                        const localStartStr = startTimeStr.replace(/[Z+-].*$/, '').replace('T', ' ');
+                        startDate = parseLocalDateTimeString(localStartStr);
+                      } else {
+                        startDate = parseLocalDateTimeString(startTimeStr);
+                      }
+                      
+                      // 選択した日付と一致するか確認
+                      const reservationDateStr = formatDate(startDate);
+                      const selectedDateStr = formatDate(selectedDate);
+                      
+                      return reservationDateStr === selectedDateStr;
+                    })
                     .map(reservation => {
                       const schedule = reservationToSchedule(reservation);
                       const isSelected = selectedSchedule?.id === reservation.id;
@@ -704,7 +742,29 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                             setSelectedSchedule(reservation);
                             setShowRegistrationModal(true);
                           }}
-                          title={`${reservation.title} (${dayjs(reservation.start_datetime).format('HH:mm')}-${dayjs(reservation.end_datetime).format('HH:mm')}) ${reservation.employee_name || ''}`}
+                          title={(() => {
+                            const startTimeStr = reservation.start_datetime;
+                            const endTimeStr = reservation.end_datetime;
+                            let startDate: Date;
+                            let endDate: Date;
+                            
+                            if (startTimeStr.includes('T') && (startTimeStr.includes('Z') || startTimeStr.includes('+') || startTimeStr.includes('-'))) {
+                              const localStartStr = startTimeStr.replace(/[Z+-].*$/, '').replace('T', ' ');
+                              const localEndStr = endTimeStr.replace(/[Z+-].*$/, '').replace('T', ' ');
+                              startDate = parseLocalDateTimeString(localStartStr);
+                              endDate = parseLocalDateTimeString(localEndStr);
+                            } else {
+                              startDate = parseLocalDateTimeString(startTimeStr);
+                              endDate = parseLocalDateTimeString(endTimeStr);
+                            }
+                            
+                            const startHour = startDate.getHours();
+                            const startMinute = startDate.getMinutes();
+                            const endHour = endDate.getHours();
+                            const endMinute = endDate.getMinutes();
+                            
+                            return `${reservation.title} (${String(startHour).padStart(2, '0')}:${String(startMinute).padStart(2, '0')}-${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}) ${reservation.employee_name || ''}`;
+                          })()}
                         >
                           <div style={{ 
                             overflow: 'hidden', 
