@@ -956,9 +956,21 @@ app.post('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) =>
     return res.status(400).json({ error: 'equipment_id, start_datetime, end_datetime required' });
   }
   
-  // ISO 8601をMySQL DATETIME形式に変換（UTCをJSTに変換）
+  // ISO 8601をMySQL DATETIME形式に変換（ローカル時間として解釈）
+  // フロントエンドから送られてくるISO文字列（例: "2025-11-14T09:00:00"）は
+  // タイムゾーン情報がないため、ローカル時間（JST）として解釈する
   const toMySQLDateTime = (isoString) => {
     if (!isoString) return null;
+    // タイムゾーン情報がない場合（Zや+09:00がない場合）、ローカル時間として解釈
+    if (!isoString.includes('Z') && !isoString.includes('+') && !isoString.includes('-', 10)) {
+      // "YYYY-MM-DDTHH:mm:ss" 形式をパースしてローカル時間として扱う
+      const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+      if (match) {
+        const [, year, month, day, hour, minute, second] = match;
+        return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+      }
+    }
+    // タイムゾーン情報がある場合は、UTCとして解釈してJSTに変換
     const utcDate = new Date(isoString);
     const jstTime = utcDate.getTime() + (9 * 60 * 60 * 1000);
     const jstDate = new Date(jstTime);
@@ -1026,9 +1038,21 @@ app.put('/api/scheduleboard/equipment-reservations/:id', asyncH(async (req, res)
     color: color ?? reservation.color ?? '#3174ad'
   };
   
-  // ISO 8601をMySQL DATETIME形式に変換（UTCをJSTに変換）
+  // ISO 8601をMySQL DATETIME形式に変換（ローカル時間として解釈）
+  // フロントエンドから送られてくるISO文字列（例: "2025-11-14T09:00:00"）は
+  // タイムゾーン情報がないため、ローカル時間（JST）として解釈する
   const toMySQLDateTime = (isoString) => {
     if (!isoString) return null;
+    // タイムゾーン情報がない場合（Zや+09:00がない場合）、ローカル時間として解釈
+    if (!isoString.includes('Z') && !isoString.includes('+') && !isoString.includes('-', 10)) {
+      // "YYYY-MM-DDTHH:mm:ss" 形式をパースしてローカル時間として扱う
+      const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+      if (match) {
+        const [, year, month, day, hour, minute, second] = match;
+        return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+      }
+    }
+    // タイムゾーン情報がある場合は、UTCとして解釈してJSTに変換
     const utcDate = new Date(isoString);
     const jstTime = utcDate.getTime() + (9 * 60 * 60 * 1000);
     const jstDate = new Date(jstTime);

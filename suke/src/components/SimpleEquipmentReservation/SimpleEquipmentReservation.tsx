@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Equipment, Employee } from '../../types';
 import { api } from '../../api';
 import dayjs from 'dayjs';
-import { formatDate, getTimeSlot, getTimeFromSlot, getEndTimeSlot, parseLocalDateTimeString } from '../../utils/dateUtils';
+import { formatDate, getTimeSlot, getTimeFromSlot, getEndTimeSlot, parseLocalDateTimeString, toLocalISODateTime } from '../../utils/dateUtils';
 import { CELL_WIDTH_PX } from '../../utils/uiConstants';
 import ScheduleRegistrationModal from '../ScheduleRegistrationModal/ScheduleRegistrationModal';
 import { useScheduleCellSelection } from '../../hooks/useScheduleCellSelection';
@@ -386,14 +386,39 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
         const endHour = Math.floor((maxSlot + 1) / 4);
         const endMinute = ((maxSlot + 1) % 4) * 15;
         
-        const dateStr = formatDate(selectedDate);
-        startDateTime = `${dateStr}T${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}:00`;
-        endDateTime = `${dateStr}T${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}:00`;
+        // ローカル時間としてDateオブジェクトを作成し、toLocalISODateTimeでISO文字列に変換
+        const startDate = new Date(
+          selectedDate.getFullYear(),
+          selectedDate.getMonth(),
+          selectedDate.getDate(),
+          startHour,
+          startMinute,
+          0
+        );
+        const endDate = new Date(
+          selectedDate.getFullYear(),
+          selectedDate.getMonth(),
+          selectedDate.getDate(),
+          endHour,
+          endMinute,
+          0
+        );
+        startDateTime = toLocalISODateTime(startDate);
+        endDateTime = toLocalISODateTime(endDate);
       } else {
         // フォームから取得
-        const dateStr = formatDate(selectedDate);
-        startDateTime = scheduleData.start_datetime || `${dateStr}T09:00:00`;
-        endDateTime = scheduleData.end_datetime || `${dateStr}T10:00:00`;
+        if (scheduleData.start_datetime && scheduleData.end_datetime) {
+          // 既にISO文字列が渡されている場合はそのまま使用
+          startDateTime = scheduleData.start_datetime;
+          endDateTime = scheduleData.end_datetime;
+        } else {
+          // フォームから日時を構築
+          const dateStr = formatDate(selectedDate);
+          const startDate = new Date(`${dateStr}T09:00:00`);
+          const endDate = new Date(`${dateStr}T10:00:00`);
+          startDateTime = toLocalISODateTime(startDate);
+          endDateTime = toLocalISODateTime(endDate);
+        }
         equipmentId = scheduleData.equipment_id || selectedEquipmentId || equipments[0]?.id || 1;
       }
 
