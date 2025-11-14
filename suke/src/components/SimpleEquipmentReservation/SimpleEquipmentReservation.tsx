@@ -499,6 +499,14 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       if (endDateStr !== selectedDateStr) {
         // 終了日が選択日と異なる場合（翌日に続く予約）、終了スロットを96に
         endSlot = 96; // その日の終わりまで表示
+      } else if (endDateStr === selectedDateStr && endDate.getHours() === 0 && endDate.getMinutes() === 0) {
+        // 終了日が選択日と同じで、かつ00:00の場合（日をまたいでいるが、終了日が選択日の00:00）
+        // これは前日の予約が選択日の00:00で終了する場合
+        // 終了スロットは0のまま（00:00 = スロット0）
+        // ただし、開始スロットが0で終了スロットが0の場合は、最小幅を確保する
+        if (startSlot === 0 && endSlot === 0) {
+          endSlot = 1; // 最小1スロット分の幅を確保（00:00-00:15を表示）
+        }
       }
       
       console.log('🔍 [getReservationStyle] Slots calculated:', { startSlot, endSlot, startHour: startDate.getHours(), startMinute: startDate.getMinutes(), reservationDate: reservationDateStr, selectedDate: selectedDateStr });
