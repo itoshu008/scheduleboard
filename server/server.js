@@ -893,7 +893,6 @@ app.get('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) => 
       // 予約の開始日時が指定日の終了時刻以前、かつ予約の終了日時が指定日の開始時刻以降
       where.push('(er.start_datetime <= ? AND er.end_datetime >= ?)');
       params.push(endJstStr, startJstStr);
-      console.log(`[API] Equipment reservations date filter: ${date}, JST range: ${startJstStr} to ${endJstStr}`);
     } else {
       // start_date/end_dateパラメータがある場合（範囲指定）
       if (start_date) { 
@@ -972,7 +971,6 @@ app.post('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) =>
   // タイムゾーン情報がないため、ローカル時間（JST）として解釈する
   const toMySQLDateTime = (isoString) => {
     if (!isoString) return null;
-    console.log(`[toMySQLDateTime] Input: ${isoString}`);
     // タイムゾーン情報がない場合（Zや+09:00や-09:00がない場合）、ローカル時間として解釈
     // 末尾にZ、+HH:MM、-HH:MMのいずれもない場合
     if (!isoString.endsWith('Z') && !/[\+\-]\d{2}:\d{2}$/.test(isoString)) {
@@ -981,12 +979,10 @@ app.post('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) =>
       if (match) {
         const [, year, month, day, hour, minute, second] = match;
         const result = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
-        console.log(`[toMySQLDateTime] No timezone, parsed as JST: ${result}`);
         return result;
       }
     }
     // タイムゾーン情報がある場合は、UTCとして解釈してJSTに変換
-    console.log(`[toMySQLDateTime] Has timezone, converting from UTC to JST`);
     const utcDate = new Date(isoString);
     const jstTime = utcDate.getTime() + (9 * 60 * 60 * 1000);
     const jstDate = new Date(jstTime);
@@ -997,26 +993,62 @@ app.post('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) =>
     const minute = String(jstDate.getUTCMinutes()).padStart(2, '0');
     const second = String(jstDate.getUTCSeconds()).padStart(2, '0');
     const result = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
-    console.log(`[toMySQLDateTime] Converted to JST: ${result}`);
     return result;
   };
   
   const startAt = toMySQLDateTime(start_datetime);
   const endAt = toMySQLDateTime(end_datetime);
-  console.log(`[POST equipment-reservations] start_datetime: ${start_datetime} -> ${startAt}, end_datetime: ${end_datetime} -> ${endAt}`);
   
   const [r] = await getPool().query(
     'INSERT INTO equipment_reservations(equipment_id, employee_id, title, start_datetime, end_datetime, note, color) VALUES (?, ?, ?, ?, ?, ?, ?);',
     [equipment_id, employee_id || null, title || note || '予約', startAt, endAt, note || null, color || '#3174ad']
   );
   
+  // データベースから取得した値をISO形式に変換
+  const formatDateTime = (dt) => {
+    if (!dt) return null;
+    if (dt instanceof Date) {
+      const jstTime = dt.getTime() - (9 * 60 * 60 * 1000);
+      return new Date(jstTime).toISOString();
+    }
+    if (typeof dt === 'string') {
+      const match = dt.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+      if (match) {
+        const [, year, month, day, hour, minute, second] = match;
+        const jstDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}+09:00`);
+        return jstDate.toISOString();
+      }
+      const date = new Date(dt + '+09:00');
+      return date.toISOString();
+    }
+    return dt;
+  };
+  
+  // 作成した予約を取得してISO形式に変換
+  const [created] = await getPool().query(
+    'SELECT * FROM equipment_reservations WHERE id = ?',
+    [r.insertId]
+  );
+  
+  const createdReservation = created[0];
+  
+  // デバッグ: データベースから取得した値の形式を確認
+  console.log(`[POST equipment-reservations] DB raw start_datetime:`, createdReservation.start_datetime, typeof createdReservation.start_datetime);
+  console.log(`[POST equipment-reservations] DB raw end_datetime:`, createdReservation.end_datetime, typeof createdReservation.end_datetime);
+  
+  const formattedStart = formatDateTime(createdReservation.start_datetime);
+  const formattedEnd = formatDateTime(createdReservation.end_datetime);
+  
+  console.log(`[POST equipment-reservations] Formatted start_datetime:`, formattedStart);
+  console.log(`[POST equipment-reservations] Formatted end_datetime:`, formattedEnd);
+  
   const result = { 
     id: r.insertId, 
     equipment_id, 
     employee_id, 
     title: title || note || '予約',
-    start_datetime, 
-    end_datetime, 
+    start_datetime: formattedStart, 
+    end_datetime: formattedEnd, 
     note,
     color: color || '#3174ad'
   };
@@ -1062,7 +1094,6 @@ app.put('/api/scheduleboard/equipment-reservations/:id', asyncH(async (req, res)
   // タイムゾーン情報がないため、ローカル時間（JST）として解釈する
   const toMySQLDateTime = (isoString) => {
     if (!isoString) return null;
-    console.log(`[toMySQLDateTime PUT] Input: ${isoString}`);
     // タイムゾーン情報がない場合（Zや+09:00や-09:00がない場合）、ローカル時間として解釈
     // 末尾にZ、+HH:MM、-HH:MMのいずれもない場合
     if (!isoString.endsWith('Z') && !/[\+\-]\d{2}:\d{2}$/.test(isoString)) {
@@ -1071,12 +1102,10 @@ app.put('/api/scheduleboard/equipment-reservations/:id', asyncH(async (req, res)
       if (match) {
         const [, year, month, day, hour, minute, second] = match;
         const result = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
-        console.log(`[toMySQLDateTime PUT] No timezone, parsed as JST: ${result}`);
         return result;
       }
     }
     // タイムゾーン情報がある場合は、UTCとして解釈してJSTに変換
-    console.log(`[toMySQLDateTime PUT] Has timezone, converting from UTC to JST`);
     const utcDate = new Date(isoString);
     const jstTime = utcDate.getTime() + (9 * 60 * 60 * 1000);
     const jstDate = new Date(jstTime);
@@ -1087,13 +1116,11 @@ app.put('/api/scheduleboard/equipment-reservations/:id', asyncH(async (req, res)
     const minute = String(jstDate.getUTCMinutes()).padStart(2, '0');
     const second = String(jstDate.getUTCSeconds()).padStart(2, '0');
     const result = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
-    console.log(`[toMySQLDateTime PUT] Converted to JST: ${result}`);
     return result;
   };
   
   const startAt = toMySQLDateTime(merged.start_datetime);
   const endAt = toMySQLDateTime(merged.end_datetime);
-  console.log(`[PUT equipment-reservations] start_datetime: ${merged.start_datetime} -> ${startAt}, end_datetime: ${merged.end_datetime} -> ${endAt}`);
   
   if (!startAt || !endAt) {
     return res.status(400).json({ error: 'start_datetime and end_datetime required' });

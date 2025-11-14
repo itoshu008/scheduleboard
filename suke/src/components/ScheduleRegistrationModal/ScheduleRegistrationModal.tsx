@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Employee, Equipment, Schedule } from '../../types';
 import { api } from '../../api';
-import { toServerISO } from '../../utils/datetime';
+import { toLocalISODateTime } from '../../utils/dateUtils';
 
 // ヘルパー関数
 const addMinutes = (d: Date, mins: number) => new Date(d.getTime() + mins * 60000);
@@ -288,14 +288,14 @@ const ScheduleRegistrationModal: React.FC<ScheduleRegistrationModalProps> = ({
         return;
       }
       
-      // Date のまま構築し、送信直前だけ ISO 化（UTC）
+      // Date のまま構築し、送信直前だけ ISO 化（ローカル時間として）
       const [y, m, d] = dateYMD.split('-').map(Number);
       const [sh, sm] = startHM.split(':').map(Number);
       const [eh, em] = endHM.split(':').map(Number);
       const startDate = new Date(y, (m || 1) - 1, d || 1, sh || 0, sm || 0, 0, 0);
       const endDate   = new Date(y, (m || 1) - 1, d || 1, eh || 0, em || 0, 0, 0);
-      const startISO = toServerISO(startDate);
-      const endISO   = toServerISO(endDate);
+      const startISO = toLocalISODateTime(startDate);
+      const endISO   = toLocalISODateTime(endDate);
       
       // 設備IDを取得（選択された設備がある場合はそれを使用、なければdefaultEquipmentId）
       const equipmentId = selectedEquipments.length > 0 

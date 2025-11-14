@@ -89,15 +89,6 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       const dateStr = formatDate(selectedDate);
       const response = await api.get(`/equipment-reservations?date=${dateStr}`);
       const reservationsData = response.data || [];
-      console.log('🔍 [設備予約] Loaded reservations:', reservationsData.length, 'for date:', dateStr);
-      if (reservationsData.length > 0) {
-        console.log('🔍 [設備予約] Sample reservation:', reservationsData[0]);
-        console.log('🔍 [設備予約] Sample start_datetime:', reservationsData[0].start_datetime);
-        console.log('🔍 [設備予約] Sample end_datetime:', reservationsData[0].end_datetime);
-        console.log('🔍 [設備予約] Sample equipment_id:', reservationsData[0].equipment_id);
-      } else {
-        console.log('🔍 [設備予約] No reservations found for date:', dateStr);
-      }
       setReservations(reservationsData);
     } catch (error) {
       console.error('予約データの読み込みに失敗:', error);
@@ -136,11 +127,6 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       // ドラッグ終了処理
       if (state.dragData && state.dragGhost) {
         try {
-          console.log('🚚 設備予約ドラッグ確定:', {
-            reservationId: state.dragData.schedule.id,
-            newDate: state.dragGhost.newDate,
-            newSlot: state.dragGhost.newSlot
-          });
           
           // 新しい開始・終了時刻を計算
           const originalStart = new Date(state.dragData.schedule.start_datetime);
@@ -173,7 +159,6 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
           
           await loadReservations();
           
-          console.log('設備予約ドラッグ更新完了');
         } catch (error) {
           console.error('設備予約ドラッグ更新エラー:', error);
           alert('予約の移動に失敗しました: ' + (error as any)?.message);
@@ -183,12 +168,6 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       // リサイズ終了処理
       if (state.resizeData && state.resizeGhost) {
         try {
-          console.log('🔧 設備予約リサイズ確定:', {
-            reservationId: state.resizeData.schedule.id,
-            edge: state.resizeData.edge,
-            newStart: state.resizeGhost.newStart.toISOString(),
-            newEnd: state.resizeGhost.newEnd.toISOString()
-          });
           
           const updateData = {
             title: state.resizeData.schedule.title || '予約',
@@ -206,7 +185,6 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
           
           await loadReservations();
           
-          console.log('設備予約リサイズ更新完了');
         } catch (error) {
           console.error('設備予約リサイズ更新エラー:', error);
           alert('予約のリサイズに失敗しました: ' + (error as any)?.message);
@@ -431,7 +409,6 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
         color: scheduleData.color || '#dc3545'
       };
 
-      console.log('設備予約作成:', payload);
       await api.post('/equipment-reservations', payload);
       await loadReservations();
       setShowRegistrationModal(false);
@@ -466,10 +443,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     const startTimeStr = reservation.start_datetime;
     const endTimeStr = reservation.end_datetime;
     
-    console.log('🔍 [getReservationStyle] Reservation ID:', reservation.id, 'start:', startTimeStr, 'end:', endTimeStr);
-    
     if (!startTimeStr || !endTimeStr) {
-      console.warn('🔍 [getReservationStyle] Reservation missing datetime:', reservation.id);
       return { display: 'none' };
     }
     
@@ -482,20 +456,14 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
         // ISO形式（UTC）の場合、new Date()で自動的にローカル時間に変換される
         startDate = new Date(startTimeStr);
         endDate = new Date(endTimeStr);
-        
-        const localStartStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')} ${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}:${String(startDate.getSeconds()).padStart(2, '0')}`;
-        console.log('🔍 [getReservationStyle] ISO format detected. UTC:', startTimeStr, '→ Local:', localStartStr);
       } else {
         // 既にローカル時間形式の場合
         startDate = parseLocalDateTimeString(startTimeStr);
         endDate = parseLocalDateTimeString(endTimeStr);
-        const localStartStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')} ${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}:${String(startDate.getSeconds()).padStart(2, '0')}`;
-        console.log('🔍 [getReservationStyle] Local format detected. Parsed:', localStartStr);
       }
       
       // 日付が無効な場合は非表示
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-        console.warn('🔍 [getReservationStyle] Invalid date for reservation:', reservation.id, startTimeStr, endTimeStr);
         return { display: 'none' };
       }
       
@@ -503,15 +471,6 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       const reservationStartDateStr = formatDate(startDate);
       const reservationEndDateStr = formatDate(endDate);
       const selectedDateStr = formatDate(selectedDate);
-      
-      console.log('🔍 [getReservationStyle] Date comparison:', {
-        reservationId: reservation.id,
-        reservationStartDate: reservationStartDateStr,
-        reservationEndDate: reservationEndDateStr,
-        selectedDate: selectedDateStr,
-        startDateLocal: `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')} ${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`,
-        endDateLocal: `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')} ${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`
-      });
       
       // 予約が選択日と重なるか確認（開始日または終了日が選択日の範囲内、または予約が選択日をまたぐ場合）
       // 選択日の00:00:00から23:59:59の範囲と予約の時間範囲が重なるかを確認
@@ -533,12 +492,6 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       const overlaps = startDate <= selectedDateEnd && endDate >= selectedDateStart;
       
       if (!overlaps) {
-        console.log('🔍 [getReservationStyle] Reservation does not overlap with selected date:', reservation.id, {
-          reservationStartLocal: `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')} ${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`,
-          reservationEndLocal: `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')} ${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`,
-          selectedDateStartLocal: `${selectedDateStart.getFullYear()}-${String(selectedDateStart.getMonth() + 1).padStart(2, '0')}-${String(selectedDateStart.getDate()).padStart(2, '0')} ${String(selectedDateStart.getHours()).padStart(2, '0')}:${String(selectedDateStart.getMinutes()).padStart(2, '0')}`,
-          selectedDateEndLocal: `${selectedDateEnd.getFullYear()}-${String(selectedDateEnd.getMonth() + 1).padStart(2, '0')}-${String(selectedDateEnd.getDate()).padStart(2, '0')} ${String(selectedDateEnd.getHours()).padStart(2, '0')}:${String(selectedDateEnd.getMinutes()).padStart(2, '0')}`
-        });
         return { display: 'none' };
       }
       
@@ -594,26 +547,8 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
         }
       }
       
-      console.log('🔍 [getReservationStyle] Slots calculated:', { 
-        reservationId: reservation.id,
-        startSlot, 
-        endSlot, 
-        startHour: startDate.getHours(), 
-        startMinute: startDate.getMinutes(),
-        endHour: endDate.getHours(),
-        endMinute: endDate.getMinutes(),
-        reservationStartDate: reservationStartDateStr, 
-        reservationEndDate: reservationEndDateStr,
-        selectedDate: selectedDateStr,
-        startDateLocal: `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')} ${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`,
-        endDateLocal: `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')} ${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`,
-        calculatedLeft: 300 + startSlot * 20,
-        calculatedWidth: (endSlot - startSlot) * 20
-      });
-      
       // スロットが無効な場合は非表示
       if (startSlot < 0 || startSlot >= 96 || endSlot <= startSlot || endSlot > 96) {
-        console.warn('🔍 [getReservationStyle] Invalid slot range for reservation:', reservation.id, startSlot, endSlot);
         return { display: 'none' };
       }
       
@@ -622,8 +557,6 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       const width = (endSlot - startSlot) * 20;
       // 親要素（行）内での相対位置なので、行の高さ40pxに対して中央寄せ（2px下げる）
       const top = 2;
-      
-      console.log('🔍 [getReservationStyle] Style calculated:', { left, width, top });
       
       return {
         position: 'absolute' as const,
@@ -646,7 +579,6 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
       };
     } catch (error) {
-      console.error('🔍 [getReservationStyle] Error calculating reservation style:', reservation.id, error, { startTimeStr, endTimeStr });
       return { display: 'none' };
     }
   };
@@ -987,11 +919,9 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                     .filter(reservation => {
                       // 設備IDが一致するか
                       if (reservation.equipment_id !== equipment.id) {
-                        console.log('🔍 [Filter] Reservation equipment_id mismatch:', reservation.id, reservation.equipment_id, 'vs', equipment.id);
                         return false;
                       }
                       
-                      console.log('🔍 [Filter] Reservation passed equipment_id check:', reservation.id);
                       
                       // APIから取得したデータは既に選択した日付でフィルタリングされているため、
                       // フロントエンドでの追加フィルタリングは不要
@@ -999,7 +929,6 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                       try {
                         const startTimeStr = reservation.start_datetime;
                         if (!startTimeStr) {
-                          console.warn('🔍 [Filter] Reservation missing start_datetime:', reservation.id);
                           return false;
                         }
                         
@@ -1016,27 +945,21 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                         
                         // 日付が無効な場合は表示しない
                         if (isNaN(startDate.getTime())) {
-                          console.warn('🔍 [Filter] Invalid date for reservation:', reservation.id, startTimeStr);
                           return false;
                         }
                         
-                        console.log('🔍 [Filter] Reservation passed all checks:', reservation.id);
                         return true; // APIで既にフィルタリングされているため、常にtrueを返す
                       } catch (error) {
-                        console.error('🔍 [Filter] Error processing reservation:', reservation.id, error, reservation);
                         return false;
                       }
                     })
                     .map(reservation => {
-                      console.log('🔍 [Map] Rendering reservation:', reservation.id);
                       const schedule = reservationToSchedule(reservation);
                       const isSelected = selectedSchedule?.id === reservation.id;
                       const style = getReservationStyle(reservation, equipmentIndex);
-                      console.log('🔍 [Map] Reservation style:', reservation.id, style);
                       
                       // 予約バーが非表示の場合はレンダリングしない
                       if (style.display === 'none') {
-                        console.log('🔍 [Map] Reservation style is display:none, skipping render:', reservation.id);
                         return null;
                       }
                       
