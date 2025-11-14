@@ -930,7 +930,17 @@ app.get('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) => 
         }
         if (typeof dt === 'string') {
           // 'YYYY-MM-DD HH:mm:ss'形式をISO形式に変換
-          const date = new Date(dt + '+09:00'); // JSTとして解釈
+          // MySQLのDATETIMEはJST（ローカル時間）として解釈される
+          // '2025-11-14 09:00:00' → JST 09:00 → UTC 00:00
+          const match = dt.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+          if (match) {
+            const [, year, month, day, hour, minute, second] = match;
+            // JSTとして解釈してUTCに変換
+            const jstDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}+09:00`);
+            return jstDate.toISOString();
+          }
+          // フォールバック: 既存のロジック
+          const date = new Date(dt + '+09:00');
           return date.toISOString();
         }
         return dt;
@@ -1099,6 +1109,16 @@ app.put('/api/scheduleboard/equipment-reservations/:id', asyncH(async (req, res)
       return new Date(jstTime).toISOString();
     }
     if (typeof dt === 'string') {
+      // 'YYYY-MM-DD HH:mm:ss'形式をISO形式に変換
+      // MySQLのDATETIMEはJST（ローカル時間）として解釈される
+      const match = dt.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+      if (match) {
+        const [, year, month, day, hour, minute, second] = match;
+        // JSTとして解釈してUTCに変換
+        const jstDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}+09:00`);
+        return jstDate.toISOString();
+      }
+      // フォールバック: 既存のロジック
       const date = new Date(dt + '+09:00');
       return date.toISOString();
     }
