@@ -883,9 +883,14 @@ app.get('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) => 
     }
     
     // dateパラメータがある場合（日付指定）
+    // JSTの日付で判定するため、UTCの日付範囲でフィルタリング
+    // 開始日または終了日が指定日の範囲内にある予約を取得
     if (date) {
-      where.push('DATE(er.start_datetime) = ?');
-      params.push(date);
+      // JST 00:00:00 から JST 23:59:59 の範囲をUTCに変換
+      const startJst = new Date(`${date}T00:00:00+09:00`);
+      const endJst = new Date(`${date}T23:59:59+09:00`);
+      where.push('(er.start_datetime <= ? AND er.end_datetime >= ?)');
+      params.push(endJst.toISOString(), startJst.toISOString());
     } else {
       // start_date/end_dateパラメータがある場合（範囲指定）
       if (start_date) { 

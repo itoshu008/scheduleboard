@@ -475,10 +475,29 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
         return { display: 'none' };
       }
       
-      const startSlot = getTimeSlot(startDate);
-      const endSlot = getEndTimeSlot(endDate);
+      // 選択されている日付と予約の日付が一致するか確認
+      const reservationDateStr = formatDate(startDate);
+      const selectedDateStr = formatDate(selectedDate);
       
-      console.log('🔍 [getReservationStyle] Slots calculated:', { startSlot, endSlot, startHour: startDate.getHours(), startMinute: startDate.getMinutes() });
+      // 日付が一致しない場合は非表示（ただし、日をまたぐ予約の場合は開始日が一致すれば表示）
+      if (reservationDateStr !== selectedDateStr) {
+        // 終了日も確認（日をまたぐ予約の場合）
+        const endDateStr = formatDate(endDate);
+        if (endDateStr !== selectedDateStr) {
+          console.log('🔍 [getReservationStyle] Reservation date mismatch:', reservation.id, 'reservation:', reservationDateStr, 'selected:', selectedDateStr);
+          return { display: 'none' };
+        }
+      }
+      
+      const startSlot = getTimeSlot(startDate);
+      let endSlot = getEndTimeSlot(endDate);
+      
+      // 日をまたぐ場合の処理：終了日が選択日と異なる場合は、その日の終わり（96）まで表示
+      if (formatDate(endDate) !== selectedDateStr) {
+        endSlot = 96; // その日の終わりまで表示
+      }
+      
+      console.log('🔍 [getReservationStyle] Slots calculated:', { startSlot, endSlot, startHour: startDate.getHours(), startMinute: startDate.getMinutes(), reservationDate: reservationDateStr, selectedDate: selectedDateStr });
       
       // スロットが無効な場合は非表示
       if (startSlot < 0 || startSlot >= 96 || endSlot <= startSlot || endSlot > 96) {
