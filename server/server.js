@@ -883,16 +883,17 @@ app.get('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) => 
     }
     
     // dateパラメータがある場合（日付指定）
-    // JSTの日付で判定するため、UTCの日付範囲でフィルタリング
+    // JSTの日付で判定するため、JST文字列で直接比較
     // 開始日または終了日が指定日の範囲内にある予約を取得
     if (date) {
-      // JST 00:00:00 から JST 23:59:59.999 の範囲をUTCに変換
-      const startJst = new Date(`${date}T00:00:00+09:00`);
-      const endJst = new Date(`${date}T23:59:59.999+09:00`);
+      // JST 00:00:00 から JST 23:59:59.999 の範囲をJST文字列として指定
+      // DATETIMEはJST（ローカル時間）として保存されているため、JST文字列で比較
+      const startJstStr = `${date} 00:00:00`;
+      const endJstStr = `${date} 23:59:59`;
       // 予約の開始日時が指定日の終了時刻以前、かつ予約の終了日時が指定日の開始時刻以降
       where.push('(er.start_datetime <= ? AND er.end_datetime >= ?)');
-      params.push(endJst.toISOString(), startJst.toISOString());
-      console.log(`[API] Equipment reservations date filter: ${date}, JST range: ${startJst.toISOString()} to ${endJst.toISOString()}`);
+      params.push(endJstStr, startJstStr);
+      console.log(`[API] Equipment reservations date filter: ${date}, JST range: ${startJstStr} to ${endJstStr}`);
     } else {
       // start_date/end_dateパラメータがある場合（範囲指定）
       if (start_date) { 
@@ -971,6 +972,7 @@ app.post('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) =>
   // タイムゾーン情報がないため、ローカル時間（JST）として解釈する
   const toMySQLDateTime = (isoString) => {
     if (!isoString) return null;
+    console.log(`[toMySQLDateTime] Input: ${isoString}`);
     // タイムゾーン情報がない場合（Zや+09:00や-09:00がない場合）、ローカル時間として解釈
     // 末尾にZ、+HH:MM、-HH:MMのいずれもない場合
     if (!isoString.endsWith('Z') && !/[\+\-]\d{2}:\d{2}$/.test(isoString)) {
@@ -978,10 +980,13 @@ app.post('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) =>
       const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
       if (match) {
         const [, year, month, day, hour, minute, second] = match;
-        return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+        const result = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+        console.log(`[toMySQLDateTime] No timezone, parsed as JST: ${result}`);
+        return result;
       }
     }
     // タイムゾーン情報がある場合は、UTCとして解釈してJSTに変換
+    console.log(`[toMySQLDateTime] Has timezone, converting from UTC to JST`);
     const utcDate = new Date(isoString);
     const jstTime = utcDate.getTime() + (9 * 60 * 60 * 1000);
     const jstDate = new Date(jstTime);
@@ -991,11 +996,14 @@ app.post('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) =>
     const hour = String(jstDate.getUTCHours()).padStart(2, '0');
     const minute = String(jstDate.getUTCMinutes()).padStart(2, '0');
     const second = String(jstDate.getUTCSeconds()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+    const result = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+    console.log(`[toMySQLDateTime] Converted to JST: ${result}`);
+    return result;
   };
   
   const startAt = toMySQLDateTime(start_datetime);
   const endAt = toMySQLDateTime(end_datetime);
+  console.log(`[POST equipment-reservations] start_datetime: ${start_datetime} -> ${startAt}, end_datetime: ${end_datetime} -> ${endAt}`);
   
   const [r] = await getPool().query(
     'INSERT INTO equipment_reservations(equipment_id, employee_id, title, start_datetime, end_datetime, note, color) VALUES (?, ?, ?, ?, ?, ?, ?);',
@@ -1054,6 +1062,7 @@ app.put('/api/scheduleboard/equipment-reservations/:id', asyncH(async (req, res)
   // タイムゾーン情報がないため、ローカル時間（JST）として解釈する
   const toMySQLDateTime = (isoString) => {
     if (!isoString) return null;
+    console.log(`[toMySQLDateTime PUT] Input: ${isoString}`);
     // タイムゾーン情報がない場合（Zや+09:00や-09:00がない場合）、ローカル時間として解釈
     // 末尾にZ、+HH:MM、-HH:MMのいずれもない場合
     if (!isoString.endsWith('Z') && !/[\+\-]\d{2}:\d{2}$/.test(isoString)) {
@@ -1061,10 +1070,13 @@ app.put('/api/scheduleboard/equipment-reservations/:id', asyncH(async (req, res)
       const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
       if (match) {
         const [, year, month, day, hour, minute, second] = match;
-        return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+        const result = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+        console.log(`[toMySQLDateTime PUT] No timezone, parsed as JST: ${result}`);
+        return result;
       }
     }
     // タイムゾーン情報がある場合は、UTCとして解釈してJSTに変換
+    console.log(`[toMySQLDateTime PUT] Has timezone, converting from UTC to JST`);
     const utcDate = new Date(isoString);
     const jstTime = utcDate.getTime() + (9 * 60 * 60 * 1000);
     const jstDate = new Date(jstTime);
@@ -1074,11 +1086,14 @@ app.put('/api/scheduleboard/equipment-reservations/:id', asyncH(async (req, res)
     const hour = String(jstDate.getUTCHours()).padStart(2, '0');
     const minute = String(jstDate.getUTCMinutes()).padStart(2, '0');
     const second = String(jstDate.getUTCSeconds()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+    const result = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+    console.log(`[toMySQLDateTime PUT] Converted to JST: ${result}`);
+    return result;
   };
   
   const startAt = toMySQLDateTime(merged.start_datetime);
   const endAt = toMySQLDateTime(merged.end_datetime);
+  console.log(`[PUT equipment-reservations] start_datetime: ${merged.start_datetime} -> ${startAt}, end_datetime: ${merged.end_datetime} -> ${endAt}`);
   
   if (!startAt || !endAt) {
     return res.status(400).json({ error: 'start_datetime and end_datetime required' });
