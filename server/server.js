@@ -961,8 +961,9 @@ app.post('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) =>
   // タイムゾーン情報がないため、ローカル時間（JST）として解釈する
   const toMySQLDateTime = (isoString) => {
     if (!isoString) return null;
-    // タイムゾーン情報がない場合（Zや+09:00がない場合）、ローカル時間として解釈
-    if (!isoString.includes('Z') && !isoString.includes('+') && !isoString.includes('-', 10)) {
+    // タイムゾーン情報がない場合（Zや+09:00や-09:00がない場合）、ローカル時間として解釈
+    // 末尾にZ、+HH:MM、-HH:MMのいずれもない場合
+    if (!isoString.endsWith('Z') && !/[\+\-]\d{2}:\d{2}$/.test(isoString)) {
       // "YYYY-MM-DDTHH:mm:ss" 形式をパースしてローカル時間として扱う
       const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
       if (match) {
@@ -1043,8 +1044,9 @@ app.put('/api/scheduleboard/equipment-reservations/:id', asyncH(async (req, res)
   // タイムゾーン情報がないため、ローカル時間（JST）として解釈する
   const toMySQLDateTime = (isoString) => {
     if (!isoString) return null;
-    // タイムゾーン情報がない場合（Zや+09:00がない場合）、ローカル時間として解釈
-    if (!isoString.includes('Z') && !isoString.includes('+') && !isoString.includes('-', 10)) {
+    // タイムゾーン情報がない場合（Zや+09:00や-09:00がない場合）、ローカル時間として解釈
+    // 末尾にZ、+HH:MM、-HH:MMのいずれもない場合
+    if (!isoString.endsWith('Z') && !/[\+\-]\d{2}:\d{2}$/.test(isoString)) {
       // "YYYY-MM-DDTHH:mm:ss" 形式をパースしてローカル時間として扱う
       const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
       if (match) {
