@@ -826,11 +826,11 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
             backgroundColor: '#f0f0f0',
             borderBottom: '2px solid #ccc',
             display: 'flex',
-            minWidth: `${200 + 96 * 20 * scheduleScale}px` // 設備列200px + 96セル×20px×スケール
+            minWidth: `${250 + 96 * 20 * scheduleScale}px` // 設備列250px + 96セル×20px×スケール
           }}>
             {/* 左上の空白セル（設備名列） */}
             <div style={{
-              width: '200px',
+              width: '250px',
               height: '40px',
               backgroundColor: '#e0e0e0',
               border: '1px solid #ccc',
@@ -878,7 +878,7 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
             className="schedule-content-area" 
             style={{
               position: 'relative',
-              minWidth: `${200 + 96 * 20 * scheduleScale}px` // 設備列200px + 96セル×20px×スケール
+              minWidth: `${250 + 96 * 20 * scheduleScale}px` // 設備列250px + 96セル×20px×スケール
             }}
             onClick={handleBackgroundClick}
             onContextMenu={(e) => {
@@ -925,9 +925,9 @@ const EquipmentReservation: React.FC<EquipmentReservationProps> = ({
                 position: 'sticky',
                 left: 0,
                 zIndex: 50,
-                width: '200px',
-                minWidth: '200px',
-                maxWidth: '200px',
+                width: '250px',
+                minWidth: '250px',
+                maxWidth: '250px',
                 height: 40,
                 display: 'flex',
                 alignItems: 'center',

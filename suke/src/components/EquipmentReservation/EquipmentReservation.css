@@ -418,8 +418,8 @@ div.schedule-table-container.equipment-reservation.schedule-grid-container {
 
 /* 設備名列 */
 .equipment-name-cell {
-  width: 150px;
-  min-width: 150px;
+  width: 250px;
+  min-width: 250px;
   background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
   border-right: 2px solid var(--primary-green, #4caf50);
   color: var(--dark-green, #2e7d32);
@@ -637,8 +637,8 @@ div.schedule-table-container.equipment-reservation.schedule-grid-container {
   }
   
   .equipment-name-cell {
-    width: 120px;
-    min-width: 120px;
+    width: 200px;
+    min-width: 200px;
     font-size: 0.8rem;
   }
   
@@ -682,8 +682,8 @@ div.schedule-table-container.equipment-reservation.schedule-grid-container {
   }
   
   .equipment-name-cell {
-    width: 100px;
-    min-width: 100px;
+    width: 150px;
+    min-width: 150px;
     font-size: 0.7rem;
     padding: 6px 2px;
   }
@@ -820,12 +820,12 @@ div.schedule-table-container.equipment-reservation.schedule-grid-container {
 
 /* === 設備名の美しい横書き表示（日別の社員名と同じスタイル） === */
 
-/* 固定設備名セル（200px） - 強制センタリング */
+/* 固定設備名セル（250px） - 強制センタリング */
 .equipment-reservation .date-cell-fixed {
   position: sticky !important;
   left: 0 !important;
   z-index: 50 !important;
-  width: 200px !important;
+  width: 250px !important;
   background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 50%, #e9ecef 100%) !important;
   border: 1px solid #dee2e6 !important;
   border-right: 3px solid #6c757d !important;
@@ -862,9 +862,9 @@ div.schedule-table-container.equipment-reservation.schedule-grid-container {
   position: sticky !important;
   left: 0 !important;
   z-index: 50 !important;
-  width: 200px !important;
-  min-width: 200px !important;
-  max-width: 200px !important;
+  width: 250px !important;
+  min-width: 250px !important;
+  max-width: 250px !important;
   background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 50%, #e9ecef 100%) !important;
   border: 1px solid #dee2e6 !important;
   border-right: 3px solid #6c757d !important;
@@ -961,7 +961,7 @@ div.schedule-table-container.equipment-reservation.schedule-grid-container {
   background-image: none !important;
 }
 
-/* 設備名テキスト（200px） - 強制センタリング */
+/* 設備名テキスト（250px） - 強制センタリング */
 .equipment-reservation .equipment-name-text {
   margin: 0 !important;
 }
