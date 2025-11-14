@@ -196,6 +196,19 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       }
     });
     setSelectedCells(convertedCells);
+    
+    // 2セル以上選択時は自動的にモーダルを開く
+    if (convertedCells.size >= 2) {
+      // 選択されたセルから設備IDを取得（最初のセルから）
+      const firstCellId = Array.from(convertedCells)[0];
+      const parts = firstCellId.split('-');
+      if (parts.length >= 3 && parts[0] === 'equipment') {
+        const equipmentId = parseInt(parts[1]);
+        setSelectedEquipmentId(equipmentId);
+      }
+      setSelectedSchedule(null);
+      setShowRegistrationModal(true);
+    }
   }, [localSelectedCells, setSelectedCells]);
 
   // グローバルなmouseupイベントリスナーでドラッグ終了を検知
@@ -216,6 +229,19 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
           }
         });
         setSelectedCells(convertedCells);
+        
+        // 2セル以上選択時は自動的にモーダルを開く
+        if (convertedCells.size >= 2) {
+          // 選択されたセルから設備IDを取得（最初のセルから）
+          const firstCellId = Array.from(convertedCells)[0];
+          const parts = firstCellId.split('-');
+          if (parts.length >= 3 && parts[0] === 'equipment') {
+            const equipmentId = parseInt(parts[1]);
+            setSelectedEquipmentId(equipmentId);
+          }
+          setSelectedSchedule(null);
+          setShowRegistrationModal(true);
+        }
       }
     };
 
@@ -269,6 +295,9 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       await loadReservations();
       setShowRegistrationModal(false);
       setSelectedCells(new Set());
+      setLocalSelectedCells(new Set());
+      setLocalIsSelecting(false);
+      setLocalSelectionAnchor(null);
       setSelectedSchedule(null);
       setSelectedEquipmentId(null);
     } catch (error: any) {
@@ -627,6 +656,23 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
                           }
                         }}
                         onMouseUp={handleEquipmentCellMouseUp}
+                        onDoubleClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          
+                          // 1セル選択時にモーダルを開く
+                          const year = selectedDate.getFullYear();
+                          const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                          const day = String(selectedDate.getDate()).padStart(2, '0');
+                          const cellId = `${year}-${month}-${day}-equipment-${equipment.id}-${slot}`;
+                          
+                          // このセルだけを選択状態にする
+                          const singleCellId = `equipment-${equipment.id}-${slot}`;
+                          setSelectedCells(new Set([singleCellId]));
+                          setSelectedEquipmentId(equipment.id);
+                          setSelectedSchedule(null);
+                          setShowRegistrationModal(true);
+                        }}
                         onDragStart={(e) => {
                           e.preventDefault(); // ブラウザのドラッグ&ドロップを無効化
                         }}
@@ -737,6 +783,10 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
             setShowRegistrationModal(false);
             setSelectedSchedule(null);
             setSelectedCells(new Set());
+            setLocalSelectedCells(new Set());
+            setLocalIsSelecting(false);
+            setLocalSelectionAnchor(null);
+            setSelectedEquipmentId(null);
           }}
           defaultStart={(() => {
             if (selectedCells.size > 0) {
