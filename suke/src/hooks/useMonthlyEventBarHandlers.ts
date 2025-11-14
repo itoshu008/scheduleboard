@@ -612,6 +612,13 @@ export const useMonthlyEventBarHandlers = ({
     };
   }, [disableGlobalMouseup, !!interactionState.dragData, !!interactionState.resizeData, interactionState.showEditModal, updateSchedulePosition, reloadSchedules]);
 
+  // isResizingを自動的にリセット（resizeDataがnullになったら）
+  useEffect(() => {
+    if (!interactionState.resizeData && isResizing) {
+      setIsResizing(false);
+    }
+  }, [interactionState.resizeData, isResizing]);
+
   return {
     interactionState,
     setInteractionState,
@@ -619,7 +626,8 @@ export const useMonthlyEventBarHandlers = ({
     mousePosition,
     handleScheduleMouseDown,
     handleResizeMouseDown,
-    updateSchedulePosition
+    updateSchedulePosition,
+    setIsResizing // 外部から制御できるようにする
   };
 };
 

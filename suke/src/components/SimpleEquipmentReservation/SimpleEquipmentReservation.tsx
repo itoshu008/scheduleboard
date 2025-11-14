@@ -91,9 +91,12 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     try {
       setLoading(true);
       const dateStr = formatDate(selectedDate);
+      console.log(`🔄 [設備予約] loadReservations called for date: ${dateStr}`);
       const response = await api.get(`/equipment-reservations?date=${dateStr}`);
       const reservationsData = response.data || [];
+      console.log(`🔄 [設備予約] Loaded ${reservationsData.length} reservations:`, reservationsData);
       setReservations(reservationsData);
+      console.log(`✅ [設備予約] setReservations called with ${reservationsData.length} items`);
     } catch (error) {
       console.error('予約データの読み込みに失敗:', error);
       setError('予約データの読み込みに失敗しました');
@@ -114,7 +117,8 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     isResizing,
     mousePosition,
     handleScheduleMouseDown,
-    handleResizeMouseDown
+    handleResizeMouseDown,
+    setIsResizing
   } = useMonthlyEventBarHandlers({
     scaledCellWidth: CELL_WIDTH_PX * scheduleScale,
     scaledRowHeight: 40 * scheduleScale,
@@ -247,6 +251,11 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
         resizeData: null,
         resizeGhost: null
       }));
+      
+      // isResizingもリセット
+      if (setIsResizing) {
+        setIsResizing(false);
+      }
     };
 
     // イベントリスナー登録（ドラッグまたはリサイズ中のみ）
