@@ -53,6 +53,7 @@ interface UseMonthlyEventBarHandlersProps {
   // 日別・全社員ビューでの社員間移動をサポート
   getEmployeeIdFromDelta?: (originalEmployeeId: number, delta: number) => number;
   enableVerticalMovement?: boolean; // 縦方向移動を有効化（日別・全社員ビュー用）
+  disableGlobalMouseup?: boolean; // グローバルmouseupハンドラーを無効化（設備予約ページ用）
 }
 
 export const useMonthlyEventBarHandlers = ({
@@ -62,7 +63,8 @@ export const useMonthlyEventBarHandlers = ({
   setSelectedSchedule,
   setSelectedCells,
   getEmployeeIdFromDelta,
-  enableVerticalMovement = false
+  enableVerticalMovement = false,
+  disableGlobalMouseup = false
 }: UseMonthlyEventBarHandlersProps) => {
   // タイムスロットから日時を作成する関数
   const createTimeFromSlot = useCallback((date: Date, slot: number): Date => {
@@ -514,6 +516,11 @@ export const useMonthlyEventBarHandlers = ({
 
   // グローバルマウスアップ処理
   useEffect(() => {
+    // disableGlobalMouseupがtrueの場合は、グローバルmouseupハンドラーを登録しない
+    if (disableGlobalMouseup) {
+      return;
+    }
+    
     const handleMouseUp = async () => {
       const state = interactionStateRef.current;
       console.log('🎯 グローバルマウスアップ:', { dragData: !!state.dragData, resizeData: !!state.resizeData });
@@ -603,7 +610,7 @@ export const useMonthlyEventBarHandlers = ({
     return () => {
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [!!interactionState.dragData, !!interactionState.resizeData, interactionState.showEditModal, updateSchedulePosition, reloadSchedules]);
+  }, [disableGlobalMouseup, !!interactionState.dragData, !!interactionState.resizeData, interactionState.showEditModal, updateSchedulePosition, reloadSchedules]);
 
   return {
     interactionState,
