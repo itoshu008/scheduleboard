@@ -1568,8 +1568,17 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                     });
 
                     return rowSchedules.map(schedule => {
-                      const startSlot = getTimeSlot(new Date(schedule.start_datetime));
-                      const endSlot = getEndTimeSlot(new Date(schedule.end_datetime));
+                      // リサイズ中は新しい時間を使用（日別ページと同じ方式）
+                      let startTime = new Date(schedule.start_datetime);
+                      let endTime = new Date(schedule.end_datetime);
+                      
+                      if (isResizing && resizeGhost && resizeGhost.schedule.id === schedule.id) {
+                        startTime = resizeGhost.newStart;
+                        endTime = resizeGhost.newEnd;
+                      }
+                      
+                      const startSlot = getTimeSlot(startTime);
+                      const endSlot = getEndTimeSlot(endTime);
                       const left = startSlot * scaledCellWidth; // scheduleScaleを考慮
                       let width = (endSlot - startSlot) * scaledCellWidth; // scheduleScaleを考慮
                       
@@ -1612,24 +1621,53 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
                       }
 
                       return (
-                        <UniversalEventBar
-                          key={schedule.id}
-                          schedule={schedule}
-                          isSelected={selectedSchedule?.id === schedule.id}
-                          isResizing={isResizing}
-                          resizeData={resizeData}
-                          scaledCellWidth={CELL_WIDTH_PX * scheduleScale}
-                          scheduleScale={scheduleScale}
-                          onMouseDown={handleScheduleMouseDown}
-                          onDoubleClick={(schedule, e) => handleScheduleDoubleClick(schedule, e)}
-                          onContextMenu={(schedule, e) => handleScheduleContextMenu(schedule, e)}
-                          onResizeMouseDown={handleResizeMouseDown}
-                          startSlot={startSlot}
-                          width={width}
-                          left={left}
-                          top={0}
-                          height={40}
-                        />
+                        <React.Fragment key={schedule.id}>
+                          <UniversalEventBar
+                            schedule={schedule}
+                            isSelected={selectedSchedule?.id === schedule.id}
+                            isResizing={isResizing}
+                            resizeData={resizeData}
+                            scaledCellWidth={CELL_WIDTH_PX * scheduleScale}
+                            scheduleScale={scheduleScale}
+                            onMouseDown={handleScheduleMouseDown}
+                            onDoubleClick={(schedule, e) => handleScheduleDoubleClick(schedule, e)}
+                            onContextMenu={(schedule, e) => handleScheduleContextMenu(schedule, e)}
+                            onResizeMouseDown={handleResizeMouseDown}
+                            startSlot={startSlot}
+                            width={width}
+                            left={left}
+                            top={0}
+                            height={40}
+                          />
+                          {/* リサイズゴースト（日別ページと同じ方式） - この行内に表示 */}
+                          {isResizing && resizeGhost && resizeGhost.schedule.id === schedule.id && (
+                            <div
+                              className="resize-ghost"
+                              style={{
+                                position: 'absolute',
+                                left: `${left}px`,
+                                top: '2px',
+                                width: `${width}px`,
+                                height: `${scaledRowHeight - 4}px`,
+                                backgroundColor: safeHexColor(schedule.color || '#3498db'),
+                                opacity: 0.7,
+                                border: '2px dashed rgba(255, 255, 255, 0.8)',
+                                borderRadius: '4px',
+                                boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
+                                zIndex: 1000,
+                                pointerEvents: 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'white',
+                                fontSize: '11px',
+                                fontWeight: 'bold'
+                              }}
+                            >
+                              {schedule.title || '無題'}
+                            </div>
+                          )}
+                        </React.Fragment>
                       );
                     });
                   })()}
@@ -1947,11 +1985,7 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
 
       {/* マウスカーソルに追従するゴーストは削除（グリッド内の正確な位置に表示する方式に統一） */}
 
-      {/* リサイズゴースト（月別ビューのロジックと統一） */}
-      {interactionState.resizeGhost && interactionState.resizeData && (() => {
-        // リサイズ中は実際のイベントバーが更新されるため、ゴースト表示は不要
-        return null;
-      })()}
+      {/* リサイズゴーストは各行の行オーバーレイ層内に表示（上記の修正で実装済み） */}
 
     </div>
   );
