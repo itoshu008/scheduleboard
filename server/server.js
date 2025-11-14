@@ -1032,15 +1032,8 @@ app.post('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) =>
   
   const createdReservation = created[0];
   
-  // デバッグ: データベースから取得した値の形式を確認
-  console.log(`[POST equipment-reservations] DB raw start_datetime:`, createdReservation.start_datetime, typeof createdReservation.start_datetime);
-  console.log(`[POST equipment-reservations] DB raw end_datetime:`, createdReservation.end_datetime, typeof createdReservation.end_datetime);
-  
   const formattedStart = formatDateTime(createdReservation.start_datetime);
   const formattedEnd = formatDateTime(createdReservation.end_datetime);
-  
-  console.log(`[POST equipment-reservations] Formatted start_datetime:`, formattedStart);
-  console.log(`[POST equipment-reservations] Formatted end_datetime:`, formattedEnd);
   
   const result = { 
     id: r.insertId, 

@@ -354,13 +354,18 @@ const ScheduleRegistrationModal: React.FC<ScheduleRegistrationModalProps> = ({
         onCreated(updatedWithFlag);
       } else {
         // 新規登録モード: 作成API呼び出し
-        // デバッグログを削除
-        // console.log('❌ ScheduleRegistrationModal: NEW SCHEDULE MODE - Creating schedule (SHOULD BE EDIT!)');
-        // console.log('❌ ScheduleRegistrationModal: Why is this NEW mode? initialValues:', initialValues);
-        const response = await api.post('/admin/schedules', payload);
-        const created = response.data;
-        console.log('✨ ScheduleRegistrationModal: Create response:', created);
-        onCreated(created);
+        // equipment_idが設定されている場合は設備予約APIを使用
+        if (equipmentId && equipmentId > 0) {
+          const response = await api.post('/equipment-reservations', payload);
+          const created = response.data;
+          console.log('✨ ScheduleRegistrationModal: Equipment reservation created:', created);
+          onCreated(created);
+        } else {
+          const response = await api.post('/admin/schedules', payload);
+          const created = response.data;
+          console.log('✨ ScheduleRegistrationModal: Create response:', created);
+          onCreated(created);
+        }
       }
       onClose();
     } catch (error) {

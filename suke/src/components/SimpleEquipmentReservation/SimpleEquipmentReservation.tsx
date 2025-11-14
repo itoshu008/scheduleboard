@@ -345,72 +345,17 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     };
   }, [localIsSelecting, localSelectedCells, setSelectedCells]);
 
-  // 予約保存
-  const handleReservationSave = async (scheduleData: any) => {
+  // 予約保存（ScheduleRegistrationModalから呼ばれる）
+  // ScheduleRegistrationModalが既に/equipment-reservationsを呼び出しているので、
+  // ここでは予約リストの再読み込みと状態のクリアのみを行う
+  const handleReservationSave = async (createdData: any) => {
     try {
-      // 選択されたセルから時間を計算
-      let startDateTime: string;
-      let endDateTime: string;
-      let equipmentId: number;
-
-      if (selectedCells.size > 0) {
-        const cellIds = Array.from(selectedCells);
-        const slots = cellIds.map(id => parseInt(id.split('-')[2]));
-        equipmentId = parseInt(cellIds[0].split('-')[1]);
-        const minSlot = Math.min(...slots);
-        const maxSlot = Math.max(...slots);
-        const startHour = Math.floor(minSlot / 4);
-        const startMinute = (minSlot % 4) * 15;
-        const endHour = Math.floor((maxSlot + 1) / 4);
-        const endMinute = ((maxSlot + 1) % 4) * 15;
-        
-        // ローカル時間としてDateオブジェクトを作成し、toLocalISODateTimeでISO文字列に変換
-        const startDate = new Date(
-          selectedDate.getFullYear(),
-          selectedDate.getMonth(),
-          selectedDate.getDate(),
-          startHour,
-          startMinute,
-          0
-        );
-        const endDate = new Date(
-          selectedDate.getFullYear(),
-          selectedDate.getMonth(),
-          selectedDate.getDate(),
-          endHour,
-          endMinute,
-          0
-        );
-        startDateTime = toLocalISODateTime(startDate);
-        endDateTime = toLocalISODateTime(endDate);
-      } else {
-        // フォームから取得
-        if (scheduleData.start_datetime && scheduleData.end_datetime) {
-          // 既にISO文字列が渡されている場合はそのまま使用
-          startDateTime = scheduleData.start_datetime;
-          endDateTime = scheduleData.end_datetime;
-        } else {
-          // フォームから日時を構築
-          const dateStr = formatDate(selectedDate);
-          const startDate = new Date(`${dateStr}T09:00:00`);
-          const endDate = new Date(`${dateStr}T10:00:00`);
-          startDateTime = toLocalISODateTime(startDate);
-          endDateTime = toLocalISODateTime(endDate);
-        }
-        equipmentId = scheduleData.equipment_id || selectedEquipmentId || equipments[0]?.id || 1;
-      }
-
-      const payload = {
-        title: scheduleData.title || scheduleData.purpose || '予約',
-        equipment_id: equipmentId,
-        employee_id: scheduleData.employee_id || employees[0]?.id || 1,
-        start_datetime: startDateTime,
-        end_datetime: endDateTime,
-        color: scheduleData.color || '#dc3545'
-      };
-
-      await api.post('/equipment-reservations', payload);
+      // WebSocketの更新を待つ（サーバー側のbroadcastDataChangeが反映されるまで）
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // ScheduleRegistrationModalが既にAPIを呼び出しているので、予約リストを再読み込み
       await loadReservations();
+      
       setShowRegistrationModal(false);
       setSelectedCells(new Set());
       setLocalSelectedCells(new Set());
@@ -419,9 +364,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       setSelectedSchedule(null);
       setSelectedEquipmentId(null);
     } catch (error: any) {
-      console.error('予約作成エラー:', error);
-      const message = error.response?.data?.message || error.response?.data?.error || '予約の作成に失敗しました';
-      alert(`エラー: ${message}`);
+      console.error('予約保存後の処理エラー:', error);
     }
   };
 
@@ -467,14 +410,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
         return { display: 'none' };
       }
       
-      // ローカル時間ベースで日付文字列を取得
-      const reservationStartDateStr = formatDate(startDate);
-      const reservationEndDateStr = formatDate(endDate);
-      const selectedDateStr = formatDate(selectedDate);
-      
-      // 予約が選択日と重なるか確認（開始日または終了日が選択日の範囲内、または予約が選択日をまたぐ場合）
-      // 選択日の00:00:00から23:59:59の範囲と予約の時間範囲が重なるかを確認
-      // ローカル時間で統一して比較する
+      // 選択日の00:00:00から23:59:59.999の範囲をローカル時間で作成
       const selectedDateStart = new Date(
         selectedDate.getFullYear(),
         selectedDate.getMonth(),
@@ -489,17 +425,14 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       );
       
       // 予約が選択日の範囲と重なるか確認（すべてローカル時間で比較）
-      const overlaps = startDate <= selectedDateEnd && endDate >= selectedDateStart;
+      // 予約の終了時刻が選択日の開始時刻より後、かつ予約の開始時刻が選択日の終了時刻より前
+      const overlaps = startDate < selectedDateEnd && endDate > selectedDateStart;
       
       if (!overlaps) {
         return { display: 'none' };
       }
       
       // スロット計算（選択日を基準に）
-      // 予約の開始・終了時刻を選択日のローカル時間として再計算
-      let startSlot: number;
-      let endSlot: number;
-      
       // 選択日の00:00:00を基準にしたDateオブジェクトを作成
       const selectedDateBase = new Date(
         selectedDate.getFullYear(),
@@ -508,26 +441,36 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
         0, 0, 0, 0
       );
       
-      if (reservationStartDateStr === selectedDateStr) {
-        // 開始日が選択日と同じ場合、予約の開始時刻からスロットを計算
-        startSlot = getTimeSlot(startDate);
-      } else {
-        // 開始日が選択日より前の場合（前日から続く予約）、開始スロットを0に
+      // 予約の開始・終了時刻を選択日のローカル時間として再計算
+      let startSlot: number;
+      let endSlot: number;
+      
+      // 予約の開始時刻が選択日の範囲内にある場合
+      if (startDate >= selectedDateStart && startDate <= selectedDateEnd) {
+        // 選択日の00:00:00からの経過時間（ミリ秒）を計算
+        const diffMs = startDate.getTime() - selectedDateStart.getTime();
+        const diffMinutes = Math.floor(diffMs / (1000 * 60));
+        startSlot = Math.floor(diffMinutes / 15);
+      } else if (startDate < selectedDateStart) {
+        // 予約の開始時刻が選択日より前の場合（前日から続く予約）
         startSlot = 0;
-      }
-      
-      if (reservationEndDateStr === selectedDateStr) {
-        // 終了日が選択日と同じ場合、予約の終了時刻からスロットを計算
-        endSlot = getEndTimeSlot(endDate);
       } else {
-        // 終了日が選択日より後の場合（翌日に続く予約）、終了スロットを96に
-        endSlot = 96;
+        // 予約の開始時刻が選択日より後の場合（この場合は重複しないはずだが、念のため）
+        return { display: 'none' };
       }
       
-      // 開始日が選択日より前で、終了日が選択日の00:00の場合の特別処理
-      if (reservationStartDateStr !== selectedDateStr && reservationEndDateStr === selectedDateStr && endDate.getHours() === 0 && endDate.getMinutes() === 0) {
-        // 前日の予約が選択日の00:00で終了する場合
-        endSlot = 0;
+      // 予約の終了時刻が選択日の範囲内にある場合
+      if (endDate >= selectedDateStart && endDate <= selectedDateEnd) {
+        // 選択日の00:00:00からの経過時間（ミリ秒）を計算
+        const diffMs = endDate.getTime() - selectedDateStart.getTime();
+        const diffMinutes = Math.ceil(diffMs / (1000 * 60));
+        endSlot = Math.ceil(diffMinutes / 15);
+      } else if (endDate > selectedDateEnd) {
+        // 予約の終了時刻が選択日より後の場合（翌日に続く予約）
+        endSlot = 96;
+      } else {
+        // 予約の終了時刻が選択日より前の場合（この場合は重複しないはずだが、念のため）
+        return { display: 'none' };
       }
       
       // スロットの範囲チェック（0-96の範囲内に収める）
@@ -536,8 +479,8 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       if (endSlot < 0) endSlot = 0;
       if (endSlot > 96) endSlot = 96;
       
-      // startSlot === endSlot の場合は最小1スロット分の高さを確保
-      if (startSlot === endSlot) {
+      // startSlot >= endSlot の場合は最小1スロット分の高さを確保
+      if (startSlot >= endSlot) {
         if (startSlot < 96) {
           endSlot = startSlot + 1;
         } else {
