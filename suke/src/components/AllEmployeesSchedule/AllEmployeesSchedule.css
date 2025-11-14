@@ -941,22 +941,6 @@ body .app-main .grid-top-controls {
    - resize-end（終了時刻ハンドル）= 緑 (#2e7d32)
 */
 
-/* 全社員ページ：リサイズ時の緑のフレーム（終了時刻ハンドル）を非表示（勤怠アプリに影響を与えないよう、名前空間で限定） */
-.all-employees-schedule .resize-handle.resize-end,
-.all-employees-schedule .resize-end,
-.all-employees-schedule-page .all-employees-schedule .resize-handle.resize-end,
-.all-employees-schedule-page .all-employees-schedule .resize-end,
-.all-employees-schedule .row-schedule-layer .resize-handle.resize-end,
-.all-employees-schedule .row-schedule-layer .resize-end {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-  width: 0 !important;
-  height: 0 !important;
-  overflow: hidden !important;
-}
-
 /* =================================================================== */
 /* 全社員スケジュール 社員名表示スタイル - 日別スケジュールと完全統一 */
 /* =================================================================== */
