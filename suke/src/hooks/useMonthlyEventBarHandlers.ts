@@ -382,6 +382,8 @@ export const useMonthlyEventBarHandlers = ({
           const deltaX = e.clientX - currentState.dragData.startX;
           const deltaY = e.clientY - currentState.dragData.startY;
           
+          console.log('🖱️ [mousemove] Drag:', { deltaX, deltaY, scaledCellWidth, scaledRowHeight });
+          
           // 時間軸の移動（横方向）- セルに明確にスナップするように計算
           // より明確なスナップのために、スロット計算を確実に整数にする
           const exactSlotDelta = deltaX / scaledCellWidth;
@@ -389,6 +391,8 @@ export const useMonthlyEventBarHandlers = ({
           const slotDelta = Math.round(exactSlotDelta);
           // スロット範囲を制限（0-95）
           const newStartSlot = Math.max(0, Math.min(95, currentState.dragData.startSlot + slotDelta));
+          
+          console.log('🖱️ [mousemove] Slot calculation:', { exactSlotDelta, slotDelta, newStartSlot, startSlot: currentState.dragData.startSlot });
           
           let newDate: Date;
           let newEmployeeId: number | undefined;
@@ -437,9 +441,14 @@ export const useMonthlyEventBarHandlers = ({
         // リサイズ処理
         if (currentState.resizeData && currentState.resizeGhost) {
           const deltaX = e.clientX - currentState.resizeData.startX;
+          
+          console.log('🖱️ [mousemove] Resize:', { deltaX, scaledCellWidth, edge: currentState.resizeData.edge });
+          
           // スロット計算を安定化：より明確なスナップ
           const exactSlotDelta = deltaX / scaledCellWidth;
           const slotDelta = Math.round(exactSlotDelta);
+          
+          console.log('🖱️ [mousemove] Resize slot calculation:', { exactSlotDelta, slotDelta });
 
           let newStart = new Date(currentState.resizeData.originalStart);
           let newEnd = new Date(currentState.resizeData.originalEnd);

@@ -70,7 +70,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
 
   // 月別ビューのイベントバー処理ロジックを使用（勤怠アプリに影響を与えないよう、ScheduleBoard専用APIのみ使用）
   // 注意: loadReservationsを先に定義してからreloadSchedulesを定義する必要がある
-  const scheduleScale = 100; // 設備ビューは固定スケール
+  const scheduleScale = 1; // 設備ビューは固定スケール（セル幅は20px）
 
   // 初期データ読み込み
   useEffect(() => {
