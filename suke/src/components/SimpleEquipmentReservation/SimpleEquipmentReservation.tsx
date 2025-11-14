@@ -9,6 +9,7 @@ import { useScheduleCellSelection } from '../../hooks/useScheduleCellSelection';
 // 月別ビューのイベントバー処理ロジックを使用（勤怠アプリに影響を与えないよう、ScheduleBoard専用APIのみ使用）
 import { useMonthlyEventBarHandlers } from '../../hooks/useMonthlyEventBarHandlers';
 import { safeHexColor, lightenColor, toApiColor } from '../../utils/color';
+import { equipmentReservationApi } from '../../utils/api';
 import './SimpleEquipmentReservation.css';
 
 interface SimpleEquipmentReservationProps {
@@ -104,15 +105,14 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     await loadReservations();
   }, [loadReservations]);
 
-  // 月別ビューのイベントバー処理ロジックを使用
+  // 月別ビューのイベントバー処理ロジックを使用（設備予約用にカスタマイズ）
   const {
     interactionState,
     setInteractionState,
     isResizing,
     mousePosition,
     handleScheduleMouseDown,
-    handleResizeMouseDown,
-    updateSchedulePosition
+    handleResizeMouseDown
   } = useMonthlyEventBarHandlers({
     scaledCellWidth: CELL_WIDTH_PX * scheduleScale,
     scaledRowHeight: 40 * scheduleScale,
@@ -120,6 +120,112 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
     setSelectedSchedule: (schedule: any) => setSelectedSchedule(schedule),
     setSelectedCells
   });
+
+  // 設備予約用のドラッグ＆リサイズ処理（equipmentReservationApiを使用）
+  useEffect(() => {
+    const handleMouseUp = async () => {
+      const state = interactionState;
+      
+      // ドラッグ終了処理
+      if (state.dragData && state.dragGhost) {
+        try {
+          console.log('🚚 設備予約ドラッグ確定:', {
+            reservationId: state.dragData.schedule.id,
+            newDate: state.dragGhost.newDate,
+            newSlot: state.dragGhost.newSlot
+          });
+          
+          // 新しい開始・終了時刻を計算
+          const originalStart = new Date(state.dragData.schedule.start_datetime);
+          const originalEnd = new Date(state.dragData.schedule.end_datetime);
+          const originalDuration = originalEnd.getTime() - originalStart.getTime();
+          
+          const { hour, minute } = getTimeFromSlot(state.dragGhost.newSlot);
+          const newStart = new Date(
+            state.dragGhost.newDate.getFullYear(),
+            state.dragGhost.newDate.getMonth(),
+            state.dragGhost.newDate.getDate(),
+            hour,
+            minute
+          );
+          const newEnd = new Date(newStart.getTime() + originalDuration);
+          
+          const updateData = {
+            title: state.dragData.schedule.title || '予約',
+            color: toApiColor(state.dragData.schedule.color),
+            employee_id: state.dragData.schedule.employee_id,
+            equipment_id: state.dragData.schedule.equipment_id || (state.dragData.schedule as any).equipment_id,
+            start_datetime: newStart,
+            end_datetime: newEnd
+          };
+          
+          await equipmentReservationApi.update(state.dragData.schedule.id, updateData);
+          
+          // WebSocketの更新を待つ
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+          await loadReservations();
+          
+          console.log('設備予約ドラッグ更新完了');
+        } catch (error) {
+          console.error('設備予約ドラッグ更新エラー:', error);
+          alert('予約の移動に失敗しました: ' + (error as any)?.message);
+        }
+      }
+      
+      // リサイズ終了処理
+      if (state.resizeData && state.resizeGhost) {
+        try {
+          console.log('🔧 設備予約リサイズ確定:', {
+            reservationId: state.resizeData.schedule.id,
+            edge: state.resizeData.edge,
+            newStart: state.resizeGhost.newStart.toISOString(),
+            newEnd: state.resizeGhost.newEnd.toISOString()
+          });
+          
+          const updateData = {
+            title: state.resizeData.schedule.title || '予約',
+            color: toApiColor(state.resizeData.schedule.color),
+            employee_id: state.resizeData.schedule.employee_id,
+            equipment_id: state.resizeData.schedule.equipment_id || (state.resizeData.schedule as any).equipment_id,
+            start_datetime: state.resizeGhost.newStart,
+            end_datetime: state.resizeGhost.newEnd
+          };
+          
+          await equipmentReservationApi.update(state.resizeData.schedule.id, updateData);
+          
+          // WebSocketの更新を待つ
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+          await loadReservations();
+          
+          console.log('設備予約リサイズ更新完了');
+        } catch (error) {
+          console.error('設備予約リサイズ更新エラー:', error);
+          alert('予約のリサイズに失敗しました: ' + (error as any)?.message);
+        }
+      }
+      
+      // 状態をクリア
+      setInteractionState((prev: any) => ({
+        ...prev,
+        dragData: null,
+        dragGhost: null,
+        resizeData: null,
+        resizeGhost: null
+      }));
+    };
+
+    // イベントリスナー登録（ドラッグまたはリサイズ中のみ）
+    const hasActiveOperation = interactionState.dragData || interactionState.resizeData;
+    if (hasActiveOperation && !interactionState.showEditModal) {
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+    
+    return () => {
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [!!interactionState.dragData, !!interactionState.resizeData, interactionState.showEditModal, interactionState, loadReservations, setInteractionState]);
 
   // 月別ビューのロジックと互換性を保つため、既存の変数名をエイリアス
   const dragData = interactionState.dragData;
@@ -316,6 +422,7 @@ const SimpleEquipmentReservation: React.FC<SimpleEquipmentReservationProps> = ({
       id: reservation.id,
       title: reservation.title,
       employee_id: reservation.employee_id,
+      equipment_id: reservation.equipment_id, // 設備予約用にequipment_idを追加
       start_datetime: reservation.start_datetime,
       end_datetime: reservation.end_datetime,
       color: reservation.color || '#dc3545'

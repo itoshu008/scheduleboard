@@ -357,20 +357,39 @@ const AllEmployeesSchedule: React.FC<AllEmployeesScheduleProps> = ({
     if (e && e.button === 2) return;
     if (e && e.button !== 0) return; // 左クリック以外はセル選択無効化
     
+    // ドラッグ中は選択無効（月別・日別ビューのロジックと統一）
+    if (interactionState.dragData || interactionState.resizeData) return;
+    
+    // イベントバー操作中または編集モーダル閉じた後はセル選択を無効化（月別・日別ビューのロジックと統一）
+    if (interactionState.isEventBarInteracting || interactionState.isModalClosing) {
+      console.log('🚫 AllEmployeesSchedule: Cell selection disabled - event bar is being interacted with or modal is closing');
+      return;
+    }
+    
     // セルIDに日付情報を含める（他のスケジュールと統一）
     const year = selectedDate.getFullYear();
     const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
     const day = String(selectedDate.getDate()).padStart(2, '0');
     const cellId = `${year}-${month}-${day}-${employeeId}-${slot}`;
     
-    // スケジュール選択をクリア
-    setSelectedSchedule(null);
+    // スケジュール選択をクリア（月別・日別ビューのロジックと統一）
+    // ただし、編集モーダルが開いている場合はクリアしない
+    // また、スケジュールアイテム上でのクリックの場合はクリアしない（ダブルクリックで編集モードに入るため）
+    if (!showRegistrationTab) {
+      // クリックされた要素がスケジュールアイテムかどうかをチェック
+      const target = e?.target as HTMLElement;
+      const isOnScheduleItem = target?.closest('.schedule-item') || target?.closest('.excel-schedule-item');
+      
+      if (!isOnScheduleItem) {
+        setSelectedSchedule(null);
+      }
+    }
     
     // セル選択開始
     setSelectedCells(new Set([cellId]));
     setIsSelecting(true);
     setSelectionAnchor({ employeeId, slot });
-  }, [selectedDate]);
+  }, [selectedDate, interactionState, showRegistrationTab]);
 
   const handleCellMouseEnter = useCallback((employeeId: number, slot: number) => {
     if (!isSelecting || !selectionAnchor) return;
