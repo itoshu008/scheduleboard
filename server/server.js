@@ -993,6 +993,128 @@ app.post('/api/scheduleboard/equipment-reservations', asyncH(async (req, res) =>
   res.json(result);
 }));
 
+app.put('/api/scheduleboard/equipment-reservations/:id', asyncH(async (req, res) => {
+  const id = Number(req.params.id);
+  const { equipment_id, employee_id, start_datetime, end_datetime, title, note, color } = req.body || {};
+  
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ error: 'Invalid id' });
+  }
+  
+  // 既存予約の確認
+  const [existing] = await getPool().query(
+    'SELECT * FROM equipment_reservations WHERE id = ?',
+    [id]
+  );
+  
+  if (!existing || existing.length === 0) {
+    return res.status(404).json({ error: 'Reservation not found' });
+  }
+  
+  const reservation = existing[0];
+  
+  // 部分更新対応：既存データとマージ
+  const merged = {
+    equipment_id: equipment_id ?? reservation.equipment_id,
+    employee_id: employee_id ?? reservation.employee_id,
+    title: title ?? note ?? reservation.title ?? reservation.note ?? '予約',
+    start_datetime: start_datetime ?? reservation.start_datetime,
+    end_datetime: end_datetime ?? reservation.end_datetime,
+    note: note ?? reservation.note,
+    color: color ?? reservation.color ?? '#3174ad'
+  };
+  
+  // ISO 8601をMySQL DATETIME形式に変換（UTCをJSTに変換）
+  const toMySQLDateTime = (isoString) => {
+    if (!isoString) return null;
+    const utcDate = new Date(isoString);
+    const jstTime = utcDate.getTime() + (9 * 60 * 60 * 1000);
+    const jstDate = new Date(jstTime);
+    const year = jstDate.getUTCFullYear();
+    const month = String(jstDate.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(jstDate.getUTCDate()).padStart(2, '0');
+    const hour = String(jstDate.getUTCHours()).padStart(2, '0');
+    const minute = String(jstDate.getUTCMinutes()).padStart(2, '0');
+    const second = String(jstDate.getUTCSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+  };
+  
+  const startAt = toMySQLDateTime(merged.start_datetime);
+  const endAt = toMySQLDateTime(merged.end_datetime);
+  
+  if (!startAt || !endAt) {
+    return res.status(400).json({ error: 'start_datetime and end_datetime required' });
+  }
+  
+  await getPool().query(
+    'UPDATE equipment_reservations SET equipment_id = ?, employee_id = ?, title = ?, start_datetime = ?, end_datetime = ?, note = ?, color = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [merged.equipment_id, merged.employee_id || null, merged.title, startAt, endAt, merged.note || null, merged.color, id]
+  );
+  
+  // 更新後のデータを取得
+  const [updated] = await getPool().query(
+    'SELECT * FROM equipment_reservations WHERE id = ?',
+    [id]
+  );
+  
+  if (!updated || updated.length === 0) {
+    return res.status(404).json({ error: 'Reservation not found after update' });
+  }
+  
+  const updatedReservation = updated[0];
+  
+  // DATETIMEをISO形式に変換
+  const formatDateTime = (dt) => {
+    if (!dt) return null;
+    if (dt instanceof Date) {
+      const jstTime = dt.getTime() - (9 * 60 * 60 * 1000);
+      return new Date(jstTime).toISOString();
+    }
+    if (typeof dt === 'string') {
+      const date = new Date(dt + '+09:00');
+      return date.toISOString();
+    }
+    return dt;
+  };
+  
+  const result = {
+    ...updatedReservation,
+    start_datetime: formatDateTime(updatedReservation.start_datetime),
+    end_datetime: formatDateTime(updatedReservation.end_datetime),
+  };
+  
+  console.log(`[API] ✅ Equipment reservation updated: ID=${id}`);
+  broadcastDataChange('equipment_reservation', result);
+  res.json(result);
+}));
+
+app.delete('/api/scheduleboard/equipment-reservations/:id', asyncH(async (req, res) => {
+  const id = Number(req.params.id);
+  
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ error: 'Invalid id' });
+  }
+  
+  // 既存予約の確認
+  const [existing] = await getPool().query(
+    'SELECT * FROM equipment_reservations WHERE id = ?',
+    [id]
+  );
+  
+  if (!existing || existing.length === 0) {
+    return res.status(404).json({ error: 'Reservation not found' });
+  }
+  
+  await getPool().query(
+    'DELETE FROM equipment_reservations WHERE id = ?',
+    [id]
+  );
+  
+  console.log(`[API] ✅ Equipment reservation deleted: ID=${id}`);
+  broadcastDataChange('equipment_reservation', { id, deleted: true });
+  res.json({ id, deleted: true });
+}));
+
 // Holidays API
 app.get('/api/scheduleboard/holidays/:year', asyncH(async (req, res) => {
   const { year } = req.params;
